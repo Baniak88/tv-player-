@@ -39,6 +39,57 @@ public class NavigationTest {
         }
     }
 
+    private void waitForText(View root,String text) throws Exception {
+        long deadline=System.currentTimeMillis()+5000;
+        while(System.currentTimeMillis()<deadline) {
+            getInstrumentation().waitForIdleSync(); if(find(root,text)!=null) return; Thread.sleep(50);
+        }
+        fail("Missing UI text: "+text);
+    }
+    @Test public void testLargeCatalogLoadsOnlyRequestedSection() throws Exception {
+        Context context=getInstrumentation().getTargetContext(); LibraryStore store=new LibraryStore(context);
+        List<Channel> items=new ArrayList<>();
+        for(int i=0;i<1000;i++) items.add(new Channel("TV "+i,"https://example.com/live/"+i+".ts","News","","tv"));
+        for(int i=0;i<40000;i++) items.add(new Channel("Film "+i,"https://example.com/movie/"+i+".mkv","Kino","","movie"));
+        for(int i=0;i<10000;i++) items.add(new Channel("Serial "+i,"https://example.com/series/"+i,"Seriale","","series"));
+        store.save(items,Collections.emptySet());
+        Set<String> favorites=new HashSet<>();
+        long start=android.os.SystemClock.elapsedRealtime();
+        List<Channel> tv=store.loadSection("tv",favorites);
+        long elapsed=android.os.SystemClock.elapsedRealtime()-start;
+        android.util.Log.i("LibraryBenchmark","TV=1000; movies=40000; series=10000; TV load ms="+elapsed);
+        assertEquals(1000,tv.size()); assertTrue("Cached TV took "+elapsed+" ms",elapsed<5000);
+        String generation=new String(java.nio.file.Files.readAllBytes(new java.io.File(context.getFilesDir(),"catalog.current").toPath()),java.nio.charset.StandardCharsets.UTF_8);
+        java.io.File movie=new java.io.File(context.getFilesDir(),"catalog-"+generation+"-movie.enc");
+        byte[] before=java.nio.file.Files.readAllBytes(movie.toPath());
+        store.saveFavorites(Collections.singleton(tv.get(0).url()));
+        assertTrue(Arrays.equals(before,java.nio.file.Files.readAllBytes(movie.toPath())));
+        assertEquals(40000,store.loadSection("movie",new HashSet<>()).size());
+        // An unrelated damaged VOD file must not prevent TV from opening.
+        try(java.io.FileOutputStream out=new java.io.FileOutputStream(movie)) { out.write(new byte[]{1,2,3}); }
+        assertEquals(1000,store.loadSection("tv",new HashSet<>()).size());
+        boolean rejected=false; try { store.loadSection("movie",new HashSet<>()); } catch(Exception expected) { rejected=true; }
+        assertTrue(rejected);
+        store.save(Collections.emptyList(),Collections.emptySet());
+    }
+    @Test public void testLegacyCacheMigratesWithFavorites() throws Exception {
+        Context context=getInstrumentation().getTargetContext(); LibraryStore store=new LibraryStore(context);
+        store.save(Collections.emptyList(),Collections.emptySet());
+        java.security.KeyStore keys=java.security.KeyStore.getInstance("AndroidKeyStore"); keys.load(null);
+        javax.crypto.Cipher cipher=javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE,(javax.crypto.SecretKey)keys.getKey("tv-library",null));
+        String json="{\"channels\":[{\"name\":\"Legacy\",\"url\":\"https://example.com/live.ts\",\"kind\":\"tv\"}],\"favorites\":[\"https://example.com/live.ts\"]}";
+        byte[] encoded=cipher.doFinal(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(context.getFilesDir(),"library.enc"))) { out.write(cipher.getIV()); out.write(encoded); }
+        new android.util.AtomicFile(new java.io.File(context.getFilesDir(),"catalog.current")).delete();
+        Set<String> favorites=new HashSet<>();
+        assertEquals("Legacy",store.loadSection("tv",favorites).get(0).name());
+        assertTrue(favorites.contains("https://example.com/live.ts"));
+        assertTrue(new java.io.File(context.getFilesDir(),"catalog.current").exists());
+        assertFalse(new java.io.File(context.getFilesDir(),"library.enc").exists());
+        assertEquals("Legacy",store.loadSection("tv",new HashSet<>()).get(0).name());
+        store.save(Collections.emptyList(),Collections.emptySet());
+    }
     private View find(View root,String text) {
         if(root instanceof TextView && text.equals(((TextView)root).getText().toString())) return root;
         if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) {
@@ -57,9 +108,9 @@ public class NavigationTest {
         View root=main.getWindow().getDecorView();
         assertNotNull(find(root,"EPG")); assertNotNull(find(root,"TV")); assertNotNull(find(root,"Seriale")); assertNotNull(find(root,"Filmy"));
         getInstrumentation().runOnMainSync(() -> find(root,"Filmy").performClick());
-        getInstrumentation().waitForIdleSync(); assertNotNull(find(root,"Test Film")); assertNull(find(root,"Test TV"));
+        getInstrumentation().waitForIdleSync(); waitForText(root,"Test Film"); assertNotNull(find(root,"Test Film")); assertNull(find(root,"Test TV"));
         getInstrumentation().runOnMainSync(() -> find(root,"Seriale").performClick());
-        getInstrumentation().waitForIdleSync(); assertNotNull(find(root,"Test Serial")); assertNull(find(root,"Test Film"));
+        getInstrumentation().waitForIdleSync(); waitForText(root,"Test Serial"); assertNotNull(find(root,"Test Serial")); assertNull(find(root,"Test Film"));
         PlayerActivity player=(PlayerActivity)getInstrumentation().startActivitySync(new Intent(context,PlayerActivity.class).putExtra("url","https://example.com/movie.mp4").putExtra("name","Test Film").putExtra("kind","movie").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         getInstrumentation().waitForIdleSync();
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR,player.getRequestedOrientation());

@@ -3,108 +3,159 @@ package pl.tvplayer;
 import android.content.Context;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonWriter;
-import com.google.gson.stream.JsonToken;
+import android.util.AtomicFile;
+import com.google.gson.stream.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.util.*;
+import java.util.zip.*;
 import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
 
 final class LibraryStore {
+    private static final Object LOCK=new Object();
     private final Context context;
-    LibraryStore(Context context) { this.context = context; }
+    private javax.crypto.SecretKey cachedKey;
+    LibraryStore(Context context) { this.context=context.getApplicationContext(); }
     private javax.crypto.SecretKey key() throws Exception {
-        KeyStore store = KeyStore.getInstance("AndroidKeyStore"); store.load(null);
-        if (!store.containsAlias("tv-library")) {
-            KeyGenerator gen = KeyGenerator.getInstance("AES", "AndroidKeyStore");
-            gen.init(new KeyGenParameterSpec.Builder("tv-library", KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
-                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build());
-            gen.generateKey();
+        if(cachedKey!=null) return cachedKey;
+        KeyStore store=KeyStore.getInstance("AndroidKeyStore"); store.load(null);
+        if(!store.containsAlias("tv-library")) {
+            KeyGenerator generator=KeyGenerator.getInstance("AES","AndroidKeyStore");
+            generator.init(new KeyGenParameterSpec.Builder("tv-library",KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build());
+            generator.generateKey();
         }
-        return (javax.crypto.SecretKey) store.getKey("tv-library", null);
+        cachedKey=(javax.crypto.SecretKey)store.getKey("tv-library",null); return cachedKey;
     }
-    void save(List<Channel> channels, Set<String> favorites) throws Exception {
-        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE, key());
-        android.util.AtomicFile file = new android.util.AtomicFile(new File(context.getFilesDir(), "library.enc"));
-        FileOutputStream out = file.startWrite();
+    private AtomicFile file(String name) { return new AtomicFile(new File(context.getFilesDir(),name)); }
+    private void write(AtomicFile file,byte[] bytes) throws IOException {
+        FileOutputStream out=file.startWrite();
+        try { out.write(bytes); file.finishWrite(out); } catch(IOException e) { file.failWrite(out); throw e; }
+    }
+    private void encryptedWrite(String name,byte[] plain) throws Exception {
+        Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE,key());
+        byte[] encrypted=cipher.doFinal(plain);
+        ByteArrayOutputStream bytes=new ByteArrayOutputStream(encrypted.length+12);
+        bytes.write(cipher.getIV()); bytes.write(encrypted); write(file(name),bytes.toByteArray());
+    }
+    private byte[] decryptedRead(String name) throws Exception {
+        byte[] bytes=file(name).readFully();
+        if(bytes.length<28) throw new IOException("Nieprawidłowy zapis biblioteki.");
+        Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE,key(),new GCMParameterSpec(128,bytes,0,12));
+        // One bulk operation avoids a hardware-keystore IPC for every 512-byte CipherInputStream read.
+        return cipher.doFinal(bytes,12,bytes.length-12);
+    }
+    private String generation() throws IOException {
+        AtomicFile current=file("catalog.current");
         try {
-            out.write(cipher.getIV());
-            // Keep the file open until AtomicFile has synced and committed it.
-            OutputStream keepOpen = new FilterOutputStream(out) {
-                @Override public void write(byte[] b, int offset, int length) throws IOException { out.write(b, offset, length); }
-                @Override public void close() throws IOException { flush(); }
-            };
-            try (JsonWriter writer = new JsonWriter(new BufferedWriter(new OutputStreamWriter(
-                    new CipherOutputStream(keepOpen, cipher), StandardCharsets.UTF_8)))) {
-                writer.beginObject().name("channels").beginArray();
-                for (Channel c : channels) {
-                    writer.beginObject().name("name").value(c.name()).name("url").value(c.url())
-                            .name("group").value(c.group()).name("epg").value(c.epgId()).name("kind").value(c.kind()).name("guide").value(c.guideUrl()).name("archiveDays").value(c.archiveDays()).name("timezone").value(c.timezone()).endObject();
-                }
-                writer.endArray().name("favorites").beginArray();
-                for (String url : favorites) writer.value(url);
-                writer.endArray().endObject();
-            }
-            file.finishWrite(out);
-        } catch (Exception e) { file.failWrite(out); throw e; }
+            String name=new String(current.readFully(),StandardCharsets.UTF_8);
+            if(!name.matches("[a-f0-9-]{36}")) throw new IOException("Nieprawidłowy indeks biblioteki.");
+            return name;
+        } catch(FileNotFoundException missing) { return null; }
     }
-    List<Channel> load(Set<String> favorites) throws Exception {
-        android.util.AtomicFile file = new android.util.AtomicFile(new File(context.getFilesDir(), "library.enc"));
-        // openRead also restores an interrupted AtomicFile backup, when present.
-        if (!file.getBaseFile().exists() && !new File(file.getBaseFile().getPath() + ".bak").exists()) return new ArrayList<>();
-        List<Channel> channels = new ArrayList<>();
-        Set<String> savedFavorites = new HashSet<>();
-        try (InputStream input = file.openRead()) {
-            byte[] iv = new byte[12]; int offset = 0;
-            while (offset < iv.length) {
-                int count = input.read(iv, offset, iv.length - offset);
-                if (count < 0) throw new IOException("Nieprawidłowy zapis biblioteki.");
-                offset += count;
-            }
-            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.DECRYPT_MODE, key(), new GCMParameterSpec(128, iv));
-            try (JsonReader reader = new JsonReader(new BufferedReader(new InputStreamReader(
-                    new CipherInputStream(input, cipher), StandardCharsets.UTF_8)))) {
-                reader.beginObject();
-                while (reader.hasNext()) {
-                    switch (reader.nextName()) {
-                        case "channels":
-                            reader.beginArray();
-                            while (reader.hasNext()) {
-                                String name = "", url = "", group = "Bez kategorii", epg = "", kind = "", guide = "", timezone = "UTC"; int archiveDays=0;
-                                reader.beginObject();
-                                while (reader.hasNext()) {
-                                    switch (reader.nextName()) {
-                                        case "name": name = SourceClient.value(reader); break;
-                                        case "url": url = SourceClient.value(reader); break;
-                                        case "group": group = SourceClient.value(reader); break;
-                                        case "epg": epg = SourceClient.value(reader); break;
-                                        case "kind": kind = SourceClient.value(reader); break;
-                                        case "guide": guide = SourceClient.value(reader); break;
-                                        case "timezone": timezone = SourceClient.value(reader); break;
-                                        case "archiveDays": try { archiveDays=Integer.parseInt(SourceClient.value(reader)); } catch(NumberFormatException ignored) {} break;
-                                        default: reader.skipValue();
-                                    }
-                                }
-                                reader.endObject(); channels.add(new Channel(name,url,group,epg,kind,guide,archiveDays,timezone));
-                            }
-                            reader.endArray(); break;
-                        case "favorites":
-                            reader.beginArray();
-                            while (reader.hasNext()) savedFavorites.add(reader.nextString());
-                            reader.endArray(); break;
-                        default: reader.skipValue();
-                    }
-                }
-                reader.endObject();
-                // Reading EOF authenticates the GCM tag before publishing the library.
-                if (reader.peek() != JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowy zapis biblioteki.");
+    private void writeChannel(JsonWriter writer,Channel c) throws IOException {
+        writer.beginObject().name("name").value(c.name()).name("url").value(c.url()).name("group").value(c.group())
+            .name("epg").value(c.epgId()).name("kind").value(c.kind()).name("guide").value(c.guideUrl())
+            .name("archiveDays").value(c.archiveDays()).name("timezone").value(c.timezone()).endObject();
+    }
+    private Channel readChannel(JsonReader reader) throws IOException {
+        String name="",url="",group="Bez kategorii",epg="",kind="",guide="",timezone="UTC"; int days=0;
+        reader.beginObject();
+        while(reader.hasNext()) {
+            switch(reader.nextName()) {
+                case "name": name=SourceClient.value(reader); break;
+                case "url": url=SourceClient.value(reader); break;
+                case "group": group=SourceClient.value(reader); break;
+                case "epg": epg=SourceClient.value(reader); break;
+                case "kind": kind=SourceClient.value(reader); break;
+                case "guide": guide=SourceClient.value(reader); break;
+                case "timezone": timezone=SourceClient.value(reader); break;
+                case "archiveDays": try { days=Integer.parseInt(SourceClient.value(reader)); } catch(NumberFormatException ignored) {} break;
+                default: reader.skipValue();
             }
         }
-        favorites.addAll(savedFavorites);
-        return channels;
+        reader.endObject(); return new Channel(name,url,group,epg,kind,guide,days,timezone);
+    }
+    void save(List<Channel> channels,Set<String> favorites) throws Exception {
+        synchronized(LOCK) {
+            String next=UUID.randomUUID().toString();
+            try {
+                for(String section:new String[]{"tv","movie","series"}) {
+                    ByteArrayOutputStream compressed=new ByteArrayOutputStream();
+                    try(JsonWriter writer=new JsonWriter(new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(compressed),StandardCharsets.UTF_8)))) {
+                        writer.beginArray(); for(Channel c:channels) if(c.section().equals(section)) writeChannel(writer,c); writer.endArray();
+                    }
+                    encryptedWrite("catalog-"+next+"-"+section+".enc",compressed.toByteArray());
+                }
+                saveFavorites(favorites);
+                write(file("catalog.current"),next.getBytes(StandardCharsets.UTF_8));
+            } catch(Exception e) {
+                for(String section:new String[]{"tv","movie","series"}) file("catalog-"+next+"-"+section+".enc").delete();
+                throw e;
+            }
+            // The manifest changes only after all sections are complete.
+            File[] old=context.getFilesDir().listFiles();
+            if(old!=null) for(File entry:old) {
+                String name=entry.getName();
+                if(name.startsWith("catalog-") && !name.startsWith("catalog-"+next+"-") && name.endsWith(".enc")) file(name).delete();
+            }
+            file("library.enc").delete();
+        }
+    }
+    void saveFavorites(Set<String> favorites) throws Exception {
+        synchronized(LOCK) {
+            ByteArrayOutputStream plain=new ByteArrayOutputStream();
+            try(JsonWriter writer=new JsonWriter(new OutputStreamWriter(plain,StandardCharsets.UTF_8))) {
+                writer.beginArray(); for(String url:favorites) writer.value(url); writer.endArray();
+            }
+            encryptedWrite("favorites.enc",plain.toByteArray());
+        }
+    }
+    private void readFavorites(Set<String> favorites) throws Exception {
+        byte[] bytes;
+        try { bytes=decryptedRead("favorites.enc"); } catch(FileNotFoundException missing) { return; }
+        try(JsonReader reader=new JsonReader(new InputStreamReader(new ByteArrayInputStream(bytes),StandardCharsets.UTF_8))) {
+            reader.beginArray(); while(reader.hasNext()) favorites.add(reader.nextString()); reader.endArray();
+            if(reader.peek()!=JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowy zapis ulubionych.");
+        }
+    }
+    List<Channel> loadSection(String section,Set<String> favorites) throws Exception {
+        synchronized(LOCK) {
+            if(!Arrays.asList("tv","movie","series").contains(section)) throw new IllegalArgumentException("Nieprawidłowa sekcja.");
+            String current=generation();
+            if(current==null) {
+                List<Channel> old=loadLegacy(favorites);
+                if(!old.isEmpty() || !favorites.isEmpty()) save(old,favorites);
+                List<Channel> result=new ArrayList<>(); for(Channel c:old) if(c.section().equals(section)) result.add(c);
+                return result;
+            }
+            byte[] compressed=decryptedRead("catalog-"+current+"-"+section+".enc");
+            List<Channel> result=new ArrayList<>();
+            try(JsonReader reader=new JsonReader(new BufferedReader(new InputStreamReader(new GZIPInputStream(new ByteArrayInputStream(compressed)),StandardCharsets.UTF_8)))) {
+                reader.beginArray(); while(reader.hasNext()) result.add(readChannel(reader)); reader.endArray();
+                if(reader.peek()!=JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowy zapis katalogu.");
+            }
+            readFavorites(favorites); return result;
+        }
+    }
+    private List<Channel> loadLegacy(Set<String> favorites) throws Exception {
+        byte[] plain;
+        try { plain=decryptedRead("library.enc"); } catch(FileNotFoundException missing) { return new ArrayList<>(); }
+        List<Channel> result=new ArrayList<>();
+        try(JsonReader reader=new JsonReader(new BufferedReader(new InputStreamReader(new ByteArrayInputStream(plain),StandardCharsets.UTF_8)))) {
+            reader.beginObject();
+            while(reader.hasNext()) {
+                switch(reader.nextName()) {
+                    case "channels": reader.beginArray(); while(reader.hasNext()) result.add(readChannel(reader)); reader.endArray(); break;
+                    case "favorites": reader.beginArray(); while(reader.hasNext()) favorites.add(reader.nextString()); reader.endArray(); break;
+                    default: reader.skipValue();
+                }
+            }
+            reader.endObject(); if(reader.peek()!=JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowy zapis starej biblioteki.");
+        }
+        return result;
     }
 }

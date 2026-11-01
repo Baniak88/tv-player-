@@ -15,6 +15,11 @@ public class MainActivity extends Activity {
     private static final int FILE_REQUEST = 41;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private List<Channel> channels = new ArrayList<>(), shown = new ArrayList<>();
+    private final Set<String> loadedSections = new HashSet<>();
+    private final Map<String,List<Channel>> sectionIndex = new HashMap<>();
+    private String loadingMessage = "Odczyt zapisanych kanałów TV…";
+    private final android.os.Handler searchHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable searchTask = () -> filter();
     private final Set<String> favorites = new HashSet<>();
     private LibraryStore store;
     private TextView status;
@@ -52,10 +57,10 @@ public class MainActivity extends Activity {
             Button tab=button(entry[1]); sectionButtons.put(entry[0],tab);
             tabs.addView(tab,new LinearLayout.LayoutParams(0,dp(46),1));
             primary(tab,entry[0].equals(section));
-            tab.setOnClickListener(v -> { section=entry[0]; onlyFavorites=false;
+            tab.setOnClickListener(v -> { if(busy) return; section=entry[0]; onlyFavorites=false;
                 primary(libraryButton,true); primary(favoriteButton,false);
                 for(java.util.Map.Entry<String,Button> item:sectionButtons.entrySet()) primary(item.getValue(),item.getKey().equals(section));
-                search.setText(""); refreshGroups(); });
+                search.setText(""); if(loadedSections.contains(section)) refreshGroups(); else loadCachedSection(section); });
         }
         LinearLayout.LayoutParams tabSize=new LinearLayout.LayoutParams(-1,-2); tabSize.bottomMargin=dp(12); root.addView(tabs,tabSize);
         search=input("Szukaj w wybranej sekcji…",false); root.addView(search);
@@ -80,7 +85,7 @@ public class MainActivity extends Activity {
         setContentView(root); busy=true; addButton.setEnabled(false);
         search.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int a, int c, int f) { }
-            public void onTextChanged(CharSequence s, int a, int b, int c) { filter(); }
+            public void onTextChanged(CharSequence s, int a, int b, int c) { searchHandler.removeCallbacks(searchTask); searchHandler.postDelayed(searchTask,180); }
             public void afterTextChanged(Editable e) { }
         });
         groups.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -94,13 +99,30 @@ public class MainActivity extends Activity {
         list.setOnItemLongClickListener((p, v, pos, id) -> {
             String url = shown.get(pos).url();
             if (!favorites.remove(url)) favorites.add(url);
-            filter(); persist(); return true;
+            filter(); persistFavorites(); return true;
         });
+        loadCachedSection("tv");
+    }
+    private void loadCachedSection(String requested) {
+        busy=true; addButton.setEnabled(false);
+        loadingMessage=requested.equals("tv")?"Odczyt zapisanych kanałów TV…":requested.equals("movie")?"Odczyt zapisanych filmów…":"Odczyt zapisanych seriali…";
+        status.setText(loadingMessage); filter();
         worker.execute(() -> {
             try {
-                List<Channel> loaded = store.load(favorites);
-                runOnUiThread(() -> { if (!isDestroyed()) { channels = loaded; busy = false; addButton.setEnabled(true); refreshGroups(); } });
-            } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) { busy=false; addButton.setEnabled(true); refreshGroups(); error("Nie można odczytać zapisanej biblioteki. Dodaj ponownie źródło."); } }); }
+                Set<String> savedFavorites=new HashSet<>();
+                List<Channel> loaded=store.loadSection(requested,savedFavorites);
+                runOnUiThread(() -> {
+                    if(isDestroyed()) return;
+                    channels.removeIf(c -> c.section().equals(requested)); channels.addAll(loaded); sectionIndex.put(requested,loaded);
+                    if(loadedSections.isEmpty()) { favorites.clear(); favorites.addAll(savedFavorites); }
+                    loadedSections.add(requested); busy=false; addButton.setEnabled(true); refreshGroups();
+                });
+            } catch(Exception e) {
+                runOnUiThread(() -> {
+                    if(isDestroyed()) return; busy=false; addButton.setEnabled(true); refreshGroups();
+                    error("Nie można odczytać zapisanej sekcji. Dodaj ponownie źródło, jeśli problem się powtórzy.");
+                });
+            }
         });
     }
     private int dp(int n) { return (int) (n * getResources().getDisplayMetrics().density); }
@@ -119,7 +141,7 @@ public class MainActivity extends Activity {
     }
     private ScrollView scroll(LinearLayout form) { ScrollView s=new ScrollView(this); s.addView(form); return s; }
     private void refreshGroups() {
-        TreeSet<String> set = new TreeSet<>(); for (Channel c : channels) if(c.section().equals(section)) set.add(c.group());
+        TreeSet<String> set = new TreeSet<>(); for (Channel c : sectionIndex.getOrDefault(section,Collections.emptyList())) set.add(c.group());
         List<String> values = new ArrayList<>(); values.add("Wszystkie kategorie"); values.addAll(set);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, values);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item); groups.setAdapter(adapter);
@@ -129,7 +151,7 @@ public class MainActivity extends Activity {
         if (list == null) return;
         String query = search.getText().toString().toLowerCase(Locale.ROOT);
         shown = new ArrayList<>();
-        for (Channel c : channels) if (c.section().equals(section) && (!onlyFavorites || favorites.contains(c.url()))
+        for (Channel c : sectionIndex.getOrDefault(section,Collections.emptyList())) if ((!onlyFavorites || favorites.contains(c.url()))
                 && (selectedGroup.equals("Wszystkie kategorie") || selectedGroup.equals(c.group()))
                 && c.name().toLowerCase(Locale.ROOT).contains(query)) shown.add(c);
         list.setAdapter(new BaseAdapter() {
@@ -150,7 +172,7 @@ public class MainActivity extends Activity {
                 LinearLayout text=(LinearLayout)row.getChildAt(1); ((TextView)text.getChildAt(0)).setText(c.name()); ((TextView)text.getChildAt(1)).setText(c.group());
                 Button star=(Button)row.getChildAt(2); boolean saved=favorites.contains(c.url()); star.setText(saved?"★":"☆"); star.setTextSize(23); star.setTextColor(saved?0xFFFFA000:0xFF8C93A2);
                 star.setContentDescription((saved?"Usuń z ulubionych: ":"Dodaj do ulubionych: ")+c.name());
-                star.setOnClickListener(v -> { if(!favorites.remove(c.url())) favorites.add(c.url()); filter(); persist(); });
+                star.setOnClickListener(v -> { if(!favorites.remove(c.url())) favorites.add(c.url()); filter(); persistFavorites(); });
                 Button guide=(Button)row.getChildAt(3); guide.setVisibility(c.kind().equals("tv")?View.VISIBLE:View.GONE);
                 guide.setContentDescription("Program TV i archiwum: "+c.name());
                 guide.setOnClickListener(v -> GuideDialog.open(MainActivity.this,c,worker,MainActivity.this::play));
@@ -158,7 +180,7 @@ public class MainActivity extends Activity {
             }
         });
         progress.setVisibility(busy?View.VISIBLE:View.GONE);
-        emptyText.setText(busy?"Wczytywanie kanałów…\nDuża lista może wymagać chwili."
+        emptyText.setText(busy?loadingMessage
             :channels.isEmpty()?"Dodaj swoją telewizję\n\nWybierz ＋ Źródło i połącz konto Xtream Codes lub listę M3U."
             :onlyFavorites?"Jeszcze nic tutaj nie ma\n\nDotknij ☆ obok kanału, aby zapisać go w ulubionych."
             :"Brak wyników\n\nZmień nazwę lub kategorię. Jeśli katalog jest pusty, zaimportuj konto Xtream ponownie.");
@@ -202,7 +224,7 @@ public class MainActivity extends Activity {
                     if (which == 1) startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE), FILE_REQUEST);
                     if (which == 2) xtreamDialog();
                     if (which == 3) new AlertDialog.Builder(this).setMessage("Usunąć zapisane kanały i ulubione z telefonu?")
-                            .setNegativeButton("Anuluj", null).setPositiveButton("Usuń", (a, b) -> { channels.clear(); favorites.clear(); persist(); refreshGroups(); }).show();
+                            .setNegativeButton("Anuluj", null).setPositiveButton("Usuń", (a, b) -> { channels.clear(); sectionIndex.clear(); favorites.clear(); loadedSections.addAll(Arrays.asList("tv","movie","series")); persist(); refreshGroups(); }).show();
                 }).show();
     }
     private LinearLayout form() { LinearLayout form = column(); form.setPadding(dp(20), dp(8), dp(20), 0); return form; }
@@ -229,7 +251,7 @@ public class MainActivity extends Activity {
         })); dialog.show();
     }
     private void load(Callable<List<Channel>> task) {
-        busy = true; addButton.setEnabled(false); status.setText("Łączenie i wczytywanie kanałów…"); filter();
+        busy = true; addButton.setEnabled(false); loadingMessage="Pobieranie katalogu od dostawcy…"; status.setText(loadingMessage); filter();
         worker.execute(() -> {
             try {
                 List<Channel> result = task.call();
@@ -237,6 +259,9 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     if (isDestroyed()) return;
                     channels = result;
+                    sectionIndex.clear();
+                    for(Channel c:result) sectionIndex.computeIfAbsent(c.section(),key -> new ArrayList<>()).add(c);
+                    loadedSections.addAll(Arrays.asList("tv","movie","series"));
                     Set<String> urls = new HashSet<>(); for (Channel c : channels) urls.add(c.url()); favorites.retainAll(urls);
                     busy = false; addButton.setEnabled(true); refreshGroups(); persist();
                 });
@@ -261,10 +286,16 @@ public class MainActivity extends Activity {
             });
         }
     }
+    private void persistFavorites() {
+        Set<String> snapshot=new HashSet<>(favorites);
+        worker.execute(() -> { try { store.saveFavorites(snapshot); } catch(Exception e) {
+            runOnUiThread(() -> { if(!isDestroyed()) error("Nie udało się zapisać ulubionych."); });
+        } });
+    }
     private void persist() {
         List<Channel> copy = new ArrayList<>(channels); Set<String> stars = new HashSet<>(favorites);
         worker.execute(() -> { try { store.save(copy, stars); } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) error("Nie udało się zapisać biblioteki na urządzeniu."); }); } });
     }
     private void error(String message) { if (!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK", null).show(); }
-    @Override protected void onDestroy() { worker.shutdown(); super.onDestroy(); }
+    @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); super.onDestroy(); }
 }
