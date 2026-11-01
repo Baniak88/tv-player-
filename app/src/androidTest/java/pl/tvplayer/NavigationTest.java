@@ -262,13 +262,16 @@ public class NavigationTest {
             GuideRepository.Data second=GuideRepository.get(context).peek(channels.get(1),false);
             if(second==null) { Thread.sleep(500); second=GuideRepository.get(context).peek(channels.get(1),false); }
             assertNotNull(second); assertFalse(second.programs().isEmpty()); assertEquals(1,server.getRequestCount());
-            final MainActivity opened=activity;
-            getInstrumentation().runOnMainSync(() -> GuideDialog.open(opened,channels.get(0),Runnable::run,c -> {}));
-            Thread.sleep(700); getInstrumentation().waitForIdleSync();
-            android.view.accessibility.AccessibilityNodeInfo window=getInstrumentation().getUiAutomation().getRootInActiveWindow();
-            assertFalse(window.findAccessibilityNodeInfosByText("Fakty testowe").isEmpty());
-            screenshot("epg-program-dialog.png"); assertEquals(1,server.getRequestCount());
-            getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            GuideRepository.get(context).streamStarted(channels.get(0));
+            try {
+                final MainActivity opened=activity;
+                getInstrumentation().runOnMainSync(() -> GuideDialog.open(opened,channels.get(0),Runnable::run,c -> {}));
+                Thread.sleep(700); getInstrumentation().waitForIdleSync();
+                android.view.accessibility.AccessibilityNodeInfo window=getInstrumentation().getUiAutomation().getRootInActiveWindow();
+                assertFalse("Provider EPG must remain available during playback",window.findAccessibilityNodeInfosByText("Fakty testowe").isEmpty());
+                screenshot("epg-program-dialog.png"); assertEquals(1,server.getRequestCount());
+                getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            } finally { GuideRepository.get(context).streamStopped(channels.get(0)); }
         } finally { if(activity!=null) { final MainActivity closing=activity; getInstrumentation().runOnMainSync(closing::finish); } server.shutdown(); }
     }
     @Test public void testEitUsesPlaybackBytesAndShowsCachedProgramme() throws Exception {
@@ -276,7 +279,17 @@ public class NavigationTest {
         okhttp3.mockwebserver.MockWebServer server=new okhttp3.mockwebserver.MockWebServer();
         long start=System.currentTimeMillis()/1000-900;
         byte[] payload=EitFixture.stream(start);
-        server.enqueue(new okhttp3.mockwebserver.MockResponse().setHeader("Content-Type","video/mp2t").setBody(new okio.Buffer().write(payload)));
+        java.util.concurrent.atomic.AtomicInteger streamConnections=new java.util.concurrent.atomic.AtomicInteger();
+        server.setDispatcher(new okhttp3.mockwebserver.Dispatcher() {
+            @Override public okhttp3.mockwebserver.MockResponse dispatch(okhttp3.mockwebserver.RecordedRequest request) {
+                if(request.getPath().startsWith("/live/")) {
+                    streamConnections.incrementAndGet();
+                    return new okhttp3.mockwebserver.MockResponse().setHeader("Content-Type","video/mp2t").setBody(new okio.Buffer().write(payload));
+                }
+                // Catalog startup refreshes provider category ranks independently of EPG.
+                return new okhttp3.mockwebserver.MockResponse().setBody("[]");
+            }
+        });
         server.start(); MainActivity activity=null;
         Channel channel=new Channel("PL-VIP| TVN RAW",server.url("/live/u/p/101.ts").toString(),"EPG ze strumienia","tvn.pl","tv");
         GuideRepository repository=GuideRepository.get(context);
@@ -296,7 +309,7 @@ public class NavigationTest {
             long deadline=System.currentTimeMillis()+4000;
             while(waiting.get()==null && System.currentTimeMillis()<deadline) { Thread.sleep(100); getInstrumentation().waitForIdleSync(); }
             assertNotNull(waiting.get()); assertEquals("Strumień DVB EIT",waiting.get().source());
-            assertEquals(1,server.getRequestCount());
+            assertEquals(1,streamConnections.get());
             assertEquals("Wiadomości ze strumienia",repository.peek(channel,false).programs().get(0).title());
             repository.streamStopped(channel);
             // Persistence runs after the active-stream waiter completes.
@@ -313,7 +326,7 @@ public class NavigationTest {
             Thread.sleep(600); getInstrumentation().waitForIdleSync();
             android.view.accessibility.AccessibilityNodeInfo window=getInstrumentation().getUiAutomation().getRootInActiveWindow();
             assertFalse(window.findAccessibilityNodeInfosByText("Wiadomości ze strumienia").isEmpty());
-            screenshot("epg-stream-dialog.png"); assertEquals(1,server.getRequestCount());
+            screenshot("epg-stream-dialog.png"); assertEquals(1,streamConnections.get());
             getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
         } finally {
             watch.cancel(); repository.streamStopped(channel);
