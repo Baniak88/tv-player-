@@ -134,7 +134,7 @@ public final class HomeActivity extends Activity {
         new AlertDialog.Builder(this).setTitle("Ustawienia").setItems(new String[]{"Dodaj lub zmień źródło","Uprawnienia aplikacji i PiP","Informacje o wersji"},(d,index) -> {
             if(index==0) open("tv",null,true);
             if(index==1) startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName())));
-            if(index==2) new AlertDialog.Builder(this).setTitle("TV Player Preview 0.6.0").setMessage("TV, filmy i seriale. Bukiety oraz sortowanie wewnątrz katalogów.\nEPG i archiwum zależą od źródła.").setPositiveButton("OK",null).show();
+            if(index==2) new AlertDialog.Builder(this).setTitle("TV Player Preview 0.6.1").setMessage("TV, filmy i seriale. Bukiety oraz sortowanie wewnątrz katalogów.\nEPG i archiwum zależą od źródła.").setPositiveButton("OK",null).show();
         }).show();
     }
     @Override public void onConfigurationChanged(Configuration configuration) { super.onConfigurationChanged(configuration); build(); }

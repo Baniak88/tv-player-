@@ -41,6 +41,7 @@ public class MainActivity extends Activity {
     private boolean onlyFavorites, busy;
     private TextView emptyText;
     private ProgressBar progress;
+    private Button emptyAction;
     private Button libraryButton;
     private String section = "tv";
     private final java.util.Map<String, Button> sectionButtons = new java.util.HashMap<>();
@@ -101,6 +102,8 @@ public class MainActivity extends Activity {
         TextView symbol=label("▣",54); symbol.setTextColor(0xFFA51B37); empty.addView(symbol);
         emptyText=label("Wczytywanie biblioteki…",17); emptyText.setGravity(Gravity.CENTER); emptyText.setTextColor(0xFFB195A3); emptyText.setPadding(0,dp(12),0,dp(16)); empty.addView(emptyText);
         progress=new ProgressBar(this); progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(0xFFA51B37)); empty.addView(progress,new LinearLayout.LayoutParams(dp(30),dp(30)));
+        emptyAction=button("＋ Dodaj źródło"); primary(emptyAction,true); emptyAction.setTextSize(16); emptyAction.setOnClickListener(v -> sourceMenu());
+        LinearLayout.LayoutParams actionSize=new LinearLayout.LayoutParams(dp(220),dp(50)); actionSize.topMargin=dp(4); empty.addView(emptyAction,actionSize);
         content.addView(empty,new FrameLayout.LayoutParams(-1,-1)); list.setEmptyView(empty);
         bouquets=new GridView(this); bouquets.setNumColumns(2); bouquets.setHorizontalSpacing(dp(10)); bouquets.setVerticalSpacing(dp(10)); bouquets.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
         bouquets.setSelector(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)); bouquets.setClipToPadding(false);
@@ -146,7 +149,7 @@ public class MainActivity extends Activity {
                     if(getIntent().getBooleanExtra("open_source",false)) { getIntent().removeExtra("open_source"); sourceMenu(); }
                     if(getIntent().getBooleanExtra("refresh_source",false)) {
                         getIntent().removeExtra("refresh_source");
-                        load(() -> new SourceClient().refreshCatalog(loaded));
+                        load(progress -> new SourceClient().refreshCatalog(loaded, progress));
                     }
                 });
             } catch(Exception e) {
@@ -171,7 +174,6 @@ public class MainActivity extends Activity {
         e.setInputType(password ? android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD : android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2); size.bottomMargin=dp(10); e.setLayoutParams(size); return e;
     }
-    private ScrollView scroll(LinearLayout form) { ScrollView s=new ScrollView(this); s.addView(form); return s; }
     private String sortMode() { return getSharedPreferences("catalog-ui",MODE_PRIVATE).getString("sort-"+section,"provider"); }
     private void chooseSort() {
         String mode=sortMode(); int selected=0;
@@ -265,8 +267,10 @@ public class MainActivity extends Activity {
             }
         });
         progress.setVisibility(busy?View.VISIBLE:View.GONE);
+        emptyAction.setVisibility(!busy && channels.isEmpty()?View.VISIBLE:View.GONE);
         emptyText.setText(busy?loadingMessage
-            :channels.isEmpty()?"Dodaj swoją telewizję\n\nWybierz ＋ Źródło i połącz konto Xtream Codes lub listę M3U."
+            :channels.isEmpty()?"Dodaj swoją telewizję\n\nPołącz konto Xtream Codes albo wczytaj listę M3U z linku lub pliku."
+            :sectionIndex.getOrDefault(section,Collections.emptyList()).isEmpty()?(section.equals("movie")?"Brak filmów\n\nTo źródło nie udostępnia filmów VOD. Listy M3U zwykle zawierają tylko telewizję.":section.equals("series")?"Brak seriali\n\nTo źródło nie udostępnia seriali. Pełny katalog daje konto Xtream Codes.":"Brak kanałów TV w tym źródle.")
             :onlyFavorites?"Jeszcze nic tutaj nie ma\n\nDotknij ☆ obok kanału, aby zapisać go w ulubionych."
             :"Brak wyników\n\nZmień nazwę lub kategorię. Jeśli katalog jest pusty, zaimportuj konto Xtream ponownie.");
         catalogTitle.setText(grid?(section.equals("tv")?"TV · Bukiety":section.equals("movie")?"Filmy · Bukiety":"Seriale · Bukiety")
@@ -322,44 +326,30 @@ public class MainActivity extends Activity {
     }
     private void sourceMenu() {
         if (busy) return;
-        new AlertDialog.Builder(this).setTitle("Dodaj źródło")
-                .setItems(new String[]{"M3U / M3U8 — adres URL", "M3U / M3U8 — plik z telefonu", "Xtream Codes — serwer i konto", "Usuń bibliotekę"}, (d, which) -> {
-                    if (which == 0) m3uDialog();
-                    if (which == 1) startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE), FILE_REQUEST);
-                    if (which == 2) xtreamDialog();
-                    if (which == 3) new AlertDialog.Builder(this).setMessage("Usunąć zapisane kanały i ulubione z telefonu?")
-                            .setNegativeButton("Anuluj", null).setPositiveButton("Usuń", (a, b) -> { catalogGeneration++; syncingOrder=false; orderRequested.clear(); channels.clear(); sectionIndex.clear(); favorites.clear(); loadedSections.addAll(Arrays.asList("tv","movie","series")); persist(); refreshGroups(); }).show();
-                }).show();
+        new SourceSheet(this, new SourceSheet.Listener() {
+            public void onXtream(String server, String user, String password) { load(progress -> new SourceClient().xtream(server, user, password, progress)); }
+            public void onM3uUrl(String url) { load(progress -> { progress.accept("Pobieranie listy M3U…"); return new SourceClient().m3u(url); }); }
+            public void onM3uFile() {
+                try { startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE), FILE_REQUEST); }
+                catch (ActivityNotFoundException e) { error("Brak aplikacji do wyboru plików na tym urządzeniu."); }
+            }
+            public void onClearLibrary() {
+                catalogGeneration++; syncingOrder=false; orderRequested.clear(); channels.clear(); sectionIndex.clear(); favorites.clear();
+                loadedSections.addAll(Arrays.asList("tv","movie","series")); persist(); refreshGroups();
+                Toast.makeText(MainActivity.this, "Biblioteka usunięta z telefonu", Toast.LENGTH_SHORT).show();
+            }
+        }).showMenu(!channels.isEmpty() || loadedSections.size() < 3);
     }
-    private LinearLayout form() { LinearLayout form = column(); form.setPadding(dp(20), dp(8), dp(20), 0); return form; }
-    private void m3uDialog() {
-        LinearLayout form = form(); EditText url = input("https://serwer/lista.m3u", false); url.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI); form.addView(url);
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Lista M3U z internetu").setView(scroll(form))
-                .setMessage("Import zastąpi bieżącą listę kanałów.").setNegativeButton("Anuluj", null).setPositiveButton("Wczytaj", null).create();
-        dialog.setOnShowListener(x -> dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(v -> {
-            try { SourceClient.validate(url.getText().toString()); }
-            catch (Exception e) { url.setError("Podaj poprawny adres HTTP lub HTTPS"); return; }
-            String address = url.getText().toString(); dialog.dismiss(); load(() -> new SourceClient().m3u(address));
-        })); dialog.show();
-    }
-    private void xtreamDialog() {
-        LinearLayout form = form(); EditText server = input("Serwer: https://dostawca:port", false), user = input("Nazwa użytkownika", false), pass = input("Hasło", true);
-        server.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI); form.addView(server); form.addView(user); form.addView(pass);
-        form.addView(label("Import TV, filmów i seriali zastąpi bieżącą bibliotekę.", 13));
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Xtream Codes").setView(scroll(form)).setNegativeButton("Anuluj", null).setPositiveButton("Połącz", null).create();
-        dialog.setOnShowListener(x -> dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(v -> {
-            try { SourceClient.validate(server.getText().toString()); } catch (Exception e) { server.setError("Podaj adres HTTP lub HTTPS"); return; }
-            if (user.getText().toString().trim().isEmpty() || pass.getText().length() == 0) { pass.setError("Uzupełnij login i hasło"); return; }
-            String address = server.getText().toString(), username = user.getText().toString().trim(), password = pass.getText().toString();
-            dialog.dismiss(); load(() -> new SourceClient().xtream(address, username, password));
-        })); dialog.show();
-    }
-    private void load(Callable<List<Channel>> task) {
+    private interface ImportTask { List<Channel> run(java.util.function.Consumer<String> progress) throws Exception; }
+    private void load(ImportTask task) {
         catalogGeneration++; syncingOrder=false; orderRequested.clear();
-        busy = true; addButton.setEnabled(false); loadingMessage="Pobieranie katalogu od dostawcy…"; status.setText(loadingMessage); filter();
+        busy = true; addButton.setEnabled(false); loadingMessage="Łączenie ze źródłem…"; status.setText(loadingMessage); filter();
         network.execute(() -> {
             try {
-                List<Channel> result = task.call();
+                List<Channel> result = task.run(step -> runOnUiThread(() -> {
+                    if (isDestroyed() || !busy) return;
+                    loadingMessage = step; status.setText(step); emptyText.setText(step);
+                }));
                 if (result.isEmpty()) throw new java.io.IOException("Źródło nie zawiera obsługiwanych kanałów HTTP/HTTPS.");
                 runOnUiThread(() -> {
                     if (isDestroyed()) return;
@@ -368,7 +358,15 @@ public class MainActivity extends Activity {
                     for(Channel c:result) sectionIndex.computeIfAbsent(c.section(),key -> new ArrayList<>()).add(c);
                     loadedSections.addAll(Arrays.asList("tv","movie","series"));
                     Set<String> urls = new HashSet<>(); for (Channel c : channels) urls.add(c.url()); favorites.retainAll(urls);
-                    busy = false; addButton.setEnabled(true); refreshGroups(); persist();
+                    busy = false; addButton.setEnabled(true);
+                    if (sectionIndex.getOrDefault(section, Collections.emptyList()).isEmpty()) {
+                        for (String candidate : new String[]{"tv","movie","series"}) if (sectionIndex.containsKey(candidate)) { section = candidate; break; }
+                        for (Map.Entry<String,Button> item : sectionButtons.entrySet()) primary(item.getValue(), item.getKey().equals(section));
+                    }
+                    showingBouquets = true; onlyFavorites = false; selectedGroup = "Wszystkie kategorie"; search.setText("");
+                    primary(libraryButton, true); primary(favoriteButton, false);
+                    refreshGroups(); persist();
+                    Toast.makeText(this, importSummary(), Toast.LENGTH_LONG).show();
                 });
             } catch (Exception e) {
                 String message = e instanceof java.io.IOException || e instanceof IllegalArgumentException ? e.getMessage() : "Sprawdź adres, połączenie i dane konta.";
@@ -379,11 +377,22 @@ public class MainActivity extends Activity {
             }
         });
     }
+    private String importSummary() {
+        int tv = sectionIndex.getOrDefault("tv", Collections.emptyList()).size();
+        int movies = sectionIndex.getOrDefault("movie", Collections.emptyList()).size();
+        int series = sectionIndex.getOrDefault("series", Collections.emptyList()).size();
+        StringBuilder text = new StringBuilder("Zaimportowano: ");
+        text.append(tv).append(" TV");
+        if (movies > 0) text.append(" · ").append(movies).append(" filmów");
+        if (series > 0) text.append(" · ").append(series).append(" seriali");
+        return text.toString();
+    }
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
         if (request == FILE_REQUEST && result == RESULT_OK && data != null && data.getData() != null) {
             android.net.Uri uri = data.getData();
-            load(() -> {
+            load(progress -> {
+                progress.accept("Odczyt pliku M3U…");
                 try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
                     if (in == null) throw new java.io.IOException("Nie można otworzyć pliku.");
                     return M3uParser.parse(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8), null);

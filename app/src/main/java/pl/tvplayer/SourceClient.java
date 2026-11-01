@@ -106,6 +106,10 @@ public final class SourceClient {
         return result;
     }
     public List<Channel> xtream(String server, String user, String pass) throws Exception {
+        return xtream(server, user, pass, step -> { });
+    }
+    public List<Channel> xtream(String server, String user, String pass, java.util.function.Consumer<String> progress) throws Exception {
+        progress.accept("Logowanie do serwera…");
         HttpUrl raw = validate(server);
         HttpUrl base = raw.newBuilder().query(null).fragment(null).build();
         if (!base.encodedPath().endsWith("/")) base = base.newBuilder().addPathSegment("").build();
@@ -114,6 +118,7 @@ public final class SourceClient {
         if (auth == null || !auth.has("auth") || !"1".equals(auth.get("auth").getAsString())
                 || (auth.has("status") && !"Active".equalsIgnoreCase(auth.get("status").getAsString())))
             throw new IOException("Logowanie odrzucone. Sprawdź dane i ważność konta.");
+        progress.accept("Pobieranie kanałów TV…");
         Map<String, String> categories = get(api(base, user, pass, "get_live_categories"), SourceClient::readCategories);
         final HttpUrl streamBase = base;
         List<Channel> all = get(api(base, user, pass, "get_live_streams"), reader -> readStreams(reader, streamBase, user, pass, categories));
@@ -121,8 +126,10 @@ public final class SourceClient {
         if(root.has("server_info") && root.get("server_info").isJsonObject())
             timezone=Guide.field(root.getAsJsonObject("server_info"),"timezone","UTC");
         for(int i=0;i<all.size();i++) { Channel c=all.get(i); all.set(i,new Channel(c.name(),c.url(),c.group(),c.epgId(),c.kind(),c.guideUrl(),c.archiveDays(),timezone,c.bouquetOrder())); }
+        progress.accept("Kanały TV: "+all.size()+". Pobieranie filmów…");
         Map<String,String> movieCategories = get(api(base,user,pass,"get_vod_categories"),SourceClient::readCategories);
         all.addAll(get(api(base,user,pass,"get_vod_streams"),reader -> readCatalog(reader,streamBase,user,pass,movieCategories,"movie")));
+        progress.accept("Pozycje: "+all.size()+". Pobieranie seriali…");
         Map<String,String> seriesCategories = get(api(base,user,pass,"get_series_categories"),SourceClient::readCategories);
         all.addAll(get(api(base,user,pass,"get_series"),reader -> readCatalog(reader,streamBase,user,pass,seriesCategories,"series")));
         return all;
@@ -147,13 +154,14 @@ public final class SourceClient {
         if(categories.isEmpty()) return items;
         return BouquetOrder.applyRanks(items,categories);
     }
-    public List<Channel> refreshCatalog(List<Channel> items) throws Exception {
+    public List<Channel> refreshCatalog(List<Channel> items) throws Exception { return refreshCatalog(items, step -> { }); }
+    public List<Channel> refreshCatalog(List<Channel> items, java.util.function.Consumer<String> progress) throws Exception {
         if(items.isEmpty()) throw new IOException("Brak zapisanego konta. Dodaj źródło.");
         HttpUrl account=accountEndpoint(items.get(0));
         if(account==null) throw new IOException("Tej listy nie można odświeżyć przez Xtream. Dodaj ponownie adres M3U.");
         String user=account.queryParameter("username"),pass=account.queryParameter("password");
         HttpUrl server=account.newBuilder().query(null).removePathSegment(account.pathSize()-1).build();
-        return xtream(server.toString(),user,pass);
+        return xtream(server.toString(),user,pass,progress);
     }
     public List<Guide.Program> guide(Channel channel) throws IOException {
         return get(Guide.endpoint(channel),reader -> Guide.parse(reader,channel.timezone()));

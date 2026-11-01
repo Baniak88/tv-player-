@@ -15,6 +15,8 @@ import javax.crypto.spec.GCMParameterSpec;
 
 final class LibraryStore {
     private static final Object LOCK=new Object();
+    /** Bumped when Channel classification changes and saved sections must be re-partitioned. */
+    private static final String KINDS_VERSION="2";
     private final Context context;
     private javax.crypto.SecretKey cachedKey;
     private final Map<String,byte[]> loadedFingerprints=new HashMap<>();
@@ -97,6 +99,7 @@ final class LibraryStore {
                 }
                 saveFavorites(favorites);
                 write(file("catalog.current"),next.getBytes(StandardCharsets.UTF_8));
+                write(file("catalog.kinds"),KINDS_VERSION.getBytes(StandardCharsets.UTF_8));
             } catch(Exception e) {
                 for(String section:new String[]{"tv","movie","series"}) file("catalog-"+next+"-"+section+".enc").delete();
                 throw e;
@@ -167,15 +170,29 @@ final class LibraryStore {
                 List<Channel> result=new ArrayList<>(); for(Channel c:old) if(c.section().equals(section)) result.add(c);
                 return result;
             }
-            byte[] compressed=decryptedRead("catalog-"+current+"-"+section+".enc");
-            List<Channel> result=new ArrayList<>();
-            try(JsonReader reader=new JsonReader(new BufferedReader(new InputStreamReader(new GZIPInputStream(new ByteArrayInputStream(compressed)),StandardCharsets.UTF_8)))) {
-                reader.beginArray(); while(reader.hasNext()) result.add(readChannel(reader)); reader.endArray();
-                if(reader.peek()!=JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowy zapis katalogu.");
+            if(!kindsCurrent()) {
+                // One-time repair: live channels named "… Film" were stored in the movie section.
+                List<Channel> all=new ArrayList<>(); Set<String> stars=new HashSet<>();
+                for(String part:new String[]{"tv","movie","series"}) all.addAll(readSection(current,part));
+                readFavorites(stars); save(all,stars); current=generation();
             }
+            List<Channel> result=readSection(current,section);
             loadedFingerprints.put(section,fingerprint("catalog-"+current+"-"+section+".enc"));
             readFavorites(favorites); return result;
         }
+    }
+    private boolean kindsCurrent() {
+        try { return KINDS_VERSION.equals(new String(file("catalog.kinds").readFully(),StandardCharsets.UTF_8).trim()); }
+        catch(IOException missing) { return false; }
+    }
+    private List<Channel> readSection(String generation,String section) throws Exception {
+        byte[] compressed=decryptedRead("catalog-"+generation+"-"+section+".enc");
+        List<Channel> result=new ArrayList<>();
+        try(JsonReader reader=new JsonReader(new BufferedReader(new InputStreamReader(new GZIPInputStream(new ByteArrayInputStream(compressed)),StandardCharsets.UTF_8)))) {
+            reader.beginArray(); while(reader.hasNext()) result.add(readChannel(reader)); reader.endArray();
+            if(reader.peek()!=JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowy zapis katalogu.");
+        }
+        return result;
     }
     private List<Channel> loadLegacy(Set<String> favorites) throws Exception {
         byte[] plain;

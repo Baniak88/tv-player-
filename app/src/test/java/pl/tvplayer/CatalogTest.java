@@ -29,4 +29,22 @@ public class CatalogTest {
         assertEquals("series",new Channel("A","https://example.com/series/u/p/2.mp4","Serial","").section());
         assertEquals("tv",new Channel("TV","https://example.com/live/u/p/3.ts","Sport","").kind());
     }
+    @Test public void liveMovieChannelsStayInTv() {
+        assertEquals("tv",new Channel("Polsat Film HD","http://host:8080/user/pass/1234","PL| FILMOWE","").kind());
+        assertEquals("tv",new Channel("TVN Film","https://example.com/stream/tvnfilm.m3u8","PL| FILMY","").kind());
+        assertEquals("tv",new Channel("Canal+ Film","https://example.com/u/p/55.ts","VOD Kanały","").kind());
+        assertEquals("movie",new Channel("Matrix","https://example.com/u/p/77","VOD | Filmy","").kind());
+        assertEquals("movie",new Channel("Matrix","https://example.com/u/p/77.mkv","Akcja","").kind());
+        assertEquals("series",new Channel("Serial S01 E02","https://example.com/u/p/78.mp4","Dramat","").section());
+    }
+    @Test public void storedMisclassifiedLiveChannelsMoveBackToTv() {
+        assertEquals("tv",new Channel("Polsat Film","http://host/u/p/12.ts","PL| FILMOWE","","movie").section());
+        assertEquals("movie",new Channel("Film","https://example.com/movie/u/p/12.mkv","Kino","","movie").section());
+        assertEquals("series",new Channel("Serial","https://example.com/player_api.php?action=get_series_info","Dramat","","series").section());
+    }
+    @Test public void sourceAddressGetsSchemeWhenMissing() {
+        assertEquals("http://dostawca.tv:8080",SourceSheet.normalize("  dostawca.tv:8080 "));
+        assertEquals("https://example.com/a.m3u",SourceSheet.normalize("https://example.com/a.m3u"));
+        assertEquals("",SourceSheet.normalize(" "));
+    }
 }
