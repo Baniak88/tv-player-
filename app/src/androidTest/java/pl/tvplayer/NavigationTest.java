@@ -98,6 +98,7 @@ public class NavigationTest {
         parent.performItemClick(child,parent.getPositionForView(child),0);
     }
     private void screenshot(String name) throws Exception {
+        Thread.sleep(800); getInstrumentation().waitForIdleSync();
         android.graphics.Bitmap bitmap=getInstrumentation().getUiAutomation().takeScreenshot(); assertNotNull(bitmap);
         try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(getInstrumentation().getTargetContext().getFilesDir(),name))) {
             bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);

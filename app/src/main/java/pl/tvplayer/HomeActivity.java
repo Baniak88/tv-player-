@@ -42,10 +42,10 @@ public final class HomeActivity extends Activity {
         name.setPadding(0,dp(large?16:6),0,0); box.addView(name); box.setOnClickListener(v -> click.run()); return box;
     }
     private View action(String label,String icon,Runnable click) {
-        LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(8),dp(4),dp(5),dp(4));
+        LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(6),dp(4),dp(4),dp(4));
         row.setBackground(interactive(false)); row.setFocusable(true); row.setClickable(true); row.setContentDescription(label);
-        row.addView(new Icon(this,icon),new LinearLayout.LayoutParams(dp(21),dp(21)));
-        TextView t=text(label,12,0xFFF1DBE0); t.setPadding(dp(6),0,0,0); t.setMaxLines(2); row.addView(t,new LinearLayout.LayoutParams(0,-2,1));
+        row.addView(new Icon(this,icon),new LinearLayout.LayoutParams(dp(18),dp(18)));
+        TextView t=text(label,12,0xFFF1DBE0); t.setPadding(dp(5),0,0,0); t.setMaxLines(label.equals("Ustawienia")?1:2); t.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP); row.addView(t,new LinearLayout.LayoutParams(0,-2,1));
         row.setOnClickListener(v -> click.run()); return row;
     }
     @Override public void onCreate(Bundle state) { super.onCreate(state); build(); }
@@ -60,7 +60,7 @@ public final class HomeActivity extends Activity {
         LinearLayout root=column();
         GradientDrawable backdrop=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFF0B1124,0xFF120B18,0xFF290910,0xFF05070C}); root.setBackground(backdrop);
         root.setOnApplyWindowInsetsListener((view,insets) -> {
-            view.setPadding(dp(14),insets.getSystemWindowInsetTop(),dp(14),insets.getSystemWindowInsetBottom());
+            view.setPadding(dp(14)+insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),dp(14)+insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
             return insets.consumeSystemWindowInsets();
         });
         page=new ListView(this); page.setDivider(null); page.setCacheColorHint(Color.TRANSPARENT); page.setSelector(new ColorDrawable(Color.TRANSPARENT));
@@ -138,7 +138,7 @@ public final class HomeActivity extends Activity {
         new AlertDialog.Builder(this).setTitle("Ustawienia").setItems(new String[]{"Dodaj lub zmień źródło","Uprawnienia aplikacji i PiP","Informacje o wersji"},(d,index) -> {
             if(index==0) open("tv",null,true);
             if(index==1) startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName())));
-            if(index==2) new AlertDialog.Builder(this).setTitle("TV Player Preview 0.5.0").setMessage("TV, filmy, seriale i widoczne bukiety.\nEPG i archiwum zależą od źródła.").setPositiveButton("OK",null).show();
+            if(index==2) new AlertDialog.Builder(this).setTitle("TV Player Preview 0.5.1").setMessage("TV, filmy, seriale i widoczne bukiety.\nEPG i archiwum zależą od źródła.").setPositiveButton("OK",null).show();
         }).show();
     }
     @Override public void onConfigurationChanged(Configuration configuration) { super.onConfigurationChanged(configuration); build(); }

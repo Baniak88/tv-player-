@@ -55,7 +55,7 @@ public class MainActivity extends Activity {
         LinearLayout root=column(); root.setBackground(new android.graphics.drawable.GradientDrawable(
             android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{0xFF0B1124,0xFF180B19,0xFF09090F}));
         root.setOnApplyWindowInsetsListener((v,insets) -> {
-            v.setPadding(dp(16),insets.getSystemWindowInsetTop(),dp(16),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets();
+            v.setPadding(dp(16)+insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),dp(16)+insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets();
         });
         LinearLayout top=new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(0,dp(wide?0:12),0,dp(wide?0:12));
         Button home=button("‹ Główna"); top.addView(home,new LinearLayout.LayoutParams(dp(100),dp(44)));
