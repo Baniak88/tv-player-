@@ -135,6 +135,20 @@ public class NavigationTest {
         if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { android.widget.GridView found=grid(((ViewGroup)root).getChildAt(i)); if(found!=null) return found; }
         return null;
     }
+    /** Taps a sort option and waits until the app saved it; repeats the tap if the dialog was not ready yet. */
+    private void chooseSort(Context context,String label,String mode) throws Exception {
+        android.content.SharedPreferences prefs=context.getSharedPreferences("catalog-ui",Context.MODE_PRIVATE);
+        for(int attempt=0;attempt<3;attempt++) {
+            clickDialog(label);
+            long deadline=System.currentTimeMillis()+2000;
+            while(System.currentTimeMillis()<deadline) {
+                getInstrumentation().waitForIdleSync();
+                if(mode.equals(prefs.getString("sort-tv",""))) { Thread.sleep(200); getInstrumentation().waitForIdleSync(); return; }
+                Thread.sleep(100);
+            }
+        }
+        fail("Sort option was not applied: "+label);
+    }
     private void clickDialog(String text) throws Exception {
         java.util.List<android.view.accessibility.AccessibilityNodeInfo> nodes=new ArrayList<>();
         long deadline=System.currentTimeMillis()+4000;
@@ -167,11 +181,11 @@ public class NavigationTest {
         View catalogRoot=catalog.getWindow().getDecorView(); waitForText(catalogRoot,"Sport");
         assertEquals("Sport",grid(catalogRoot).getAdapter().getItem(1)); assertEquals("Dzieci",grid(catalogRoot).getAdapter().getItem(2));
         getInstrumentation().runOnMainSync(() -> description(catalogRoot,"Sortuj bukiety").performClick());
-        clickDialog("Nazwa A–Z");
+        chooseSort(context,"Nazwa A–Z","az");
         assertEquals("Dzieci",grid(catalogRoot).getAdapter().getItem(1));
         assertEquals("az",context.getSharedPreferences("catalog-ui",Context.MODE_PRIVATE).getString("sort-tv",""));
         getInstrumentation().runOnMainSync(() -> description(catalogRoot,"Sortuj bukiety").performClick());
-        clickDialog("Kolejność dostawcy");
+        chooseSort(context,"Kolejność dostawcy","provider");
         assertEquals("Sport",grid(catalogRoot).getAdapter().getItem(1));
         screenshot("bouquets-grid.png");
         getInstrumentation().runOnMainSync(() -> clickGridText(catalogRoot,"Sport"));
