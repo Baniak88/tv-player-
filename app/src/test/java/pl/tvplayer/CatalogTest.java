@@ -47,4 +47,15 @@ public class CatalogTest {
         assertEquals("https://example.com/a.m3u",SourceSheet.normalize("https://example.com/a.m3u"));
         assertEquals("",SourceSheet.normalize(" "));
     }
+    @Test public void postersAreReadFromXtreamAndM3u() throws Exception {
+        List<Channel> movies=SourceClient.readCatalog(new StringReader("[{\"stream_id\":12,\"name\":\"Film\",\"stream_icon\":\"https://img.example.com/p.jpg\"}]"),
+            HttpUrl.get("https://example.com/"),"u","p",Collections.emptyMap(),"movie");
+        assertEquals("https://img.example.com/p.jpg",movies.get(0).logo());
+        List<Channel> series=SourceClient.readCatalog(new StringReader("[{\"series_id\":8,\"name\":\"Serial\",\"cover\":\"https://img.example.com/s.jpg\"}]"),
+            HttpUrl.get("https://example.com/"),"u","p",Collections.emptyMap(),"series");
+        assertEquals("https://img.example.com/s.jpg",series.get(0).logo());
+        List<Channel> m3u=M3uParser.parse("#EXTINF:-1 tvg-logo=\"https://img.example.com/tvp.png\" group-title=\"PL\",TVP 1\nhttps://example.com/1.ts\n#EXTINF:-1,B\nhttps://example.com/2.ts",null);
+        assertEquals("https://img.example.com/tvp.png",m3u.get(0).logo()); assertEquals("",m3u.get(1).logo());
+        assertEquals("https://img.example.com/tvp.png",m3u.get(0).withOrder(3).logo());
+    }
 }

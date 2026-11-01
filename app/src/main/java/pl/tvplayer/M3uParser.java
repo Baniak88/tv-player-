@@ -16,7 +16,7 @@ public final class M3uParser {
     public static List<Channel> parse(Reader source, String baseUrl) throws IOException {
         BufferedReader reader = source instanceof BufferedReader ? (BufferedReader) source : new BufferedReader(source);
         List<Channel> channels = new ArrayList<>();
-        String name = "", group = "Bez kategorii", epg = "";
+        String name = "", group = "Bez kategorii", epg = "", logo = "";
         String raw;
         while ((raw = reader.readLine()) != null) {
             String line = raw.replace("\uFEFF", "").trim();
@@ -28,11 +28,12 @@ public final class M3uParser {
                     if (line.charAt(i) == ',' && !quoted) { comma = i; break; }
                 }
                 name = comma >= 0 ? line.substring(comma + 1).trim() : "Kanał";
-                group = "Bez kategorii"; epg = "";
+                group = "Bez kategorii"; epg = ""; logo = "";
                 Matcher matcher = ATTRIBUTE.matcher(comma >= 0 ? line.substring(0, comma) : line);
                 while (matcher.find()) {
                     if (matcher.group(1).equals("group-title")) group = matcher.group(2);
                     if (matcher.group(1).equals("tvg-id")) epg = matcher.group(2);
+                    if (matcher.group(1).equals("tvg-logo")) logo = matcher.group(2);
                     if (matcher.group(1).equals("tvg-name") && name.isEmpty()) name = matcher.group(2);
                 }
             } else if (line.startsWith("#EXTGRP:")) {
@@ -42,10 +43,10 @@ public final class M3uParser {
                     URI uri = baseUrl == null ? URI.create(line) : URI.create(baseUrl).resolve(line);
                     if ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) {
                         channels.add(new Channel(name.isEmpty() ? "Kanał " + (channels.size() + 1) : name,
-                                uri.toString(), group.isEmpty() ? "Bez kategorii" : group, epg));
+                                uri.toString(), group.isEmpty() ? "Bez kategorii" : group, epg).withLogo(logo));
                     }
                 } catch (IllegalArgumentException ignored) { }
-                name = ""; group = "Bez kategorii"; epg = "";
+                name = ""; group = "Bez kategorii"; epg = ""; logo = "";
             }
         }
         return channels;

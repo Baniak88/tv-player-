@@ -20,7 +20,7 @@ public final class BouquetOrder {
         Map<String,Integer> ranks=new LinkedHashMap<>(); int rank=0;
         for(String name:categories.values()) { if(!ranks.containsKey(name)) ranks.put(name,rank); rank++; }
         List<Channel> result=new ArrayList<>(items.size());
-        for(Channel c:items) result.add(new Channel(c.name(),c.url(),c.group(),c.epgId(),c.kind(),c.guideUrl(),c.archiveDays(),c.timezone(),ranks.getOrDefault(c.group(),Integer.MAX_VALUE)));
+        for(Channel c:items) result.add(c.withOrder(ranks.getOrDefault(c.group(),Integer.MAX_VALUE)));
         return result;
     }
 }

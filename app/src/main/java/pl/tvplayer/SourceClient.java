@@ -72,7 +72,7 @@ public final class SourceClient {
         List<Channel> result = new ArrayList<>();
         reader.beginArray();
         while (reader.hasNext()) {
-            String id = "", name = "Kanał", category = "", epg = "", extension = "mp4";
+            String id = "", name = "Kanał", category = "", epg = "", extension = "mp4", icon = "";
             int archive=0,days=0;
             reader.beginObject();
             while (reader.hasNext()) {
@@ -81,6 +81,7 @@ public final class SourceClient {
                     case "container_extension": extension = value(reader); break;
                     case "tv_archive": try { archive=Integer.parseInt(value(reader)); } catch(NumberFormatException ignored) {} break;
                     case "tv_archive_duration": try { days=Integer.parseInt(value(reader)); } catch(NumberFormatException ignored) {} break;
+                    case "stream_icon": case "cover": if (icon.isEmpty()) icon = value(reader); else reader.skipValue(); break;
                     case "name": name = value(reader); break;
                     case "category_id": category = value(reader); break;
                     case "epg_channel_id": epg = value(reader); break;
@@ -99,7 +100,7 @@ public final class SourceClient {
                     .addPathSegment(id + (kind.equals("tv") ? ".ts" : "." + extension)).build().toString();
             }
             String guide=kind.equals("tv")?api(base,user,pass,"get_simple_data_table").newBuilder().addQueryParameter("stream_id",id).build().toString():"";
-            result.add(new Channel(name,url,categories.getOrDefault(category,"Bez kategorii"),epg,kind,guide,archive==1?Math.max(0,days):0,"UTC",ranks.getOrDefault(category,Integer.MAX_VALUE)));
+            result.add(new Channel(name,url,categories.getOrDefault(category,"Bez kategorii"),epg,kind,guide,archive==1?Math.max(0,days):0,"UTC",ranks.getOrDefault(category,Integer.MAX_VALUE),icon));
         }
         reader.endArray();
         if (reader.peek() != JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowa odpowiedź serwera.");
@@ -125,7 +126,7 @@ public final class SourceClient {
         String timezone="UTC";
         if(root.has("server_info") && root.get("server_info").isJsonObject())
             timezone=Guide.field(root.getAsJsonObject("server_info"),"timezone","UTC");
-        for(int i=0;i<all.size();i++) { Channel c=all.get(i); all.set(i,new Channel(c.name(),c.url(),c.group(),c.epgId(),c.kind(),c.guideUrl(),c.archiveDays(),timezone,c.bouquetOrder())); }
+        for(int i=0;i<all.size();i++) { Channel c=all.get(i); all.set(i,c.withTimezone(timezone)); }
         progress.accept("Kanały TV: "+all.size()+". Pobieranie filmów…");
         Map<String,String> movieCategories = get(api(base,user,pass,"get_vod_categories"),SourceClient::readCategories);
         all.addAll(get(api(base,user,pass,"get_vod_streams"),reader -> readCatalog(reader,streamBase,user,pass,movieCategories,"movie")));
@@ -191,8 +192,10 @@ public final class SourceClient {
                     if (!ext.matches("[a-zA-Z0-9]{1,8}")) ext = "mp4";
                     String number = field(episode,"episode_num","");
                     String title = field(episode,"title","Odcinek " + number);
+                    String still = "";
+                    if (episode.has("info") && episode.get("info").isJsonObject()) still = field(episode.getAsJsonObject("info"),"movie_image","");
                     String url = base.newBuilder().addPathSegment("series").addPathSegment(user).addPathSegment(pass).addPathSegment(id+"."+ext).build().toString();
-                    result.add(new Channel(seriesName+" · "+number+" · "+title,url,"Sezon "+season.getKey(),"","episode"));
+                    result.add(new Channel(seriesName+" · "+number+" · "+title,url,"Sezon "+season.getKey(),"","episode").withLogo(still));
                 }
             }
             return result;

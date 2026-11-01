@@ -72,10 +72,12 @@ final class LibraryStore {
     private void writeChannel(JsonWriter writer,Channel c) throws IOException {
         writer.beginObject().name("name").value(c.name()).name("url").value(c.url()).name("group").value(c.group())
             .name("epg").value(c.epgId()).name("kind").value(c.kind()).name("guide").value(c.guideUrl())
-            .name("archiveDays").value(c.archiveDays()).name("timezone").value(c.timezone()).name("bouquetOrder").value(c.bouquetOrder()).endObject();
+            .name("archiveDays").value(c.archiveDays()).name("timezone").value(c.timezone()).name("bouquetOrder").value(c.bouquetOrder());
+        if(!c.logo().isEmpty()) writer.name("logo").value(c.logo());
+        writer.endObject();
     }
     private Channel readChannel(JsonReader reader) throws IOException {
-        String name="",url="",group="Bez kategorii",epg="",kind="",guide="",timezone="UTC"; int days=0,order=Integer.MAX_VALUE;
+        String name="",url="",group="Bez kategorii",epg="",kind="",guide="",timezone="UTC",logo=""; int days=0,order=Integer.MAX_VALUE;
         reader.beginObject();
         while(reader.hasNext()) {
             switch(reader.nextName()) {
@@ -86,12 +88,13 @@ final class LibraryStore {
                 case "kind": kind=SourceClient.value(reader); break;
                 case "guide": guide=SourceClient.value(reader); break;
                 case "timezone": timezone=SourceClient.value(reader); break;
+                case "logo": logo=SourceClient.value(reader); break;
                 case "bouquetOrder": try { order=Integer.parseInt(SourceClient.value(reader)); } catch(NumberFormatException ignored) {} break;
                 case "archiveDays": try { days=Integer.parseInt(SourceClient.value(reader)); } catch(NumberFormatException ignored) {} break;
                 default: reader.skipValue();
             }
         }
-        reader.endObject(); return new Channel(name,url,group,epg,kind,guide,days,timezone,order);
+        reader.endObject(); return new Channel(name,url,group,epg,kind,guide,days,timezone,order,logo);
     }
     void save(List<Channel> channels,Set<String> favorites) throws Exception {
         synchronized(LOCK) {

@@ -50,6 +50,17 @@ public class MainActivity extends Activity {
     private String section = "tv";
     private final java.util.Map<String, Button> sectionButtons = new java.util.HashMap<>();
     private String selectedGroup = ALL;
+    private ListView shelves;
+    private BaseAdapter shelfAdapter, posterAdapter;
+    private GridView posters;
+    private List<String> shelfNames=new ArrayList<>();
+    private final Map<String,List<Channel>> shelfItems=new HashMap<>();
+    private FrameLayout hero;
+    private ImageView heroImage;
+    private TextView heroTitle, heroMeta;
+    private Button heroPlay, heroSave;
+    private Channel heroItem;
+    private LinearLayout coverHint;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); store = new LibraryStore(this);
@@ -75,7 +86,8 @@ public class MainActivity extends Activity {
         String[][] sections={{"tv","TV"},{"movie","Filmy"},{"series","Seriale"}};
         for(String[] entry:sections) {
             Button tab=Ui.button(this,entry[1]); sectionButtons.put(entry[0],tab);
-            tabs.addView(tab,new LinearLayout.LayoutParams(0,dp(38),1));
+            tab.setMinHeight(0); tab.setMinimumHeight(0); tab.setPadding(dp(4),0,dp(4),0);
+            tabs.addView(tab,new LinearLayout.LayoutParams(0,-1,1));
             Ui.style(tab,entry[0].equals(section));
             tab.setOnClickListener(v -> { if(busy || entry[0].equals(section) && showingBouquets && !onlyFavorites) return; section=entry[0]; onlyFavorites=false; showingBouquets=true; selectedGroup=ALL;
                 Ui.style(libraryButton,true); Ui.style(favoriteButton,false);
@@ -113,7 +125,7 @@ public class MainActivity extends Activity {
         bouquets=new GridView(this); bouquets.setNumColumns(wide?4:2); bouquets.setHorizontalSpacing(dp(8)); bouquets.setVerticalSpacing(dp(8)); bouquets.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
         bouquets.setSelector(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)); bouquets.setClipToPadding(false); bouquets.setFastScrollEnabled(true);
         bouquets.setOnItemClickListener((parent,v,index,id) -> { if(busy) return; selectedGroup=bouquetNames.get(index); showingBouquets=false; filter(true); });
-        content.addView(bouquets,new FrameLayout.LayoutParams(-1,-1)); root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
+        content.addView(bouquets,new FrameLayout.LayoutParams(-1,-1)); buildVodViews(content,wide); root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout dock=new LinearLayout(this); dock.setPadding(dp(3),dp(3),dp(3),dp(3)); dock.setBackground(Ui.shape(this,Ui.SURFACE,14,Ui.BORDER));
         libraryButton=Ui.button(this,"Bukiety"); favoriteButton=Ui.button(this,"☆ Ulubione");
         dock.addView(libraryButton,new LinearLayout.LayoutParams(0,dp(42),1)); dock.addView(favoriteButton,new LinearLayout.LayoutParams(0,dp(42),1));
@@ -155,7 +167,8 @@ public class MainActivity extends Activity {
         if(!favorites.remove(c.url())) favorites.add(c.url());
         persistFavorites();
         // Only the favourites view changes its rows; elsewhere keep the scroll position.
-        if(onlyFavorites) filter(false); else rows.notifyDataSetChanged();
+        if(onlyFavorites) filter(false); else { rows.notifyDataSetChanged(); posterAdapter.notifyDataSetChanged(); }
+        if(shelves.getVisibility()==View.VISIBLE) shelfAdapter.notifyDataSetChanged();
     }
     private void putSection(String name,List<Channel> items) {
         sectionIndex.put(name,items);
@@ -262,6 +275,7 @@ public class MainActivity extends Activity {
                 card.setContentDescription("Bukiet "+name); return card;
             }
         });
+        if(vod()) prepareShelves(items);
         filter(true);
     }
     private View row(Channel c,View reused) {
@@ -270,8 +284,12 @@ public class MainActivity extends Activity {
         else {
             row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(12),dp(8),dp(4),dp(8)); row.setMinimumHeight(dp(64));
             row.setBackground(Ui.touch(this,Ui.SURFACE,12,0));
+            FrameLayout badge=new FrameLayout(this); badge.setBackground(Ui.shape(this,Ui.SURFACE_HIGH,10,0)); badge.setClipToOutline(true);
             TextView icon=Ui.text(this,"",14,Ui.TEXT); icon.setGravity(Gravity.CENTER); icon.setTypeface(null,Typeface.BOLD);
-            icon.setBackground(Ui.shape(this,Ui.SURFACE_HIGH,10,0)); row.addView(icon,new LinearLayout.LayoutParams(dp(42),dp(42)));
+            badge.addView(icon,new FrameLayout.LayoutParams(-1,-1));
+            ImageView logo=new ImageView(this); logo.setScaleType(ImageView.ScaleType.FIT_CENTER); logo.setPadding(dp(4),dp(4),dp(4),dp(4));
+            badge.addView(logo,new FrameLayout.LayoutParams(-1,-1));
+            row.addView(badge,new LinearLayout.LayoutParams(dp(52),dp(42)));
             LinearLayout text=column(); text.setPadding(dp(12),0,dp(6),0);
             TextView name=Ui.text(this,"",15,Ui.TEXT); name.setMaxLines(1); name.setEllipsize(TextUtils.TruncateAt.END); text.addView(name);
             TextView group=Ui.text(this,"",12,Ui.MUTED); group.setMaxLines(1); group.setEllipsize(TextUtils.TruncateAt.END); group.setPadding(0,dp(3),0,0); text.addView(group);
@@ -279,7 +297,8 @@ public class MainActivity extends Activity {
             Button guide=Ui.button(this,"EPG"); guide.setFocusable(false); guide.setTextSize(12); Ui.ghost(guide,Ui.MUTED); row.addView(guide,new LinearLayout.LayoutParams(dp(48),dp(44)));
             Button star=Ui.button(this,"☆"); star.setFocusable(false); star.setTextSize(20); Ui.ghost(star,Ui.FAINT); row.addView(star,new LinearLayout.LayoutParams(dp(44),dp(44)));
         }
-        TextView icon=(TextView)row.getChildAt(0);
+        FrameLayout badge=(FrameLayout)row.getChildAt(0); TextView icon=(TextView)badge.getChildAt(0);
+        ImageLoader.get(this).load(c.logo(),(ImageView)badge.getChildAt(1),dp(52),dp(42));
         String initial=c.name().replaceAll("^[^\\p{L}\\p{N}]*(?:[A-Z]{2,3}\\s*[|:]\\s*)?","");
         icon.setText(c.kind().equals("tv")?(initial.isEmpty()?"▶":initial.substring(0,Math.min(2,initial.length())).toUpperCase(Locale.ROOT)):c.kind().equals("series")?"▤":"▶");
         LinearLayout text=(LinearLayout)row.getChildAt(1); ((TextView)text.getChildAt(0)).setText(c.name());
@@ -293,6 +312,11 @@ public class MainActivity extends Activity {
         return row;
     }
     private void filter() { filter(true); }
+    /** Hiding an adapter view also drops its old rows, so hidden screens never keep stale items. */
+    private void show(AbsListView view,BaseAdapter adapter,boolean visible) {
+        if(!visible && view.getVisibility()==View.VISIBLE) view.setAdapter(adapter);
+        view.setVisibility(visible?View.VISIBLE:View.GONE);
+    }
     private void filter(boolean resetScroll) {
         if (list == null) return;
         String query = search.getText().toString().trim().toLowerCase(Locale.ROOT);
@@ -310,7 +334,8 @@ public class MainActivity extends Activity {
                 next.add(c);
             }
         }
-        shown=next; rows.notifyDataSetChanged(); if(resetScroll) list.setSelection(0);
+        shown=next; rows.notifyDataSetChanged(); posterAdapter.notifyDataSetChanged();
+        if(resetScroll) { list.setSelection(0); posters.setSelection(0); }
         int total=items.size();
         progress.setVisibility(busy?View.VISIBLE:View.GONE);
         emptyAction.setVisibility(!busy && channels.isEmpty()?View.VISIBLE:View.GONE);
@@ -322,13 +347,175 @@ public class MainActivity extends Activity {
         boolean inside=!grid && !busy && total>0;
         crumb.setVisibility(inside?View.VISIBLE:View.GONE);
         crumbTitle.setText(!inside?"":onlyFavorites?"Ulubione":!query.isEmpty() && showingBouquets?"Wyniki wyszukiwania":selectedGroup.equals(ALL)?"Cała oferta":selectedGroup);
-        status.setVisibility(busy || total==0?View.GONE:View.VISIBLE);
+        boolean vod=vod();
+        status.setVisibility(busy || total==0 || (grid && vod)?View.GONE:View.VISIBLE);
         sortButton.setVisibility(grid?View.VISIBLE:View.INVISIBLE);
-        bouquets.setVisibility(grid && !busy && total>0?View.VISIBLE:View.GONE);
-        list.setVisibility(!grid && !busy && !shown.isEmpty()?View.VISIBLE:View.GONE);
+        bouquets.setVisibility(grid && !busy && total>0 && !vod?View.VISIBLE:View.GONE);
+        shelves.setVisibility(grid && !busy && total>0 && vod?View.VISIBLE:View.GONE);
+        show(list,rows,!grid && !busy && !shown.isEmpty() && !vod);
+        show(posters,posterAdapter,!grid && !busy && !shown.isEmpty() && vod);
         emptyPanel.setVisibility(busy || total==0 || (!grid && shown.isEmpty())?View.VISIBLE:View.GONE);
         if(!busy) status.setText(grid?Ui.count(bouquetCounts.size())+" bukietów · "+Ui.count(total)+" pozycji"+(syncingOrder?" · aktualizuję kolejność…":"")
             :Ui.count(shown.size())+(shown.size()==1?" pozycja":" pozycji"));
+    }
+    // ---- Films and series: streaming-style shelves and poster grid ------------------------------
+
+    private boolean vod() { return !section.equals("tv"); }
+    private boolean hasCovers(List<Channel> items) {
+        int checked=0;
+        for(Channel c:items) { if(!c.logo().isEmpty()) return true; if(++checked>400) break; }
+        return false;
+    }
+    private void buildVodViews(FrameLayout content,boolean wide) {
+        shelves=new ListView(this); shelves.setDivider(null); shelves.setSelector(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+        shelves.setClipToPadding(false); shelves.setPadding(0,0,0,dp(8)); shelves.setVerticalScrollBarEnabled(false);
+        // Featured item on top of the shelves.
+        LinearLayout header=column();
+        hero=new FrameLayout(this); hero.setClipToOutline(true); hero.setBackground(Ui.shape(this,Ui.SURFACE,16,0));
+        heroImage=new ImageView(this); heroImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        hero.addView(heroImage,new FrameLayout.LayoutParams(-1,-1));
+        View shade=new View(this); shade.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0x660E0F11,0xF00E0F11}));
+        hero.addView(shade,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout heroText=column(); heroText.setPadding(dp(16),0,dp(16),dp(16));
+        heroMeta=Ui.text(this,"",12,Ui.MUTED); heroMeta.setMaxLines(1); heroMeta.setEllipsize(TextUtils.TruncateAt.END); heroText.addView(heroMeta);
+        heroTitle=Ui.text(this,"",22,Ui.TEXT); heroTitle.setTypeface(null,Typeface.BOLD); heroTitle.setMaxLines(2); heroTitle.setEllipsize(TextUtils.TruncateAt.END);
+        heroTitle.setPadding(0,dp(2),0,dp(12)); heroText.addView(heroTitle);
+        LinearLayout heroButtons=new LinearLayout(this);
+        heroPlay=Ui.button(this,"▶  Odtwórz"); Ui.primary(heroPlay); heroPlay.setTextSize(15);
+        heroPlay.setOnClickListener(v -> { if(heroItem!=null) open(heroItem); });
+        heroButtons.addView(heroPlay,new LinearLayout.LayoutParams(0,dp(44),1));
+        heroSave=Ui.button(this,"＋  Moja lista"); heroSave.setTextColor(Ui.TEXT); heroSave.setBackground(Ui.touch(this,0x33FFFFFF,12,0));
+        heroSave.setOnClickListener(v -> { if(heroItem!=null) { toggleFavorite(heroItem); bindHero(); } });
+        LinearLayout.LayoutParams saveSize=new LinearLayout.LayoutParams(0,dp(44),1); saveSize.leftMargin=dp(10); heroButtons.addView(heroSave,saveSize);
+        heroText.addView(heroButtons);
+        hero.addView(heroText,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+        header.addView(hero,new LinearLayout.LayoutParams(-1,dp(wide?220:300)));
+        // Shown instead of the hero when the saved library has no artwork yet.
+        coverHint=column(); coverHint.setPadding(dp(16),dp(14),dp(16),dp(14)); coverHint.setBackground(Ui.shape(this,Ui.SURFACE,16,Ui.BORDER));
+        TextView hintText=Ui.text(this,"Brak okładek w zapisanej bibliotece. Odśwież źródło, aby pobrać plakaty filmów i seriali.",13,Ui.MUTED); coverHint.addView(hintText);
+        Button refresh=Ui.button(this,"Odśwież źródło"); Ui.primary(refresh);
+        refresh.setOnClickListener(v -> { List<Channel> items=sectionIndex.getOrDefault(section,Collections.emptyList()); if(!busy && !items.isEmpty()) load(progress -> new SourceClient().refreshCatalog(items,progress)); });
+        LinearLayout.LayoutParams refreshSize=new LinearLayout.LayoutParams(-2,dp(40)); refreshSize.topMargin=dp(10); coverHint.addView(refresh,refreshSize);
+        header.addView(coverHint,new LinearLayout.LayoutParams(-1,-2));
+        View gap=new View(this); header.addView(gap,new LinearLayout.LayoutParams(1,dp(6)));
+        shelves.addHeaderView(header,null,false);
+        shelfAdapter=new BaseAdapter() {
+            public int getCount() { return shelfNames.size(); }
+            public Object getItem(int p) { return shelfNames.get(p); }
+            public long getItemId(int p) { return p; }
+            public View getView(int p,View reused,ViewGroup parent) { return shelf(shelfNames.get(p),reused); }
+        };
+        shelves.setAdapter(shelfAdapter);
+        shelves.setOnItemClickListener((parent,v,index,id) -> {
+            int row=index-shelves.getHeaderViewsCount(); if(busy || row<0 || row>=shelfNames.size()) return;
+            selectedGroup=shelfNames.get(row); showingBouquets=false; filter(true);
+        });
+        content.addView(shelves,new FrameLayout.LayoutParams(-1,-1));
+        posters=new GridView(this); posters.setNumColumns(wide?6:3); posters.setHorizontalSpacing(dp(10)); posters.setVerticalSpacing(dp(14));
+        posters.setStretchMode(GridView.STRETCH_COLUMN_WIDTH); posters.setSelector(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+        posters.setClipToPadding(false); posters.setPadding(0,dp(4),0,dp(12)); posters.setFastScrollEnabled(true);
+        posterAdapter=new BaseAdapter() {
+            public int getCount() { return shown.size(); }
+            public Object getItem(int p) { return shown.get(p); }
+            public long getItemId(int p) { return p; }
+            public View getView(int p,View reused,ViewGroup parent) {
+                int columns=Math.max(1,posters.getNumColumns());
+                int available=posters.getWidth()>0?posters.getWidth():getResources().getDisplayMetrics().widthPixels-dp(32);
+                return poster(shown.get(p),reused,Math.max(dp(60),(available-dp(10)*(columns-1))/columns));
+            }
+        };
+        posters.setAdapter(posterAdapter);
+        posters.setOnItemClickListener((parent,v,index,id) -> open(shown.get(index)));
+        posters.setOnItemLongClickListener((parent,v,index,id) -> { toggleFavorite(shown.get(index)); return true; });
+        content.addView(posters,new FrameLayout.LayoutParams(-1,-1));
+    }
+    private void open(Channel c) { if(c.kind().equals("series")) openSeries(c); else play(c); }
+    private void prepareShelves(List<Channel> items) {
+        shelfItems.clear();
+        for(Channel c:items) { List<Channel> row=shelfItems.computeIfAbsent(c.group(),key -> new ArrayList<>()); if(row.size()<24) row.add(c); }
+        shelfNames=new ArrayList<>(bouquetCounts.keySet());
+        heroItem=null;
+        if(hasCovers(items)) {
+            // Prefer a "recently added" style bouquet, otherwise the first one with artwork.
+            List<String> order=new ArrayList<>(shelfNames);
+            order.sort(Comparator.comparingInt(name -> name.toLowerCase(Locale.ROOT).matches(".*(ostatnio|nowo|nowości|nowosci|new|recent|latest|2026|2025).*")?0:1));
+            for(String name:order) { for(Channel c:shelfItems.get(name)) if(!c.logo().isEmpty()) { heroItem=c; break; } if(heroItem!=null) break; }
+        }
+        bindHero();
+        coverHint.setVisibility(!items.isEmpty() && heroItem==null?View.VISIBLE:View.GONE);
+        shelves.setAdapter(shelfAdapter);
+    }
+    private void bindHero() {
+        hero.setVisibility(heroItem==null?View.GONE:View.VISIBLE);
+        if(heroItem==null) { heroTitle.setText(""); heroMeta.setText(""); heroImage.setImageDrawable(null); return; }
+        heroTitle.setText(heroItem.name()); heroMeta.setText(heroItem.group().toUpperCase(Locale.ROOT));
+        heroPlay.setText(heroItem.kind().equals("series")?"▶  Odcinki":"▶  Odtwórz");
+        boolean saved=favorites.contains(heroItem.url()); heroSave.setText(saved?"✓  Moja lista":"＋  Moja lista");
+        ImageLoader.get(this).load(heroItem.logo(),heroImage,getResources().getDisplayMetrics().widthPixels,dp(300));
+    }
+    private View shelf(String name,View reused) {
+        LinearLayout row;
+        if(reused instanceof LinearLayout) row=(LinearLayout)reused;
+        else {
+            row=column(); row.setPadding(0,dp(10),0,dp(6));
+            LinearLayout head=new LinearLayout(this); head.setGravity(Gravity.CENTER_VERTICAL); head.setPadding(dp(2),0,dp(2),dp(8));
+            TextView title=Ui.text(this,"",16,Ui.TEXT); title.setTypeface(null,Typeface.BOLD); title.setMaxLines(1); title.setEllipsize(TextUtils.TruncateAt.END);
+            head.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+            TextView more=Ui.text(this,"",12,Ui.MUTED); head.addView(more);
+            row.addView(head);
+            HorizontalScrollView scroller=new HorizontalScrollView(this); scroller.setHorizontalScrollBarEnabled(false); scroller.setClipToPadding(false);
+            LinearLayout strip=new LinearLayout(this); scroller.addView(strip); row.addView(scroller);
+        }
+        LinearLayout head=(LinearLayout)row.getChildAt(0);
+        ((TextView)head.getChildAt(0)).setText(name);
+        Integer total=bouquetCounts.get(name);
+        ((TextView)head.getChildAt(1)).setText(Ui.count(total==null?0:total)+"  ›");
+        head.setOnClickListener(v -> { if(busy) return; selectedGroup=name; showingBouquets=false; filter(true); });
+        HorizontalScrollView scroller=(HorizontalScrollView)row.getChildAt(1);
+        if(!name.equals(row.getTag())) scroller.scrollTo(0,0);
+        row.setTag(name);
+        LinearLayout strip=(LinearLayout)scroller.getChildAt(0);
+        List<Channel> items=shelfItems.getOrDefault(name,Collections.emptyList());
+        int width=dp(getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE?118:112);
+        for(int i=0;i<items.size();i++) {
+            View old=i<strip.getChildCount()?strip.getChildAt(i):null;
+            View card=poster(items.get(i),old,width);
+            if(old==null) { LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(width,-2); size.rightMargin=dp(10); strip.addView(card,size); }
+            card.setVisibility(View.VISIBLE);
+            Channel item=items.get(i);
+            card.setOnClickListener(v -> open(item));
+            card.setOnLongClickListener(v -> { toggleFavorite(item); return true; });
+        }
+        for(int i=items.size();i<strip.getChildCount();i++) strip.getChildAt(i).setVisibility(View.GONE);
+        return row;
+    }
+    /** Poster card: 2:3 artwork (or a quiet title placeholder), favourite badge and one-line title. */
+    private View poster(Channel c,View reused,int width) {
+        LinearLayout card;
+        if(reused instanceof LinearLayout && reused.getTag()!=null) card=(LinearLayout)reused;
+        else {
+            card=column(); card.setTag("poster");
+            FrameLayout frame=new FrameLayout(this); frame.setClipToOutline(true); frame.setBackground(Ui.shape(this,Ui.SURFACE_HIGH,10,0));
+            TextView placeholder=Ui.text(this,"",13,Ui.MUTED); placeholder.setGravity(Gravity.CENTER); placeholder.setPadding(dp(8),dp(8),dp(8),dp(8));
+            placeholder.setMaxLines(4); placeholder.setEllipsize(TextUtils.TruncateAt.END);
+            frame.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
+            ImageView image=new ImageView(this); image.setScaleType(ImageView.ScaleType.CENTER_CROP); frame.addView(image,new FrameLayout.LayoutParams(-1,-1));
+            TextView badge=Ui.text(this,"★",12,Ui.STAR); badge.setGravity(Gravity.CENTER); badge.setBackground(Ui.shape(this,0xCC0E0F11,12,0));
+            FrameLayout.LayoutParams badgeSize=new FrameLayout.LayoutParams(dp(24),dp(24),Gravity.TOP|Gravity.END); badgeSize.topMargin=dp(6); badgeSize.rightMargin=dp(6);
+            frame.addView(badge,badgeSize);
+            card.addView(frame,new LinearLayout.LayoutParams(-1,width*3/2));
+            TextView title=Ui.text(this,"",12,Ui.MUTED); title.setMaxLines(1); title.setEllipsize(TextUtils.TruncateAt.END); title.setPadding(dp(2),dp(6),dp(2),0);
+            card.addView(title);
+        }
+        FrameLayout frame=(FrameLayout)card.getChildAt(0);
+        LinearLayout.LayoutParams frameSize=(LinearLayout.LayoutParams)frame.getLayoutParams();
+        if(frameSize.height!=width*3/2) { frameSize.height=width*3/2; frame.setLayoutParams(frameSize); }
+        ((TextView)frame.getChildAt(0)).setText(c.name());
+        ImageLoader.get(this).load(c.logo(),(ImageView)frame.getChildAt(1),width,width*3/2);
+        frame.getChildAt(2).setVisibility(favorites.contains(c.url())?View.VISIBLE:View.GONE);
+        ((TextView)card.getChildAt(1)).setText(c.name());
+        card.setContentDescription(c.name());
+        return card;
     }
     @Override protected void onSaveInstanceState(Bundle out) {
         out.putString("section",section); out.putString("bouquet",selectedGroup); out.putBoolean("showingBouquets",showingBouquets);
