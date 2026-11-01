@@ -25,14 +25,14 @@ final class StreamGuideStore extends SQLiteOpenHelper {
         return result;
     }
     synchronized void save(Channel channel,List<Guide.Program> programs) {
-        SQLiteDatabase db=getWritableDatabase(); long now=System.currentTimeMillis()/1000;
+        SQLiteDatabase db=getWritableDatabase(); long now=System.currentTimeMillis()/1000; String stream=key(channel);
         db.beginTransaction();
         try {
             db.delete("programs","end<? OR updated<?",new String[]{String.valueOf(now-86400),String.valueOf(now-21600)});
             try(SQLiteStatement insert=db.compileStatement("INSERT OR REPLACE INTO programs VALUES(?,?,?,?,?,?,?)")) {
                 for(Guide.Program p:programs) {
                     if(p.end()<=now || p.start()>now+7*86400) continue;
-                    insert.clearBindings(); insert.bindString(1,key(channel)); insert.bindLong(2,p.start()); insert.bindLong(3,p.end());
+                    insert.clearBindings(); insert.bindString(1,stream); insert.bindLong(2,p.start()); insert.bindLong(3,p.end());
                     insert.bindString(4,p.title()); insert.bindString(5,p.description()); insert.bindString(6,p.serverStart()); insert.bindLong(7,now); insert.executeInsert();
                 }
             }

@@ -56,4 +56,9 @@ public class TsEitParserTest {
     @Test public void rejectsUnboundEitWithoutPat() {
         assertTrue(read(EitFixture.concat(EitFixture.packets(18,EitFixture.eit(101,START,"Unbound")),EitFixture.padding(),EitFixture.padding())).programs().isEmpty());
     }
+    @Test public void readsMultipleSectionsInOnePayload() {
+        byte[] first=EitFixture.section(78,101,EitFixture.concat(new byte[]{0,1,0,1,0,78},EitFixture.event(1,START,"One","")));
+        byte[] second=EitFixture.section(78,101,EitFixture.concat(new byte[]{0,1,0,1,0,78},EitFixture.event(2,START+3600,"Two","")));
+        assertEquals(2,read(stream(EitFixture.pat(101),EitFixture.concat(first,second))).programs().size());
+    }
 }

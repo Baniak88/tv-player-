@@ -111,4 +111,5 @@ jobs:
         run: |
           cp apk/debug/app-debug.apk TV-Player-0.8.2.apk
           gh release view v0.8.2-preview >/dev/null 2>&1 || gh release create v0.8.2-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Preview 0.8.2" --notes "EPG ze strumienia MPEG-TS (DVB EIT), zapis programu lokalnie i odczyt podczas oglądania bez dodatkowego połączenia. Ręczne sprawdzenie wybranego strumienia, czytelniejsze wiersze teraz/dalej. Obsługa API i XMLTV zachowana."
+          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v0.8.2-preview" -f sha="$SOURCE_SHA" -F force=false >/dev/null
           gh release upload v0.8.2-preview TV-Player-0.8.2.apk --clobber

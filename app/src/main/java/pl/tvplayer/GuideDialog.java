@@ -7,7 +7,6 @@ import java.util.function.Consumer;
 public final class GuideDialog {
     public static void open(Activity activity,Channel channel,Executor worker,Consumer<Channel> play) {
         GuideRepository repository=GuideRepository.get(activity);
-        if(repository.isObserving(channel)) { openStream(activity,channel,play); return; }
         ProgressDialog waiting=new ProgressDialog(activity); waiting.setMessage("Pobieranie programu TV…"); waiting.setCancelable(true);
         waiting.setButton(android.content.DialogInterface.BUTTON_NEUTRAL,"Ze strumienia",(d,w) -> { waiting.dismiss(); openStream(activity,channel,play); });
         waiting.show();
