@@ -77,7 +77,17 @@ public class PlayerActivity extends Activity {
             }
         };
         setContentView(root); updateFullscreen();
+        // The system may drop the fullscreen flags (focus change, dialogs, rotation); restore them.
+        getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(visibility -> {
+            if(fullscreen && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN)==0) root.postDelayed(this::restoreImmersive,1500);
+        });
     }
+    private void restoreImmersive() {
+        if(isFinishing() || !fullscreen || enteringPip || isInPictureInPictureMode()) return;
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+    }
+    @Override public void onWindowFocusChanged(boolean hasFocus) { super.onWindowFocusChanged(hasFocus); if(hasFocus) restoreImmersive(); }
     private void updateFullscreen() {
         if(enteringPip || isInPictureInPictureMode()) return;
         setRequestedOrientation(fullscreen?sensorOrientation:ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);

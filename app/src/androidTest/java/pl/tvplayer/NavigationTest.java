@@ -39,6 +39,15 @@ public class NavigationTest {
         }
     }
 
+    private boolean eventuallyFullscreen(PlayerActivity player) throws Exception {
+        long deadline=System.currentTimeMillis()+3000;
+        while(System.currentTimeMillis()<deadline) {
+            getInstrumentation().waitForIdleSync();
+            if((player.getWindow().getDecorView().getSystemUiVisibility() & View.SYSTEM_UI_FLAG_FULLSCREEN)!=0) return true;
+            Thread.sleep(100);
+        }
+        return false;
+    }
     private void waitForText(View root,String text) throws Exception {
         long deadline=System.currentTimeMillis()+5000;
         while(System.currentTimeMillis()<deadline) {
@@ -238,7 +247,7 @@ public class NavigationTest {
         getInstrumentation().runOnMainSync(() -> find(player.getWindow().getDecorView(),"↙").performClick());
         getInstrumentation().waitForIdleSync(); assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,player.getRequestedOrientation());
         getInstrumentation().runOnMainSync(() -> find(player.getWindow().getDecorView(),"⤢").performClick());
-        getInstrumentation().waitForIdleSync(); assertTrue((player.getWindow().getDecorView().getSystemUiVisibility() & View.SYSTEM_UI_FLAG_FULLSCREEN)!=0);
+        getInstrumentation().waitForIdleSync(); assertTrue(eventuallyFullscreen(player));
         getInstrumentation().runOnMainSync(() -> find(player.getWindow().getDecorView(),"Opcje").performClick());
         getInstrumentation().waitForIdleSync();
         getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
