@@ -1,12 +1,18 @@
 package pl.tvplayer;
-import android.test.InstrumentationTestCase;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
+import static org.junit.Assert.*;
 import android.content.Intent;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.view.*;
 import android.widget.*;
 import java.util.*;
-public class NavigationTest extends InstrumentationTestCase {
+@RunWith(AndroidJUnit4.class)
+public class NavigationTest {
+    private android.app.Instrumentation getInstrumentation() { return InstrumentationRegistry.getInstrumentation(); }
     private View find(View root,String text) {
         if(root instanceof TextView && text.equals(((TextView)root).getText().toString())) return root;
         if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) {
@@ -14,7 +20,7 @@ public class NavigationTest extends InstrumentationTestCase {
         }
         return null;
     }
-    public void testTabsAndFullscreen() throws Exception {
+    @Test public void testTabsAndFullscreen() throws Exception {
         Context context=getInstrumentation().getTargetContext();
         new LibraryStore(context).save(Arrays.asList(
             new Channel("Test TV","https://example.com/live.ts","Test","","tv"),

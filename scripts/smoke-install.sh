@@ -19,5 +19,5 @@ if grep -q 'FATAL EXCEPTION' smoke-output/runtime.txt; then
 fi
 
 adb install apk/androidTest/debug/app-debug-androidTest.apk
-adb shell am instrument -w pl.tvplayer.preview.test/android.test.InstrumentationTestRunner | tee smoke-output/navigation-test.txt
+adb shell am instrument -w pl.tvplayer.preview.test/androidx.test.runner.AndroidJUnitRunner | tee smoke-output/navigation-test.txt
 grep -q 'OK (1 test)' smoke-output/navigation-test.txt
