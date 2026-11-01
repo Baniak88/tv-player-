@@ -24,7 +24,13 @@ public class MainActivity extends Activity {
     private LibraryStore store;
     private TextView status;
     private EditText search;
-    private Spinner groups;
+    private GridView bouquets;
+    private TextView catalogTitle;
+    private Button bouquetButton;
+    private LinearLayout emptyPanel;
+    private boolean showingBouquets=true;
+    private List<String> bouquetNames=new ArrayList<>();
+    private final Map<String,Integer> bouquetCounts=new TreeMap<>();
     private ListView list;
     private Button favoriteButton, addButton;
     private boolean onlyFavorites, busy;
@@ -37,60 +43,70 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); store = new LibraryStore(this);
-        LinearLayout root = column(); root.setBackgroundColor(0xFFF3F4F8);
-        root.setOnApplyWindowInsetsListener((v, insets) -> {
-            v.setPadding(dp(18), insets.getSystemWindowInsetTop(), dp(18), insets.getSystemWindowInsetBottom());
-            return insets.consumeSystemWindowInsets();
-        });
-        LinearLayout chrome = new LinearLayout(this); chrome.setGravity(Gravity.CENTER_VERTICAL); chrome.setPadding(dp(4), dp(18), dp(4), dp(18));
-        for (int color : new int[]{0xFFFF6058,0xFFFFBD2E,0xFF28C840}) {
-            View dot = new View(this); dot.setBackground(surface(color,6,color));
-            LinearLayout.LayoutParams size = new LinearLayout.LayoutParams(dp(10),dp(10)); size.rightMargin=dp(6); chrome.addView(dot,size);
+        String requested=getIntent().getStringExtra("section");
+        if(Arrays.asList("tv","movie","series").contains(requested)) section=requested;
+        String requestedGroup=getIntent().getStringExtra("bouquet");
+        if(requestedGroup!=null) { selectedGroup=requestedGroup; showingBouquets=false; }
+        if(state!=null) {
+            section=state.getString("section",section); selectedGroup=state.getString("bouquet",selectedGroup);
+            showingBouquets=state.getBoolean("showingBouquets",showingBouquets); onlyFavorites=state.getBoolean("onlyFavorites",false);
         }
-        TextView brand=label("TV Player",14); brand.setGravity(Gravity.CENTER); brand.setTypeface(null,Typeface.BOLD); chrome.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
-        TextView badge=label("PREVIEW",10); badge.setTextColor(0xFF747B8A); chrome.addView(badge); root.addView(chrome);
-        TextView title=label("Twoja biblioteka",30); title.setTypeface(null,Typeface.BOLD); root.addView(title);
-        TextView sub=label("Telewizja w swoim rytmie.",14); sub.setTextColor(0xFF747B8A); sub.setPadding(0,dp(6),0,dp(18)); root.addView(sub);
+        boolean wide=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        LinearLayout root=column(); root.setBackground(new android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{0xFF0B1124,0xFF180B19,0xFF09090F}));
+        root.setOnApplyWindowInsetsListener((v,insets) -> {
+            v.setPadding(dp(16),insets.getSystemWindowInsetTop(),dp(16),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets();
+        });
+        LinearLayout top=new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(0,dp(wide?0:12),0,dp(wide?0:12));
+        Button home=button("‹ Główna"); top.addView(home,new LinearLayout.LayoutParams(dp(100),dp(44)));
+        home.setOnClickListener(v -> { startActivity(new Intent(this,HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)); finish(); });
+        TextView brand=label("TV PLAYER",16); brand.setTypeface(null,Typeface.BOLD); brand.setGravity(Gravity.END);
+        top.addView(brand,new LinearLayout.LayoutParams(0,-2,1)); brand.setVisibility(wide?View.GONE:View.VISIBLE); root.addView(top);
+        TextView title=label("Twoje bukiety",26); catalogTitle=title; title.setTypeface(null,Typeface.BOLD); root.addView(title); title.setVisibility(wide?View.GONE:View.VISIBLE);
+        TextView sub=label("Wybierz temat, potem to, co chcesz oglądać.",13); sub.setTextColor(0xFFBA9CAA); sub.setPadding(0,dp(5),0,dp(16)); root.addView(sub); sub.setVisibility(wide?View.GONE:View.VISIBLE);
         LinearLayout tabs=new LinearLayout(this);
         String[][] sections={{"tv","TV"},{"series","Seriale"},{"movie","Filmy"}};
         for(String[] entry:sections) {
             Button tab=button(entry[1]); sectionButtons.put(entry[0],tab);
             tabs.addView(tab,new LinearLayout.LayoutParams(0,dp(46),1));
             primary(tab,entry[0].equals(section));
-            tab.setOnClickListener(v -> { if(busy) return; section=entry[0]; onlyFavorites=false;
+            tab.setOnClickListener(v -> { if(busy) return; section=entry[0]; onlyFavorites=false; showingBouquets=true; selectedGroup="Wszystkie kategorie";
                 primary(libraryButton,true); primary(favoriteButton,false);
                 for(java.util.Map.Entry<String,Button> item:sectionButtons.entrySet()) primary(item.getValue(),item.getKey().equals(section));
                 search.setText(""); if(loadedSections.contains(section)) refreshGroups(); else loadCachedSection(section); });
         }
-        LinearLayout.LayoutParams tabSize=new LinearLayout.LayoutParams(-1,-2); tabSize.bottomMargin=dp(12); root.addView(tabs,tabSize);
-        search=input("Szukaj w wybranej sekcji…",false); root.addView(search);
+        LinearLayout.LayoutParams tabSize=new LinearLayout.LayoutParams(-1,-2); tabSize.bottomMargin=dp(12); if(wide) top.addView(tabs,new LinearLayout.LayoutParams(0,dp(44),1)); else root.addView(tabs,tabSize);
+        search=input("Szukaj w wybranej sekcji…",false); if(!wide) root.addView(search);
         LinearLayout tools=new LinearLayout(this); tools.setGravity(Gravity.CENTER_VERTICAL);
-        groups=new Spinner(this); groups.setBackground(surface(Color.WHITE,12,0xFFE3E6ED)); tools.addView(groups,new LinearLayout.LayoutParams(0,dp(46),1));
+        if(wide) tools.addView(search,new LinearLayout.LayoutParams(0,dp(46),1));
+        bouquetButton=button("▦ Bukiety"); bouquetButton.setMaxLines(1); bouquetButton.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        tools.addView(bouquetButton,new LinearLayout.LayoutParams(0,dp(46),1));
+        bouquetButton.setOnClickListener(v -> { showingBouquets=true; selectedGroup="Wszystkie kategorie"; search.setText(""); filter(); });
         addButton=button("＋ Źródło"); primary(addButton,true); LinearLayout.LayoutParams sourceSize=new LinearLayout.LayoutParams(dp(118),dp(46)); sourceSize.leftMargin=dp(10); tools.addView(addButton,sourceSize); root.addView(tools);
         addButton.setOnClickListener(v -> sourceMenu());
-        status=label("Wczytywanie biblioteki…",12); status.setTextColor(0xFF747B8A); status.setPadding(dp(2),dp(12),0,dp(10)); root.addView(status);
+        status=label("Wczytywanie biblioteki…",12); status.setTextColor(0xFFB195A3); status.setPadding(dp(2),dp(12),0,dp(10)); root.addView(status);
         FrameLayout content=new FrameLayout(this);
-        list=new ListView(this); list.setDivider(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)); list.setDividerHeight(dp(8)); list.setSelector(new android.graphics.drawable.ColorDrawable(0x19007AFF)); list.setClipToPadding(false);
+        list=new ListView(this); list.setDivider(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)); list.setDividerHeight(dp(8)); list.setSelector(new android.graphics.drawable.ColorDrawable(0x19D62B4D)); list.setClipToPadding(false);
         content.addView(list,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout empty=column(); empty.setGravity(Gravity.CENTER); empty.setPadding(dp(20),dp(12),dp(20),dp(12));
-        TextView symbol=label("▣",54); symbol.setTextColor(0xFF007AFF); empty.addView(symbol);
-        emptyText=label("Wczytywanie biblioteki…",17); emptyText.setGravity(Gravity.CENTER); emptyText.setTextColor(0xFF747B8A); emptyText.setPadding(0,dp(12),0,dp(16)); empty.addView(emptyText);
-        progress=new ProgressBar(this); progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(0xFF007AFF)); empty.addView(progress,new LinearLayout.LayoutParams(dp(30),dp(30)));
-        content.addView(empty,new FrameLayout.LayoutParams(-1,-1)); list.setEmptyView(empty); root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout dock=new LinearLayout(this); dock.setPadding(dp(5),dp(5),dp(5),dp(5)); dock.setBackground(surface(Color.WHITE,20,0xFFE3E6ED)); dock.setElevation(dp(3));
-        libraryButton=button("▣ Biblioteka"); favoriteButton=button("☆ Ulubione"); dock.addView(libraryButton,new LinearLayout.LayoutParams(0,dp(46),1)); dock.addView(favoriteButton,new LinearLayout.LayoutParams(0,dp(46),1)); primary(libraryButton,true);
-        libraryButton.setOnClickListener(v -> { onlyFavorites=false; primary(libraryButton,true); primary(favoriteButton,false); filter(); });
-        favoriteButton.setOnClickListener(v -> { onlyFavorites=true; primary(libraryButton,false); primary(favoriteButton,true); filter(); });
-        LinearLayout.LayoutParams dockSize=new LinearLayout.LayoutParams(-1,-2); dockSize.topMargin=dp(10); dockSize.bottomMargin=dp(14); root.addView(dock,dockSize);
+        LinearLayout empty=column(); emptyPanel=empty; empty.setGravity(Gravity.CENTER); empty.setPadding(dp(20),dp(12),dp(20),dp(12));
+        TextView symbol=label("▣",54); symbol.setTextColor(0xFFA51B37); empty.addView(symbol);
+        emptyText=label("Wczytywanie biblioteki…",17); emptyText.setGravity(Gravity.CENTER); emptyText.setTextColor(0xFFB195A3); emptyText.setPadding(0,dp(12),0,dp(16)); empty.addView(emptyText);
+        progress=new ProgressBar(this); progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(0xFFA51B37)); empty.addView(progress,new LinearLayout.LayoutParams(dp(30),dp(30)));
+        content.addView(empty,new FrameLayout.LayoutParams(-1,-1)); list.setEmptyView(empty);
+        bouquets=new GridView(this); bouquets.setNumColumns(2); bouquets.setHorizontalSpacing(dp(10)); bouquets.setVerticalSpacing(dp(10)); bouquets.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
+        bouquets.setSelector(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)); bouquets.setClipToPadding(false);
+        bouquets.setOnItemClickListener((parent,v,index,id) -> { if(busy) return; selectedGroup=bouquetNames.get(index); showingBouquets=false; filter(); });
+        content.addView(bouquets,new FrameLayout.LayoutParams(-1,-1)); root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout dock=new LinearLayout(this); dock.setPadding(dp(5),dp(5),dp(5),dp(5)); dock.setBackground(surface(0xFF160F1E,5,0xFF552335)); dock.setElevation(dp(3));
+        libraryButton=button("▦ Bukiety"); favoriteButton=button("☆ Ulubione"); dock.addView(libraryButton,new LinearLayout.LayoutParams(0,dp(46),1)); dock.addView(favoriteButton,new LinearLayout.LayoutParams(0,dp(46),1)); primary(libraryButton,true);
+        libraryButton.setOnClickListener(v -> { onlyFavorites=false; showingBouquets=true; selectedGroup="Wszystkie kategorie"; primary(libraryButton,true); primary(favoriteButton,false); filter(); });
+        favoriteButton.setOnClickListener(v -> { onlyFavorites=true; showingBouquets=false; selectedGroup="Wszystkie kategorie"; primary(libraryButton,false); primary(favoriteButton,true); filter(); });
+        LinearLayout.LayoutParams dockSize=new LinearLayout.LayoutParams(-1,-2); dockSize.topMargin=dp(10); dockSize.bottomMargin=dp(14); if(wide) { dock.removeView(favoriteButton); favoriteButton.setText("☆"); top.addView(favoriteButton,new LinearLayout.LayoutParams(dp(48),dp(44))); } else root.addView(dock,dockSize);
         setContentView(root); busy=true; addButton.setEnabled(false);
         search.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int a, int c, int f) { }
             public void onTextChanged(CharSequence s, int a, int b, int c) { searchHandler.removeCallbacks(searchTask); searchHandler.postDelayed(searchTask,180); }
             public void afterTextChanged(Editable e) { }
-        });
-        groups.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { selectedGroup = (String) p.getItemAtPosition(pos); filter(); }
-            public void onNothingSelected(AdapterView<?> p) { }
         });
         list.setOnItemClickListener((p, v, pos, id) -> {
             Channel c = shown.get(pos);
@@ -101,7 +117,8 @@ public class MainActivity extends Activity {
             if (!favorites.remove(url)) favorites.add(url);
             filter(); persistFavorites(); return true;
         });
-        loadCachedSection("tv");
+        if(state!=null) search.setText(state.getString("query",""));
+        loadCachedSection(section);
     }
     private void loadCachedSection(String requested) {
         busy=true; addButton.setEnabled(false);
@@ -116,6 +133,7 @@ public class MainActivity extends Activity {
                     channels.removeIf(c -> c.section().equals(requested)); channels.addAll(loaded); sectionIndex.put(requested,loaded);
                     if(loadedSections.isEmpty()) { favorites.clear(); favorites.addAll(savedFavorites); }
                     loadedSections.add(requested); busy=false; addButton.setEnabled(true); refreshGroups();
+                    if(getIntent().getBooleanExtra("open_source",false)) { getIntent().removeExtra("open_source"); sourceMenu(); }
                 });
             } catch(Exception e) {
                 runOnUiThread(() -> {
@@ -130,28 +148,50 @@ public class MainActivity extends Activity {
     private android.graphics.drawable.GradientDrawable surface(int color,int radius,int border) {
         android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable(); bg.setColor(color); bg.setCornerRadius(dp(radius)); bg.setStroke(dp(1),border); return bg;
     }
-    private TextView label(String text,int size) { TextView t=new TextView(this); t.setText(text); t.setTextSize(size); t.setTextColor(0xFF20232C); return t; }
+    private TextView label(String text,int size) { TextView t=new TextView(this); t.setText(text); t.setTextSize(size); t.setTextColor(0xFFF5E9ED); return t; }
     private Button button(String text) { Button b=new Button(this); b.setText(text); b.setTextSize(14); b.setAllCaps(false); b.setMinWidth(0); b.setMinimumWidth(0); b.setMinHeight(dp(44)); b.setMinimumHeight(dp(44)); b.setPadding(dp(10),0,dp(10),0); b.setStateListAnimator(null); primary(b,false); return b; }
-    private void primary(Button b,boolean selected) { b.setTextColor(selected?Color.WHITE:0xFF697386); b.setBackground(surface(selected?0xFF007AFF:Color.WHITE,13,selected?0xFF007AFF:Color.WHITE)); }
+    private void primary(Button b,boolean selected) { b.setTextColor(selected?Color.WHITE:0xFFBFA1AE); b.setBackground(surface(selected?0xFFA51B37:0xFF241220,5,selected?0xFFC64660:0xFF542438)); }
     private EditText input(String hint,boolean password) {
-        EditText e=new EditText(this); e.setHint(hint); e.setSingleLine(true); e.setTextSize(16); e.setTextColor(0xFF20232C); e.setHintTextColor(0xFF8C93A2);
-        e.setPadding(dp(16),dp(12),dp(16),dp(12)); e.setBackground(surface(Color.WHITE,14,0xFFDDE1EA)); e.setMinHeight(dp(50));
+        EditText e=new EditText(this); e.setHint(hint); e.setSingleLine(true); e.setTextSize(16); e.setTextColor(0xFFF5E9ED); e.setHintTextColor(0xFF9F8291);
+        e.setPadding(dp(16),dp(12),dp(16),dp(12)); e.setBackground(surface(0xFF1A1222,5,0xFF5A2B3C)); e.setMinHeight(dp(50));
         e.setInputType(password ? android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD : android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2); size.bottomMargin=dp(10); e.setLayoutParams(size); return e;
     }
     private ScrollView scroll(LinearLayout form) { ScrollView s=new ScrollView(this); s.addView(form); return s; }
     private void refreshGroups() {
-        TreeSet<String> set = new TreeSet<>(); for (Channel c : sectionIndex.getOrDefault(section,Collections.emptyList())) set.add(c.group());
-        List<String> values = new ArrayList<>(); values.add("Wszystkie kategorie"); values.addAll(set);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, values);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item); groups.setAdapter(adapter);
-        selectedGroup = values.get(0); filter();
+        bouquetCounts.clear();
+        List<Channel> items=sectionIndex.getOrDefault(section,Collections.emptyList());
+        for(Channel c:items) bouquetCounts.put(c.group(),bouquetCounts.getOrDefault(c.group(),0)+1);
+        bouquetNames=new ArrayList<>(); bouquetNames.add("Wszystkie kategorie"); bouquetNames.addAll(bouquetCounts.keySet());
+        if(!bouquetNames.contains(selectedGroup)) selectedGroup="Wszystkie kategorie";
+        bouquets.setAdapter(new BaseAdapter() {
+            public int getCount() { return bouquetNames.size(); }
+            public Object getItem(int p) { return bouquetNames.get(p); }
+            public long getItemId(int p) { return p; }
+            public View getView(int p,View reused,ViewGroup parent) {
+                LinearLayout card;
+                if(reused instanceof LinearLayout) card=(LinearLayout)reused;
+                else {
+                    card=column(); card.setPadding(dp(14),dp(14),dp(10),dp(12)); card.setBackground(surface(0xFF35101F,5,0xFF713044));
+                    card.setLayoutParams(new android.widget.AbsListView.LayoutParams(-1,dp(getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE?84:106)));
+                    TextView title=label("",17); title.setTypeface(null,Typeface.BOLD); title.setMaxLines(2); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    card.addView(title,new LinearLayout.LayoutParams(-1,0,1));
+                    TextView count=label("",12); count.setTextColor(0xFFD69DAB); card.addView(count);
+                }
+                String name=bouquetNames.get(p);
+                ((TextView)card.getChildAt(0)).setText(p==0?"Cała oferta":name);
+                ((TextView)card.getChildAt(1)).setText((p==0?items.size():bouquetCounts.get(name))+(section.equals("tv")?" kanałów  ›":" pozycji  ›"));
+                card.setContentDescription("Bukiet "+name); return card;
+            }
+        });
+        filter();
     }
     private void filter() {
         if (list == null) return;
         String query = search.getText().toString().toLowerCase(Locale.ROOT);
+        boolean grid=showingBouquets && query.isEmpty() && !onlyFavorites;
         shown = new ArrayList<>();
-        for (Channel c : sectionIndex.getOrDefault(section,Collections.emptyList())) if ((!onlyFavorites || favorites.contains(c.url()))
+        if(!grid) for (Channel c : sectionIndex.getOrDefault(section,Collections.emptyList())) if ((!onlyFavorites || favorites.contains(c.url()))
                 && (selectedGroup.equals("Wszystkie kategorie") || selectedGroup.equals(c.group()))
                 && c.name().toLowerCase(Locale.ROOT).contains(query)) shown.add(c);
         list.setAdapter(new BaseAdapter() {
@@ -162,15 +202,15 @@ public class MainActivity extends Activity {
                 Channel c=shown.get(p); LinearLayout row;
                 if(reused instanceof LinearLayout) row=(LinearLayout)reused;
                 else {
-                    row=new LinearLayout(MainActivity.this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(14),dp(12),dp(10),dp(12)); row.setBackground(surface(Color.WHITE,16,0xFFE6E8EF));
-                    TextView icon=label("▶",17); icon.setTextColor(0xFF007AFF); icon.setGravity(Gravity.CENTER); icon.setBackground(surface(0xFFEBF3FF,12,0xFFEBF3FF)); row.addView(icon,new LinearLayout.LayoutParams(dp(44),dp(44)));
+                    row=new LinearLayout(MainActivity.this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(14),dp(12),dp(10),dp(12)); row.setBackground(surface(0xFF211223,5,0xFF552335));
+                    TextView icon=label("▶",17); icon.setTextColor(0xFFA51B37); icon.setGravity(Gravity.CENTER); icon.setBackground(surface(0xFF4F1428,12,0xFF4F1428)); row.addView(icon,new LinearLayout.LayoutParams(dp(44),dp(44)));
                     LinearLayout text=column(); text.setPadding(dp(12),0,dp(8),0); TextView name=label("",16); name.setTypeface(null,Typeface.BOLD); name.setMaxLines(1); name.setEllipsize(android.text.TextUtils.TruncateAt.END); text.addView(name);
-                    TextView group=label("",12); group.setTextColor(0xFF818897); group.setMaxLines(1); group.setEllipsize(android.text.TextUtils.TruncateAt.END); group.setPadding(0,dp(5),0,0); text.addView(group); row.addView(text,new LinearLayout.LayoutParams(0,-2,1));
+                    TextView group=label("",12); group.setTextColor(0xFFBA9AA9); group.setMaxLines(1); group.setEllipsize(android.text.TextUtils.TruncateAt.END); group.setPadding(0,dp(5),0,0); text.addView(group); row.addView(text,new LinearLayout.LayoutParams(0,-2,1));
                     Button star=button("☆"); star.setFocusable(false); row.addView(star,new LinearLayout.LayoutParams(dp(48),dp(48)));
                     Button guide=button("EPG"); guide.setFocusable(false); row.addView(guide,new LinearLayout.LayoutParams(dp(48),dp(48)));
                 }
                 LinearLayout text=(LinearLayout)row.getChildAt(1); ((TextView)text.getChildAt(0)).setText(c.name()); ((TextView)text.getChildAt(1)).setText(c.group());
-                Button star=(Button)row.getChildAt(2); boolean saved=favorites.contains(c.url()); star.setText(saved?"★":"☆"); star.setTextSize(23); star.setTextColor(saved?0xFFFFA000:0xFF8C93A2);
+                Button star=(Button)row.getChildAt(2); boolean saved=favorites.contains(c.url()); star.setText(saved?"★":"☆"); star.setTextSize(23); star.setTextColor(saved?0xFFFFA000:0xFF9F8291);
                 star.setContentDescription((saved?"Usuń z ulubionych: ":"Dodaj do ulubionych: ")+c.name());
                 star.setOnClickListener(v -> { if(!favorites.remove(c.url())) favorites.add(c.url()); filter(); persistFavorites(); });
                 Button guide=(Button)row.getChildAt(3); guide.setVisibility(c.kind().equals("tv")?View.VISIBLE:View.GONE);
@@ -184,7 +224,26 @@ public class MainActivity extends Activity {
             :channels.isEmpty()?"Dodaj swoją telewizję\n\nWybierz ＋ Źródło i połącz konto Xtream Codes lub listę M3U."
             :onlyFavorites?"Jeszcze nic tutaj nie ma\n\nDotknij ☆ obok kanału, aby zapisać go w ulubionych."
             :"Brak wyników\n\nZmień nazwę lub kategorię. Jeśli katalog jest pusty, zaimportuj konto Xtream ponownie.");
-        if(!busy) status.setText(channels.isEmpty()?"Dodaj pierwsze źródło, aby zacząć.":shown.size()+" z "+channels.size()+" kanałów");
+        catalogTitle.setText(grid?(section.equals("tv")?"TV · Bukiety":section.equals("movie")?"Filmy · Bukiety":"Seriale · Bukiety")
+            :onlyFavorites?"Ulubione":selectedGroup.equals("Wszystkie kategorie")?"Cała oferta":selectedGroup);
+        int total=sectionIndex.getOrDefault(section,Collections.emptyList()).size();
+        bouquets.setVisibility(grid && !busy && total>0?View.VISIBLE:View.GONE);
+        list.setVisibility(!grid && !busy && !shown.isEmpty()?View.VISIBLE:View.GONE);
+        emptyPanel.setVisibility(busy || total==0 || (!grid && shown.isEmpty())?View.VISIBLE:View.GONE);
+        bouquetButton.setText(grid?"▦ Bukiety ("+bouquetCounts.size()+")":"‹ Bukiety");
+        if(!busy) status.setText(total==0?"Brak pozycji w tej sekcji. Dodaj lub zmień źródło."
+            :grid?bouquetCounts.size()+" bukietów  ·  "+total+" pozycji"
+            :(selectedGroup.equals("Wszystkie kategorie")?"Cała oferta":selectedGroup)+"  ·  "+shown.size()+" pozycji");
+    }
+    @Override protected void onSaveInstanceState(Bundle out) {
+        out.putString("section",section); out.putString("bouquet",selectedGroup); out.putBoolean("showingBouquets",showingBouquets);
+        out.putBoolean("onlyFavorites",onlyFavorites); out.putString("query",search.getText().toString()); super.onSaveInstanceState(out);
+    }
+    @Override public void onBackPressed() {
+        if(!showingBouquets || !search.getText().toString().isEmpty() || onlyFavorites) {
+            showingBouquets=true; onlyFavorites=false; selectedGroup="Wszystkie kategorie"; search.setText("");
+            primary(libraryButton,true); primary(favoriteButton,false); filter();
+        } else super.onBackPressed();
     }
     private void play(Channel c) {
         startActivity(new Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()).putExtra("guide",c.guideUrl()).putExtra("days",c.archiveDays()).putExtra("timezone",c.timezone()));

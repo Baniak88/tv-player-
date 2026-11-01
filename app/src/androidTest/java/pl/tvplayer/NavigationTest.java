@@ -90,6 +90,44 @@ public class NavigationTest {
         assertEquals("Legacy",store.loadSection("tv",new HashSet<>()).get(0).name());
         store.save(Collections.emptyList(),Collections.emptySet());
     }
+    private void clickGridText(View root,String text) {
+        View target=find(root,text); assertNotNull(target);
+        View child=target;
+        while(child.getParent() instanceof View && !(child.getParent() instanceof android.widget.AdapterView)) child=(View)child.getParent();
+        android.widget.AdapterView<?> parent=(android.widget.AdapterView<?>)child.getParent();
+        parent.performItemClick(child,parent.getPositionForView(child),0);
+    }
+    private void screenshot(String name) throws Exception {
+        android.graphics.Bitmap bitmap=getInstrumentation().getUiAutomation().takeScreenshot(); assertNotNull(bitmap);
+        try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(getInstrumentation().getTargetContext().getFilesDir(),name))) {
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);
+        }
+        bitmap.recycle();
+    }
+    @Test public void testHomeDashboardAndVisibleBouquets() throws Exception {
+        Context context=getInstrumentation().getTargetContext();
+        new LibraryStore(context).save(Arrays.asList(
+            new Channel("Sport 1","https://example.com/sport.ts","Sport","","tv"),
+            new Channel("Sport 2","https://example.com/sport2.ts","Sport","","tv"),
+            new Channel("Kids 1","https://example.com/kids.ts","Dzieci","","tv")),Collections.emptySet());
+        HomeActivity home=(HomeActivity)getInstrumentation().startActivitySync(new Intent(context,HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        View root=home.getWindow().getDecorView(); waitForText(root,"Sport");
+        assertNotNull(find(root,"Telewizja na żywo")); assertNotNull(find(root,"Filmy")); assertNotNull(find(root,"Seriale"));
+        assertNotNull(find(root,"Konto")); assertNotNull(find(root,"Zmień źródło")); assertNotNull(find(root,"Ustawienia"));
+        assertNotNull(find(root,"Odśwież widok")); assertNotNull(find(root,"Wyjście")); assertNotNull(find(root,"Dzieci"));
+        screenshot("home-portrait.png");
+        android.app.Instrumentation.ActivityMonitor monitor=getInstrumentation().addMonitor(MainActivity.class.getName(),null,false);
+        getInstrumentation().runOnMainSync(() -> ((View)find(root,"Sport").getParent()).performClick());
+        MainActivity catalog=(MainActivity)monitor.waitForActivityWithTimeout(5000); assertNotNull(catalog);
+        waitForText(catalog.getWindow().getDecorView(),"Sport 1");
+        assertNull(find(catalog.getWindow().getDecorView(),"Kids 1")); screenshot("sport-bouquet.png");
+        getInstrumentation().removeMonitor(monitor);
+        getInstrumentation().runOnMainSync(catalog::finish);
+        getInstrumentation().waitForIdleSync();
+        getInstrumentation().runOnMainSync(() -> home.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));
+        Thread.sleep(1000); getInstrumentation().waitForIdleSync(); screenshot("home-landscape.png");
+        getInstrumentation().runOnMainSync(home::finish);
+    }
     private View find(View root,String text) {
         if(root instanceof TextView && text.equals(((TextView)root).getText().toString())) return root;
         if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) {
@@ -100,17 +138,25 @@ public class NavigationTest {
     @Test public void testTabsAndFullscreen() throws Exception {
         Context context=getInstrumentation().getTargetContext();
         new LibraryStore(context).save(Arrays.asList(
-            new Channel("Test TV","https://example.com/live.ts","Test","","tv"),
-            new Channel("Test Film","https://example.com/movie.mp4","Test","","movie"),
-            new Channel("Test Serial","https://example.com/player_api.php","Test","","series")),Collections.emptySet());
+            new Channel("Test TV","https://example.com/live.ts","Sport","","tv"),
+            new Channel("Test Kids","https://example.com/kids.ts","Dzieci","","tv"),
+            new Channel("Test Film","https://example.com/movie.mp4","Kino","","movie"),
+            new Channel("Test Serial","https://example.com/player_api.php","Dramat","","series")),Collections.emptySet());
         MainActivity main=(MainActivity)getInstrumentation().startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         Thread.sleep(1500); getInstrumentation().waitForIdleSync();
         View root=main.getWindow().getDecorView();
+        waitForText(root,"Sport"); assertNotNull(find(root,"Dzieci"));
+        getInstrumentation().runOnMainSync(() -> clickGridText(root,"Sport"));
+        getInstrumentation().waitForIdleSync(); assertNotNull(find(root,"Test TV")); assertNull(find(root,"Test Kids"));
         assertNotNull(find(root,"EPG")); assertNotNull(find(root,"TV")); assertNotNull(find(root,"Seriale")); assertNotNull(find(root,"Filmy"));
         getInstrumentation().runOnMainSync(() -> find(root,"Filmy").performClick());
-        getInstrumentation().waitForIdleSync(); waitForText(root,"Test Film"); assertNotNull(find(root,"Test Film")); assertNull(find(root,"Test TV"));
+        getInstrumentation().waitForIdleSync(); waitForText(root,"Kino");
+        getInstrumentation().runOnMainSync(() -> clickGridText(root,"Kino"));
+        waitForText(root,"Test Film"); assertNotNull(find(root,"Test Film")); assertNull(find(root,"Test TV"));
         getInstrumentation().runOnMainSync(() -> find(root,"Seriale").performClick());
-        getInstrumentation().waitForIdleSync(); waitForText(root,"Test Serial"); assertNotNull(find(root,"Test Serial")); assertNull(find(root,"Test Film"));
+        getInstrumentation().waitForIdleSync(); waitForText(root,"Dramat");
+        getInstrumentation().runOnMainSync(() -> clickGridText(root,"Dramat"));
+        waitForText(root,"Test Serial"); assertNotNull(find(root,"Test Serial")); assertNull(find(root,"Test Film"));
         PlayerActivity player=(PlayerActivity)getInstrumentation().startActivitySync(new Intent(context,PlayerActivity.class).putExtra("url","https://example.com/movie.mp4").putExtra("name","Test Film").putExtra("kind","movie").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         getInstrumentation().waitForIdleSync();
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR,player.getRequestedOrientation());
