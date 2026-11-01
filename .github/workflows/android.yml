@@ -25,7 +25,11 @@ jobs:
       - name: Install Android SDK
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Test, lint and build
-        run: gradle testDebugUnitTest lintDebug assembleDebug --no-daemon
+        run: |
+          gradle testDebugUnitTest lintDebug assembleDebug --no-daemon || {
+            cat app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt 2>/dev/null || true
+            exit 1
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: tv-player-debug

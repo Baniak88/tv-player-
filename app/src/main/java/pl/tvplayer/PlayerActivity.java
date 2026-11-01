@@ -21,7 +21,7 @@ public class PlayerActivity extends Activity {
         if (url == null) { finish(); return; }
         if (state != null) position = state.getLong("position");
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON | WindowManager.LayoutParams.FLAG_SECURE);
-        getWindow().getDecorView().setSystemUiVisibility(5894);
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         android.widget.FrameLayout root = new android.widget.FrameLayout(this);
         root.setBackgroundColor(android.graphics.Color.BLACK);
         view = new PlayerView(this); view.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING);
@@ -31,7 +31,7 @@ public class PlayerActivity extends Activity {
         TextView title = new TextView(this); title.setText(getIntent().getStringExtra("name")); title.setTextColor(-1); title.setTextSize(16); title.setGravity(Gravity.CENTER_VERTICAL); top.addView(title, new LinearLayout.LayoutParams(0, -1, 1));
         Button rotate = new Button(this); rotate.setText("↻"); rotate.setContentDescription("Zmień orientację ekranu"); rotate.setOnClickListener(v -> setRequestedOrientation(getResources().getConfiguration().orientation == 2 ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)); top.addView(rotate);
         root.addView(top, new android.widget.FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
-        LinearLayout error = new LinearLayout(this); error.setOrientation(1); error.setGravity(Gravity.CENTER); error.setBackgroundColor(0xDD0D1421); error.setPadding(24, 20, 24, 20);
+        LinearLayout error = new LinearLayout(this); error.setOrientation(LinearLayout.VERTICAL); error.setGravity(Gravity.CENTER); error.setBackgroundColor(0xDD0D1421); error.setPadding(24, 20, 24, 20);
         message = new TextView(this); message.setTextColor(-1); message.setTextSize(17); error.addView(message);
         Button retry = new Button(this); retry.setText("Spróbuj ponownie"); error.addView(retry); retry.setOnClickListener(v -> { error.setVisibility(View.GONE); player.prepare(); player.play(); });
         error.setVisibility(View.GONE); root.addView(error, new android.widget.FrameLayout.LayoutParams(-1, -2, Gravity.CENTER));

@@ -70,12 +70,12 @@ public class MainActivity extends Activity {
         });
     }
     private int dp(int n) { return (int) (n * getResources().getDisplayMetrics().density); }
-    private LinearLayout column() { LinearLayout l = new LinearLayout(this); l.setOrientation(1); return l; }
+    private LinearLayout column() { LinearLayout l = new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
     private TextView label(String text, int size) { TextView t = new TextView(this); t.setText(text); t.setTextSize(size); t.setTextColor(Color.WHITE); return t; }
     private Button button(String text) { Button b = new Button(this); b.setText(text); b.setAllCaps(false); return b; }
     private EditText input(String hint, boolean password) {
         EditText e = new EditText(this); e.setHint(hint); e.setSingleLine(true); e.setTextSize(16);
-        e.setInputType(password ? 129 : android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        e.setInputType(password ? android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD : android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         return e;
     }
     private void refreshGroups() {
@@ -118,10 +118,10 @@ public class MainActivity extends Activity {
     }
     private LinearLayout form() { LinearLayout form = column(); form.setPadding(dp(20), dp(8), dp(20), 0); return form; }
     private void m3uDialog() {
-        LinearLayout form = form(); EditText url = input("https://serwer/lista.m3u", false); url.setInputType(17); form.addView(url);
+        LinearLayout form = form(); EditText url = input("https://serwer/lista.m3u", false); url.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI); form.addView(url);
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Lista M3U z internetu").setView(form)
                 .setMessage("Import zastąpi bieżącą listę kanałów.").setNegativeButton("Anuluj", null).setPositiveButton("Wczytaj", null).create();
-        dialog.setOnShowListener(x -> dialog.getButton(-1).setOnClickListener(v -> {
+        dialog.setOnShowListener(x -> dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(v -> {
             try { SourceClient.validate(url.getText().toString()); }
             catch (Exception e) { url.setError("Podaj poprawny adres HTTP lub HTTPS"); return; }
             String address = url.getText().toString(); dialog.dismiss(); load(() -> new SourceClient().m3u(address));
@@ -129,10 +129,10 @@ public class MainActivity extends Activity {
     }
     private void xtreamDialog() {
         LinearLayout form = form(); EditText server = input("Serwer: https://dostawca:port", false), user = input("Nazwa użytkownika", false), pass = input("Hasło", true);
-        server.setInputType(17); form.addView(server); form.addView(user); form.addView(pass);
+        server.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI); form.addView(server); form.addView(user); form.addView(pass);
         form.addView(label("Import kanałów TV na żywo zastąpi bieżącą listę.", 13));
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Xtream Codes").setView(form).setNegativeButton("Anuluj", null).setPositiveButton("Połącz", null).create();
-        dialog.setOnShowListener(x -> dialog.getButton(-1).setOnClickListener(v -> {
+        dialog.setOnShowListener(x -> dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(v -> {
             try { SourceClient.validate(server.getText().toString()); } catch (Exception e) { server.setError("Podaj adres HTTP lub HTTPS"); return; }
             if (user.getText().toString().trim().isEmpty() || pass.getText().length() == 0) { pass.setError("Uzupełnij login i hasło"); return; }
             String address = server.getText().toString(), username = user.getText().toString().trim(), password = pass.getText().toString();
