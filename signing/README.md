@@ -1,0 +1,1 @@
+Publiczny klucz testowy dla aplikacji pl.tvplayer.preview. Hasło i alias są w konfiguracji Gradle. Ten klucz jest celowo publiczny i służy wyłącznie do wersji Preview. Nigdy nie używać go do produkcyjnego wydania ani sklepu. Zachowanie tego pliku pozwala aktualizować kolejne wersje Preview bez zmiany podpisu.

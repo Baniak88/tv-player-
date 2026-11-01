@@ -23,27 +23,47 @@ public class MainActivity extends Activity {
     private ListView list;
     private Button favoriteButton, addButton;
     private boolean onlyFavorites, busy;
+    private TextView emptyText;
+    private ProgressBar progress;
+    private Button libraryButton;
     private String selectedGroup = "Wszystkie kategorie";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state); store = new LibraryStore(this);
-        LinearLayout root = column(); root.setPadding(dp(20), 0, dp(20), 0);
+        LinearLayout root = column(); root.setBackgroundColor(0xFFF3F4F8);
         root.setOnApplyWindowInsetsListener((v, insets) -> {
-            v.setPadding(dp(20), insets.getSystemWindowInsetTop(), dp(20), insets.getSystemWindowInsetBottom());
+            v.setPadding(dp(18), insets.getSystemWindowInsetTop(), dp(18), insets.getSystemWindowInsetBottom());
             return insets.consumeSystemWindowInsets();
         });
-        TextView brand = label("TV PLAYER", 15); brand.setTextColor(Color.rgb(78, 226, 177)); brand.setPadding(0, dp(22), 0, dp(20)); root.addView(brand);
-        TextView title = label("Twoja telewizja.\nZawsze pod ręką.", 30); title.setTypeface(null, Typeface.BOLD); root.addView(title);
-        TextView hint = label("Na żywo • Twoje listy • Twoje kanały", 14); hint.setTextColor(0xFF9BAABE); hint.setPadding(0, dp(12), 0, dp(20)); root.addView(hint);
-        addButton = button("＋ Dodaj źródło"); root.addView(addButton); addButton.setOnClickListener(v -> sourceMenu());
-        search = input("Szukaj kanału", false); root.addView(search);
-        groups = new Spinner(this); root.addView(groups);
-        favoriteButton = button("☆ Pokaż ulubione"); root.addView(favoriteButton);
-        favoriteButton.setOnClickListener(v -> { onlyFavorites = !onlyFavorites; favoriteButton.setText(onlyFavorites ? "★ Ulubione • pokaż wszystkie" : "☆ Pokaż ulubione"); filter(); });
-        status = label("Wczytywanie biblioteki…", 13); status.setPadding(0, dp(12), 0, dp(12)); root.addView(status);
-        list = new ListView(this); list.setDividerHeight(dp(8)); root.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
-        TextView tip = label("Przytrzymaj kanał, aby zmienić ulubione", 12); tip.setTextColor(0xFF9BAABE); tip.setPadding(0, dp(10), 0, dp(10)); root.addView(tip);
-        setContentView(root);
+        LinearLayout chrome = new LinearLayout(this); chrome.setGravity(Gravity.CENTER_VERTICAL); chrome.setPadding(dp(4), dp(18), dp(4), dp(18));
+        for (int color : new int[]{0xFFFF6058,0xFFFFBD2E,0xFF28C840}) {
+            View dot = new View(this); dot.setBackground(surface(color,6,color));
+            LinearLayout.LayoutParams size = new LinearLayout.LayoutParams(dp(10),dp(10)); size.rightMargin=dp(6); chrome.addView(dot,size);
+        }
+        TextView brand=label("TV Player",14); brand.setGravity(Gravity.CENTER); brand.setTypeface(null,Typeface.BOLD); chrome.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
+        TextView badge=label("PREVIEW",10); badge.setTextColor(0xFF747B8A); chrome.addView(badge); root.addView(chrome);
+        TextView title=label("Twoja biblioteka",30); title.setTypeface(null,Typeface.BOLD); root.addView(title);
+        TextView sub=label("Telewizja w swoim rytmie.",14); sub.setTextColor(0xFF747B8A); sub.setPadding(0,dp(6),0,dp(18)); root.addView(sub);
+        search=input("Szukaj kanału…",false); root.addView(search);
+        LinearLayout tools=new LinearLayout(this); tools.setGravity(Gravity.CENTER_VERTICAL);
+        groups=new Spinner(this); groups.setBackground(surface(Color.WHITE,12,0xFFE3E6ED)); tools.addView(groups,new LinearLayout.LayoutParams(0,dp(46),1));
+        addButton=button("＋ Źródło"); primary(addButton,true); LinearLayout.LayoutParams sourceSize=new LinearLayout.LayoutParams(dp(118),dp(46)); sourceSize.leftMargin=dp(10); tools.addView(addButton,sourceSize); root.addView(tools);
+        addButton.setOnClickListener(v -> sourceMenu());
+        status=label("Wczytywanie biblioteki…",12); status.setTextColor(0xFF747B8A); status.setPadding(dp(2),dp(12),0,dp(10)); root.addView(status);
+        FrameLayout content=new FrameLayout(this);
+        list=new ListView(this); list.setDivider(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)); list.setDividerHeight(dp(8)); list.setSelector(new android.graphics.drawable.ColorDrawable(0x19007AFF)); list.setClipToPadding(false);
+        content.addView(list,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout empty=column(); empty.setGravity(Gravity.CENTER); empty.setPadding(dp(20),dp(12),dp(20),dp(12));
+        TextView symbol=label("▣",54); symbol.setTextColor(0xFF007AFF); empty.addView(symbol);
+        emptyText=label("Wczytywanie biblioteki…",17); emptyText.setGravity(Gravity.CENTER); emptyText.setTextColor(0xFF747B8A); emptyText.setPadding(0,dp(12),0,dp(16)); empty.addView(emptyText);
+        progress=new ProgressBar(this); progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(0xFF007AFF)); empty.addView(progress,new LinearLayout.LayoutParams(dp(30),dp(30)));
+        content.addView(empty,new FrameLayout.LayoutParams(-1,-1)); list.setEmptyView(empty); root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout dock=new LinearLayout(this); dock.setPadding(dp(5),dp(5),dp(5),dp(5)); dock.setBackground(surface(Color.WHITE,20,0xFFE3E6ED)); dock.setElevation(dp(3));
+        libraryButton=button("▣ Biblioteka"); favoriteButton=button("☆ Ulubione"); dock.addView(libraryButton,new LinearLayout.LayoutParams(0,dp(46),1)); dock.addView(favoriteButton,new LinearLayout.LayoutParams(0,dp(46),1)); primary(libraryButton,true);
+        libraryButton.setOnClickListener(v -> { onlyFavorites=false; primary(libraryButton,true); primary(favoriteButton,false); filter(); });
+        favoriteButton.setOnClickListener(v -> { onlyFavorites=true; primary(libraryButton,false); primary(favoriteButton,true); filter(); });
+        LinearLayout.LayoutParams dockSize=new LinearLayout.LayoutParams(-1,-2); dockSize.topMargin=dp(10); dockSize.bottomMargin=dp(14); root.addView(dock,dockSize);
+        setContentView(root); busy=true; addButton.setEnabled(false);
         search.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int a, int c, int f) { }
             public void onTextChanged(CharSequence s, int a, int b, int c) { filter(); }
@@ -65,19 +85,25 @@ public class MainActivity extends Activity {
         worker.execute(() -> {
             try {
                 List<Channel> loaded = store.load(favorites);
-                runOnUiThread(() -> { if (!isDestroyed()) { channels = loaded; refreshGroups(); } });
-            } catch (Exception e) { runOnUiThread(() -> { refreshGroups(); error("Nie można odczytać zapisanej biblioteki. Dodaj ponownie źródło."); }); }
+                runOnUiThread(() -> { if (!isDestroyed()) { channels = loaded; busy = false; addButton.setEnabled(true); refreshGroups(); } });
+            } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) { busy=false; addButton.setEnabled(true); refreshGroups(); error("Nie można odczytać zapisanej biblioteki. Dodaj ponownie źródło."); } }); }
         });
     }
     private int dp(int n) { return (int) (n * getResources().getDisplayMetrics().density); }
     private LinearLayout column() { LinearLayout l = new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
-    private TextView label(String text, int size) { TextView t = new TextView(this); t.setText(text); t.setTextSize(size); t.setTextColor(Color.WHITE); return t; }
-    private Button button(String text) { Button b = new Button(this); b.setText(text); b.setAllCaps(false); return b; }
-    private EditText input(String hint, boolean password) {
-        EditText e = new EditText(this); e.setHint(hint); e.setSingleLine(true); e.setTextSize(16);
-        e.setInputType(password ? android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD : android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        return e;
+    private android.graphics.drawable.GradientDrawable surface(int color,int radius,int border) {
+        android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable(); bg.setColor(color); bg.setCornerRadius(dp(radius)); bg.setStroke(dp(1),border); return bg;
     }
+    private TextView label(String text,int size) { TextView t=new TextView(this); t.setText(text); t.setTextSize(size); t.setTextColor(0xFF20232C); return t; }
+    private Button button(String text) { Button b=new Button(this); b.setText(text); b.setTextSize(14); b.setAllCaps(false); b.setMinWidth(0); b.setMinimumWidth(0); b.setMinHeight(dp(44)); b.setMinimumHeight(dp(44)); b.setPadding(dp(10),0,dp(10),0); b.setStateListAnimator(null); primary(b,false); return b; }
+    private void primary(Button b,boolean selected) { b.setTextColor(selected?Color.WHITE:0xFF697386); b.setBackground(surface(selected?0xFF007AFF:Color.WHITE,13,selected?0xFF007AFF:Color.WHITE)); }
+    private EditText input(String hint,boolean password) {
+        EditText e=new EditText(this); e.setHint(hint); e.setSingleLine(true); e.setTextSize(16); e.setTextColor(0xFF20232C); e.setHintTextColor(0xFF8C93A2);
+        e.setPadding(dp(16),dp(12),dp(16),dp(12)); e.setBackground(surface(Color.WHITE,14,0xFFDDE1EA)); e.setMinHeight(dp(50));
+        e.setInputType(password ? android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD : android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2); size.bottomMargin=dp(10); e.setLayoutParams(size); return e;
+    }
+    private ScrollView scroll(LinearLayout form) { ScrollView s=new ScrollView(this); s.addView(form); return s; }
     private void refreshGroups() {
         TreeSet<String> set = new TreeSet<>(); for (Channel c : channels) set.add(c.group());
         List<String> values = new ArrayList<>(); values.add("Wszystkie kategorie"); values.addAll(set);
@@ -96,14 +122,29 @@ public class MainActivity extends Activity {
             public int getCount() { return shown.size(); }
             public Object getItem(int p) { return shown.get(p); }
             public long getItemId(int p) { return p; }
-            public View getView(int p, View reused, ViewGroup parent) {
-                TextView row = reused instanceof TextView ? (TextView) reused : label("", 17);
-                Channel c = shown.get(p);
-                row.setText((favorites.contains(c.url()) ? "★  " : "▶  ") + c.name() + "\n" + c.group());
-                row.setPadding(dp(16), dp(14), dp(16), dp(14)); row.setBackgroundColor(0xFF192638); return row;
+            public View getView(int p,View reused,ViewGroup parent) {
+                Channel c=shown.get(p); LinearLayout row;
+                if(reused instanceof LinearLayout) row=(LinearLayout)reused;
+                else {
+                    row=new LinearLayout(MainActivity.this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(14),dp(12),dp(10),dp(12)); row.setBackground(surface(Color.WHITE,16,0xFFE6E8EF));
+                    TextView icon=label("▶",17); icon.setTextColor(0xFF007AFF); icon.setGravity(Gravity.CENTER); icon.setBackground(surface(0xFFEBF3FF,12,0xFFEBF3FF)); row.addView(icon,new LinearLayout.LayoutParams(dp(44),dp(44)));
+                    LinearLayout text=column(); text.setPadding(dp(12),0,dp(8),0); TextView name=label("",16); name.setTypeface(null,Typeface.BOLD); name.setMaxLines(1); name.setEllipsize(android.text.TextUtils.TruncateAt.END); text.addView(name);
+                    TextView group=label("",12); group.setTextColor(0xFF818897); group.setMaxLines(1); group.setEllipsize(android.text.TextUtils.TruncateAt.END); group.setPadding(0,dp(5),0,0); text.addView(group); row.addView(text,new LinearLayout.LayoutParams(0,-2,1));
+                    Button star=button("☆"); star.setFocusable(false); row.addView(star,new LinearLayout.LayoutParams(dp(48),dp(48)));
+                }
+                LinearLayout text=(LinearLayout)row.getChildAt(1); ((TextView)text.getChildAt(0)).setText(c.name()); ((TextView)text.getChildAt(1)).setText(c.group());
+                Button star=(Button)row.getChildAt(2); boolean saved=favorites.contains(c.url()); star.setText(saved?"★":"☆"); star.setTextSize(23); star.setTextColor(saved?0xFFFFA000:0xFF8C93A2);
+                star.setContentDescription((saved?"Usuń z ulubionych: ":"Dodaj do ulubionych: ")+c.name());
+                star.setOnClickListener(v -> { if(!favorites.remove(c.url())) favorites.add(c.url()); filter(); persist(); });
+                return row;
             }
         });
-        if (!busy) status.setText(channels.isEmpty() ? "Dodaj listę M3U lub konto Xtream Codes, aby zacząć." : shown.size() + " z " + channels.size() + " kanałów");
+        progress.setVisibility(busy?View.VISIBLE:View.GONE);
+        emptyText.setText(busy?"Wczytywanie kanałów…\nDuża lista może wymagać chwili."
+            :channels.isEmpty()?"Dodaj swoją telewizję\n\nWybierz ＋ Źródło i połącz konto Xtream Codes lub listę M3U."
+            :onlyFavorites?"Jeszcze nic tutaj nie ma\n\nDotknij ☆ obok kanału, aby zapisać go w ulubionych."
+            :"Brak wyników\n\nZmień nazwę lub kategorię i spróbuj ponownie.");
+        if(!busy) status.setText(channels.isEmpty()?"Dodaj pierwsze źródło, aby zacząć.":shown.size()+" z "+channels.size()+" kanałów");
     }
     private void sourceMenu() {
         if (busy) return;
@@ -119,7 +160,7 @@ public class MainActivity extends Activity {
     private LinearLayout form() { LinearLayout form = column(); form.setPadding(dp(20), dp(8), dp(20), 0); return form; }
     private void m3uDialog() {
         LinearLayout form = form(); EditText url = input("https://serwer/lista.m3u", false); url.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI); form.addView(url);
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Lista M3U z internetu").setView(form)
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Lista M3U z internetu").setView(scroll(form))
                 .setMessage("Import zastąpi bieżącą listę kanałów.").setNegativeButton("Anuluj", null).setPositiveButton("Wczytaj", null).create();
         dialog.setOnShowListener(x -> dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(v -> {
             try { SourceClient.validate(url.getText().toString()); }
@@ -131,7 +172,7 @@ public class MainActivity extends Activity {
         LinearLayout form = form(); EditText server = input("Serwer: https://dostawca:port", false), user = input("Nazwa użytkownika", false), pass = input("Hasło", true);
         server.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI); form.addView(server); form.addView(user); form.addView(pass);
         form.addView(label("Import kanałów TV na żywo zastąpi bieżącą listę.", 13));
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Xtream Codes").setView(form).setNegativeButton("Anuluj", null).setPositiveButton("Połącz", null).create();
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Xtream Codes").setView(scroll(form)).setNegativeButton("Anuluj", null).setPositiveButton("Połącz", null).create();
         dialog.setOnShowListener(x -> dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(v -> {
             try { SourceClient.validate(server.getText().toString()); } catch (Exception e) { server.setError("Podaj adres HTTP lub HTTPS"); return; }
             if (user.getText().toString().trim().isEmpty() || pass.getText().length() == 0) { pass.setError("Uzupełnij login i hasło"); return; }
@@ -140,11 +181,11 @@ public class MainActivity extends Activity {
         })); dialog.show();
     }
     private void load(Callable<List<Channel>> task) {
-        busy = true; addButton.setEnabled(false); status.setText("Łączenie i wczytywanie kanałów…");
+        busy = true; addButton.setEnabled(false); status.setText("Łączenie i wczytywanie kanałów…"); filter();
         worker.execute(() -> {
             try {
                 List<Channel> result = task.call();
-                if (result.isEmpty()) throw new Exception("Źródło nie zawiera obsługiwanych kanałów HTTP/HTTPS.");
+                if (result.isEmpty()) throw new java.io.IOException("Źródło nie zawiera obsługiwanych kanałów HTTP/HTTPS.");
                 runOnUiThread(() -> {
                     if (isDestroyed()) return;
                     channels = result;
