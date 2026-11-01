@@ -9,7 +9,7 @@ import androidx.media3.common.*;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
 
-@androidx.media3.common.util.UnstableApi
+@androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlayerActivity extends Activity {
     private ExoPlayer player;
     private PlayerView view;
