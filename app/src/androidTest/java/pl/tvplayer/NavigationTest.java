@@ -271,6 +271,56 @@ public class NavigationTest {
             getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
         } finally { if(activity!=null) { final MainActivity closing=activity; getInstrumentation().runOnMainSync(closing::finish); } server.shutdown(); }
     }
+    @Test public void testEitUsesPlaybackBytesAndShowsCachedProgramme() throws Exception {
+        Context context=getInstrumentation().getTargetContext();
+        okhttp3.mockwebserver.MockWebServer server=new okhttp3.mockwebserver.MockWebServer();
+        long start=System.currentTimeMillis()/1000-900;
+        byte[] payload=EitFixture.stream(start);
+        server.enqueue(new okhttp3.mockwebserver.MockResponse().setHeader("Content-Type","video/mp2t").setBody(new okio.Buffer().write(payload)));
+        server.start(); MainActivity activity=null;
+        Channel channel=new Channel("PL-VIP| TVN RAW",server.url("/live/u/p/101.ts").toString(),"EPG ze strumienia","tvn.pl","tv");
+        GuideRepository repository=GuideRepository.get(context);
+        repository.streamStarted(channel);
+        java.util.concurrent.atomic.AtomicReference<GuideRepository.Data> waiting=new java.util.concurrent.atomic.AtomicReference<>();
+        StreamGuideProbe watch=repository.requestStream(channel,waiting::set);
+        try {
+            androidx.media3.datasource.DataSource original=new androidx.media3.datasource.DefaultHttpDataSource.Factory().createDataSource();
+            EitDataSource source=new EitDataSource(original,channel,repository);
+            java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();
+            try {
+                source.open(new androidx.media3.datasource.DataSpec(android.net.Uri.parse(channel.url())));
+                byte[] buffer=new byte[97]; int read;
+                while((read=source.read(buffer,0,buffer.length))!=-1) bytes.write(buffer,0,read);
+            } finally { source.close(); }
+            assertArrayEquals("EPG reader modified playback bytes",payload,bytes.toByteArray());
+            long deadline=System.currentTimeMillis()+4000;
+            while(waiting.get()==null && System.currentTimeMillis()<deadline) { Thread.sleep(100); getInstrumentation().waitForIdleSync(); }
+            assertNotNull(waiting.get()); assertEquals("Strumień DVB EIT",waiting.get().source());
+            assertEquals(1,server.getRequestCount());
+            assertEquals("Wiadomości ze strumienia",repository.peek(channel,false).programs().get(0).title());
+            repository.streamStopped(channel);
+            // Persistence runs after the active-stream waiter completes.
+            List<Guide.Program> stored=Collections.emptyList();
+            while(stored.isEmpty() && System.currentTimeMillis()<deadline) { stored=new StreamGuideStore(context).load(channel); if(stored.isEmpty()) Thread.sleep(100); }
+            assertFalse("Stream programme was not persisted",stored.isEmpty());
+            new LibraryStore(context).save(Arrays.asList(channel),Collections.emptySet());
+            activity=(MainActivity)getInstrumentation().startActivitySync(new Intent(context,MainActivity.class).putExtra("section","tv").putExtra("bouquet","EPG ze strumienia").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            View root=activity.getWindow().getDecorView(); waitForText(root,"PL-VIP| TVN RAW");
+            assertNotNull(findContaining(root,"Wiadomości ze strumienia")); assertNotNull(findContaining(root,"Następny program"));
+            screenshot("epg-stream-list.png");
+            final MainActivity opened=activity;
+            getInstrumentation().runOnMainSync(() -> GuideDialog.openStream(opened,channel,c -> {}));
+            Thread.sleep(600); getInstrumentation().waitForIdleSync();
+            android.view.accessibility.AccessibilityNodeInfo window=getInstrumentation().getUiAutomation().getRootInActiveWindow();
+            assertFalse(window.findAccessibilityNodeInfosByText("Wiadomości ze strumienia").isEmpty());
+            screenshot("epg-stream-dialog.png"); assertEquals(1,server.getRequestCount());
+            getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+        } finally {
+            watch.cancel(); repository.streamStopped(channel);
+            if(activity!=null) { final MainActivity closing=activity; getInstrumentation().runOnMainSync(closing::finish); }
+            server.shutdown();
+        }
+    }
     private View findContaining(View root,String text) {
         if(root instanceof TextView && ((TextView)root).getText().toString().contains(text)) return root;
         if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { View found=findContaining(((ViewGroup)root).getChildAt(i),text); if(found!=null) return found; }

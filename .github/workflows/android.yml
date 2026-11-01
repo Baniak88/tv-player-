@@ -36,7 +36,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: TV-Player-Preview-0.8.1
+          name: TV-Player-Preview-0.8.2
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: TV-Player-Preview-0.8.1
+          name: TV-Player-Preview-0.8.2
           path: apk
       - name: Enable KVM
         run: |
@@ -75,13 +75,13 @@ jobs:
         run: |
           python3 - <<'PY'
           import base64, json, pathlib
-          for name in ['home-portrait','home-landscape','sport-bouquet','bouquets-grid','epg-channel-list','epg-program-dialog']:
+          for name in ['home-portrait','home-landscape','sport-bouquet','bouquets-grid','epg-channel-list','epg-program-dialog','epg-stream-list','epg-stream-dialog']:
               path=pathlib.Path('smoke-output',name+'.png')
               if not path.exists(): continue
               data=path.read_bytes()
               pathlib.Path('/tmp',name+'.json').write_text(json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}))
           PY
-          for name in home-portrait home-landscape sport-bouquet bouquets-grid epg-channel-list epg-program-dialog; do
+          for name in home-portrait home-landscape sport-bouquet bouquets-grid epg-channel-list epg-program-dialog epg-stream-list epg-stream-dialog; do
             if [ ! -f "/tmp/$name.json" ]; then continue; fi
             ref=$(gh api "repos/$GH_REPO/git/blobs" --input "/tmp/$name.json" --jq '.sha')
             echo "UI_PREVIEW $name $ref"
@@ -101,7 +101,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: TV-Player-Preview-0.8.1
+          name: TV-Player-Preview-0.8.2
           path: apk
       - name: Publish directly installable APK
         env:
@@ -109,6 +109,6 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/app-debug.apk TV-Player-0.8.1.apk
-          gh release view v0.8.1-preview >/dev/null 2>&1 || gh release create v0.8.1-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Preview 0.8.1" --notes "EPG przy kanałach: teraz i dalej. Alternatywne API Xtream oraz XMLTV/XMLTV.gz z lokalnym indeksem. Obsługa źródeł EPG z nagłówka M3U i starszych adresów strumieni."
-          gh release upload v0.8.1-preview TV-Player-0.8.1.apk --clobber
+          cp apk/debug/app-debug.apk TV-Player-0.8.2.apk
+          gh release view v0.8.2-preview >/dev/null 2>&1 || gh release create v0.8.2-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Preview 0.8.2" --notes "EPG ze strumienia MPEG-TS (DVB EIT), zapis programu lokalnie i odczyt podczas oglądania bez dodatkowego połączenia. Ręczne sprawdzenie wybranego strumienia, czytelniejsze wiersze teraz/dalej. Obsługa API i XMLTV zachowana."
+          gh release upload v0.8.2-preview TV-Player-0.8.2.apk --clobber

@@ -104,3 +104,4 @@ public final class Guide {
             .addPathSegment(stamp).addPathSegment(api.queryParameter("stream_id")+".m3u8").build().toString();
     }
 }
+

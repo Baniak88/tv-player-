@@ -27,7 +27,7 @@ public record Channel(String name, String url, String group, String epgId, Strin
         this(name, url, group, epgId, infer(url, group, name));
     }
     public Channel {
-        if(url==null) url=""; if(group==null) group="Bez kategorii"; if(name==null) name="";
+        if(url==null) url=""; if(group==null) group="Bez kategorii"; if(name==null) name=""; if(epgId==null) epgId="";
         if (kind == null || kind.isEmpty()) kind = infer(url, group, name);
         if(guideUrl==null) guideUrl=""; if(logo==null) logo=""; if(timezone==null || timezone.isEmpty()) timezone="UTC";
     }
@@ -54,3 +54,4 @@ public record Channel(String name, String url, String group, String epgId, Strin
         return "tv";
     }
 }
+

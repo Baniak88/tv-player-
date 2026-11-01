@@ -28,8 +28,9 @@ public class PlayerActivity extends Activity {
     private final java.util.concurrent.ExecutorService guideWorker=java.util.concurrent.Executors.newSingleThreadExecutor();
     private static final int RECORD_FILE=72;
     private int recordingMinutes=60;
+    private boolean streamObserved;
     private Channel liveChannel() {
-        return new Channel(getIntent().getStringExtra("name"),url,"","",onDemand?"movie":"tv",
+        return new Channel(getIntent().getStringExtra("name"),url,"",getIntent().getStringExtra("epgId"),onDemand?"movie":"tv",
             getIntent().getStringExtra("guide"),getIntent().getIntExtra("days",0),getIntent().getStringExtra("timezone"));
     }
     private int dp(int value) { return (int)(value*getResources().getDisplayMetrics().density); }
@@ -173,7 +174,14 @@ public class PlayerActivity extends Activity {
     @Override protected void onStart() {
         super.onStart(); if(url==null) return;
         if(player!=null) return;
-        player=new ExoPlayer.Builder(this).setLoadControl(new DefaultLoadControl.Builder().setBackBuffer(30000,true).build()).build(); view.setPlayer(player);
+        ExoPlayer.Builder builder=new ExoPlayer.Builder(this).setLoadControl(new DefaultLoadControl.Builder().setBackBuffer(30000,true).build());
+        if(!onDemand) {
+            Channel channel=liveChannel(); GuideRepository repository=GuideRepository.get(this);
+            androidx.media3.datasource.DefaultDataSource.Factory upstream=new androidx.media3.datasource.DefaultDataSource.Factory(this);
+            builder.setMediaSourceFactory(new androidx.media3.exoplayer.source.DefaultMediaSourceFactory(() -> new EitDataSource(upstream.createDataSource(),channel,repository)));
+            repository.streamStarted(channel); streamObserved=true;
+        }
+        player=builder.build(); view.setPlayer(player);
         player.addListener(new Player.Listener() {
             @Override public void onPlayerError(PlaybackException e) {
                 message.setText("Nie można odtworzyć materiału. Sprawdź internet, dostępność źródła lub kodeki telefonu.\nKod: "+e.getErrorCodeName());
@@ -214,15 +222,18 @@ public class PlayerActivity extends Activity {
             long duration=player.getDuration();
             if(player.getPlaybackState()==Player.STATE_ENDED || (duration>0 && position>=duration-2000)) position=0;
             if(onDemand) getPreferences(MODE_PRIVATE).edit().putLong(bookmark,position).apply();
-            view.setPlayer(null); player.release(); player=null;
+            view.setPlayer(null); player.release(); player=null; stopStreamObservation();
         }
         super.onStop();
     }
     @Override protected void onDestroy() {
         if(player!=null) { view.setPlayer(null); player.release(); player=null; }
+        stopStreamObservation();
         if(rotation!=null) rotation.disable(); guideWorker.shutdown(); super.onDestroy();
     }
+    private void stopStreamObservation() { if(streamObserved) { GuideRepository.get(this).streamStopped(liveChannel()); streamObserved=false; } }
     @Override protected void onSaveInstanceState(Bundle out) {
         out.putLong("position",player==null?position:player.getCurrentPosition()); out.putBoolean("fullscreen",fullscreen); super.onSaveInstanceState(out);
     }
 }
+

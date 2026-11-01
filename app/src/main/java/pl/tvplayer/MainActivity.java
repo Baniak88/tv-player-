@@ -285,28 +285,32 @@ public class MainActivity extends Activity {
         LinearLayout row;
         if(reused instanceof LinearLayout) row=(LinearLayout)reused;
         else {
-            row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(12),dp(8),dp(4),dp(8)); row.setMinimumHeight(dp(64));
+            row=column(); row.setPadding(dp(12),dp(10),dp(8),dp(10)); row.setMinimumHeight(dp(94));
             row.setBackground(Ui.touch(this,Ui.SURFACE,12,0));
+            LinearLayout header=new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
             FrameLayout badge=new FrameLayout(this); badge.setBackground(Ui.shape(this,Ui.SURFACE_HIGH,10,0)); badge.setClipToOutline(true);
             TextView icon=Ui.text(this,"",14,Ui.TEXT); icon.setGravity(Gravity.CENTER); icon.setTypeface(null,Typeface.BOLD);
             badge.addView(icon,new FrameLayout.LayoutParams(-1,-1));
             ImageView logo=new ImageView(this); logo.setScaleType(ImageView.ScaleType.FIT_CENTER); logo.setPadding(dp(4),dp(4),dp(4),dp(4));
             badge.addView(logo,new FrameLayout.LayoutParams(-1,-1));
-            row.addView(badge,new LinearLayout.LayoutParams(dp(52),dp(42)));
-            LinearLayout text=column(); text.setPadding(dp(12),0,dp(6),0);
-            TextView name=Ui.text(this,"",15,Ui.TEXT); name.setMaxLines(1); name.setEllipsize(TextUtils.TruncateAt.END); text.addView(name);
-            TextView group=Ui.text(this,"",12,Ui.MUTED); group.setMaxLines(1); group.setEllipsize(TextUtils.TruncateAt.END); group.setPadding(0,dp(3),0,0); text.addView(group);
-            TextView next=Ui.text(this,"",11,Ui.FAINT); next.setMaxLines(1); next.setEllipsize(TextUtils.TruncateAt.END); next.setPadding(0,dp(3),0,0); text.addView(next);
-            row.addView(text,new LinearLayout.LayoutParams(0,-2,1));
-            Button guide=Ui.button(this,"EPG"); guide.setFocusable(false); guide.setTextSize(12); Ui.ghost(guide,Ui.MUTED); row.addView(guide,new LinearLayout.LayoutParams(dp(48),dp(44)));
-            Button star=Ui.button(this,"☆"); star.setFocusable(false); star.setTextSize(20); Ui.ghost(star,Ui.FAINT); row.addView(star,new LinearLayout.LayoutParams(dp(44),dp(44)));
+            header.addView(badge,new LinearLayout.LayoutParams(dp(46),dp(40)));
+            TextView name=Ui.text(this,"",15,Ui.TEXT); name.setMaxLines(2); name.setEllipsize(TextUtils.TruncateAt.END); name.setPadding(dp(10),0,dp(4),0);
+            header.addView(name,new LinearLayout.LayoutParams(0,-2,1));
+            Button guide=Ui.button(this,"EPG"); guide.setFocusable(false); guide.setTextSize(12); Ui.ghost(guide,Ui.MUTED); header.addView(guide,new LinearLayout.LayoutParams(dp(44),dp(44)));
+            Button star=Ui.button(this,"☆"); star.setFocusable(false); star.setTextSize(20); Ui.ghost(star,Ui.FAINT); header.addView(star,new LinearLayout.LayoutParams(dp(40),dp(44)));
+            row.addView(header,new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout schedule=column(); schedule.setPadding(0,dp(6),dp(4),0);
+            TextView now=Ui.text(this,"",13,Ui.MUTED); now.setMaxLines(2); now.setEllipsize(TextUtils.TruncateAt.END); schedule.addView(now);
+            TextView next=Ui.text(this,"",12,Ui.FAINT); next.setMaxLines(1); next.setEllipsize(TextUtils.TruncateAt.END); next.setPadding(0,dp(4),0,0); schedule.addView(next);
+            row.addView(schedule,new LinearLayout.LayoutParams(-1,-2));
         }
-        FrameLayout badge=(FrameLayout)row.getChildAt(0); TextView icon=(TextView)badge.getChildAt(0);
-        ImageLoader.get(this).load(c.logo(),(ImageView)badge.getChildAt(1),dp(52),dp(42));
+        LinearLayout header=(LinearLayout)row.getChildAt(0),schedule=(LinearLayout)row.getChildAt(1);
+        FrameLayout badge=(FrameLayout)header.getChildAt(0); TextView icon=(TextView)badge.getChildAt(0);
+        ImageLoader.get(this).load(c.logo(),(ImageView)badge.getChildAt(1),dp(46),dp(40));
         String initial=c.name().replaceAll("^[^\\p{L}\\p{N}]*(?:[A-Z]{2,3}\\s*[|:]\\s*)?","");
         icon.setText(c.kind().equals("tv")?(initial.isEmpty()?"▶":initial.substring(0,Math.min(2,initial.length())).toUpperCase(Locale.ROOT)):c.kind().equals("series")?"▤":"▶");
-        LinearLayout text=(LinearLayout)row.getChildAt(1); ((TextView)text.getChildAt(0)).setText(c.name());
-        TextView detail=(TextView)text.getChildAt(1),next=(TextView)text.getChildAt(2); detail.setMaxLines(1);
+        ((TextView)header.getChildAt(1)).setText(c.name());
+        TextView detail=(TextView)schedule.getChildAt(0),next=(TextView)schedule.getChildAt(1);
         if(c.kind().equals("tv")) {
             GuideRepository repository=GuideRepository.get(this);
             bindSchedule(detail,next,repository.peek(c,false)); row.setTag(c.url());
@@ -317,10 +321,10 @@ public class MainActivity extends Activity {
                 if(view!=null && after!=null && owner!=null && c.url().equals(owner.getTag())) bindSchedule(view,after,data);
             });
         } else { detail.setText(c.group()); next.setVisibility(View.GONE); }
-        Button guide=(Button)row.getChildAt(2); guide.setVisibility(c.kind().equals("tv")?View.VISIBLE:View.GONE);
+        Button guide=(Button)header.getChildAt(2); guide.setVisibility(c.kind().equals("tv")?View.VISIBLE:View.GONE);
         guide.setContentDescription("Program TV i archiwum: "+c.name());
         guide.setOnClickListener(v -> GuideDialog.open(MainActivity.this,c,network,MainActivity.this::play));
-        Button star=(Button)row.getChildAt(3); boolean saved=favorites.contains(c.url()); star.setText(saved?"★":"☆"); star.setTextColor(saved?Ui.STAR:Ui.FAINT);
+        Button star=(Button)header.getChildAt(3); boolean saved=favorites.contains(c.url()); star.setText(saved?"★":"☆"); star.setTextColor(saved?Ui.STAR:Ui.FAINT);
         star.setContentDescription((saved?"Usuń z ulubionych: ":"Dodaj do ulubionych: ")+c.name());
         star.setOnClickListener(v -> toggleFavorite(c));
         return row;
@@ -546,7 +550,7 @@ public class MainActivity extends Activity {
         } else super.onBackPressed();
     }
     private void play(Channel c) {
-        startActivity(new Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()).putExtra("guide",c.guideUrl()).putExtra("days",c.archiveDays()).putExtra("timezone",c.timezone()));
+        startActivity(new Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()).putExtra("guide",c.guideUrl()).putExtra("epgId",c.epgId()).putExtra("days",c.archiveDays()).putExtra("timezone",c.timezone()));
     }
     /** Episodes already fetched in this process; reopening a series is then instant. */
     private static final Map<String,List<Channel>> EPISODES=java.util.Collections.synchronizedMap(new LinkedHashMap<String,List<Channel>>(16,.75f,true) {
@@ -671,7 +675,9 @@ public class MainActivity extends Activity {
         worker.execute(() -> { try { store.save(copy, stars); } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) error("Nie udało się zapisać biblioteki na urządzeniu."); }); } });
     }
     private void error(String message) { if (!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK", null).show(); }
-    @Override protected void onResume() { super.onResume(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
+    @Override protected void onResume() { super.onResume(); if(rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
+    @Override public void onWindowFocusChanged(boolean focus) { super.onWindowFocusChanged(focus); if(focus && rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); }
     @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); super.onPause(); }
     @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }
 }
+
