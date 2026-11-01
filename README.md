@@ -36,3 +36,7 @@ Dane źródła trafiają bezpośrednio do wskazanego dostawcy. Aplikacja nie ma 
 ## Walidacja
 
 Kod wymaga kompilacji i testu z rzeczywistym dostawcą na telefonie. Samo przygotowanie kodu nie potwierdza poprawnego odtwarzania. Workflow uruchamia testy parsera, Android Lint i kompilację przed udostępnieniem APK.
+
+## Wersja 0.1.1
+
+Usunięto limit importu 30 MB. M3U (URL i pliki), kanały i kategorie Xtream oraz zaszyfrowana biblioteka są przetwarzane strumieniowo. Nie ma stałego limitu rozmiaru źródła; liczba kanałów pozostaje ograniczona dostępną pamięcią telefonu. Testy regresji generują źródła M3U i Xtream większe niż 30 MB. Pobieranie ma limit czasu 5 minut.

@@ -3,7 +3,10 @@ package pl.tvplayer;
 import android.content.Context;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
-import org.json.*;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
+import com.google.gson.stream.JsonToken;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.util.*;
@@ -24,32 +27,80 @@ final class LibraryStore {
         return (javax.crypto.SecretKey) store.getKey("tv-library", null);
     }
     void save(List<Channel> channels, Set<String> favorites) throws Exception {
-        JSONArray items = new JSONArray();
-        for (Channel c : channels) items.put(new JSONObject().put("name", c.name()).put("url", c.url()).put("group", c.group()).put("epg", c.epgId()));
-        byte[] plain = new JSONObject().put("channels", items).put("favorites", new JSONArray(favorites)).toString().getBytes(StandardCharsets.UTF_8);
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE, key());
-        byte[] encrypted = cipher.doFinal(plain);
-        android.util.AtomicFile file = new android.util.AtomicFile(new java.io.File(context.getFilesDir(), "library.enc"));
-        java.io.FileOutputStream out = file.startWrite();
-        try { out.write(cipher.getIV()); out.write(encrypted); file.finishWrite(out); }
-        catch (Exception e) { file.failWrite(out); throw e; }
+        android.util.AtomicFile file = new android.util.AtomicFile(new File(context.getFilesDir(), "library.enc"));
+        FileOutputStream out = file.startWrite();
+        try {
+            out.write(cipher.getIV());
+            // Keep the file open until AtomicFile has synced and committed it.
+            OutputStream keepOpen = new FilterOutputStream(out) {
+                @Override public void write(byte[] b, int offset, int length) throws IOException { out.write(b, offset, length); }
+                @Override public void close() throws IOException { flush(); }
+            };
+            try (JsonWriter writer = new JsonWriter(new BufferedWriter(new OutputStreamWriter(
+                    new CipherOutputStream(keepOpen, cipher), StandardCharsets.UTF_8)))) {
+                writer.beginObject().name("channels").beginArray();
+                for (Channel c : channels) {
+                    writer.beginObject().name("name").value(c.name()).name("url").value(c.url())
+                            .name("group").value(c.group()).name("epg").value(c.epgId()).endObject();
+                }
+                writer.endArray().name("favorites").beginArray();
+                for (String url : favorites) writer.value(url);
+                writer.endArray().endObject();
+            }
+            file.finishWrite(out);
+        } catch (Exception e) { file.failWrite(out); throw e; }
     }
     List<Channel> load(Set<String> favorites) throws Exception {
-        android.util.AtomicFile file = new android.util.AtomicFile(new java.io.File(context.getFilesDir(), "library.enc"));
-        if (!file.getBaseFile().exists()) return new ArrayList<>();
-        byte[] bytes = file.readFully();
-        if (bytes.length < 28) throw new java.io.IOException("Nieprawidłowy zapis biblioteki.");
-        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        cipher.init(Cipher.DECRYPT_MODE, key(), new GCMParameterSpec(128, Arrays.copyOfRange(bytes, 0, 12)));
-        JSONObject root = new JSONObject(new String(cipher.doFinal(Arrays.copyOfRange(bytes, 12, bytes.length)), StandardCharsets.UTF_8));
-        JSONArray saved = root.getJSONArray("favorites");
-        for (int i = 0; i < saved.length(); i++) favorites.add(saved.getString(i));
+        android.util.AtomicFile file = new android.util.AtomicFile(new File(context.getFilesDir(), "library.enc"));
+        // openRead also restores an interrupted AtomicFile backup, when present.
+        if (!file.getBaseFile().exists() && !new File(file.getBaseFile().getPath() + ".bak").exists()) return new ArrayList<>();
         List<Channel> channels = new ArrayList<>();
-        JSONArray items = root.getJSONArray("channels");
-        for (int i = 0; i < items.length(); i++) {
-            JSONObject c = items.getJSONObject(i);
-            channels.add(new Channel(c.getString("name"), c.getString("url"), c.getString("group"), c.optString("epg")));
+        Set<String> savedFavorites = new HashSet<>();
+        try (InputStream input = file.openRead()) {
+            byte[] iv = new byte[12]; int offset = 0;
+            while (offset < iv.length) {
+                int count = input.read(iv, offset, iv.length - offset);
+                if (count < 0) throw new IOException("Nieprawidłowy zapis biblioteki.");
+                offset += count;
+            }
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE, key(), new GCMParameterSpec(128, iv));
+            try (JsonReader reader = new JsonReader(new BufferedReader(new InputStreamReader(
+                    new CipherInputStream(input, cipher), StandardCharsets.UTF_8)))) {
+                reader.beginObject();
+                while (reader.hasNext()) {
+                    switch (reader.nextName()) {
+                        case "channels":
+                            reader.beginArray();
+                            while (reader.hasNext()) {
+                                String name = "", url = "", group = "Bez kategorii", epg = "";
+                                reader.beginObject();
+                                while (reader.hasNext()) {
+                                    switch (reader.nextName()) {
+                                        case "name": name = SourceClient.value(reader); break;
+                                        case "url": url = SourceClient.value(reader); break;
+                                        case "group": group = SourceClient.value(reader); break;
+                                        case "epg": epg = SourceClient.value(reader); break;
+                                        default: reader.skipValue();
+                                    }
+                                }
+                                reader.endObject(); channels.add(new Channel(name, url, group, epg));
+                            }
+                            reader.endArray(); break;
+                        case "favorites":
+                            reader.beginArray();
+                            while (reader.hasNext()) savedFavorites.add(reader.nextString());
+                            reader.endArray(); break;
+                        default: reader.skipValue();
+                    }
+                }
+                reader.endObject();
+                // Reading EOF authenticates the GCM tag before publishing the library.
+                if (reader.peek() != JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowy zapis biblioteki.");
+            }
         }
+        favorites.addAll(savedFavorites);
         return channels;
     }
 }

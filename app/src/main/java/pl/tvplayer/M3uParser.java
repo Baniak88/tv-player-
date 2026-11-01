@@ -1,6 +1,7 @@
 package pl.tvplayer;
 
 import java.net.URI;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -9,10 +10,16 @@ import java.util.regex.Pattern;
 public final class M3uParser {
     private static final Pattern ATTRIBUTE = Pattern.compile("([\\w-]+)=\"([^\"]*)\"");
     public static List<Channel> parse(String text, String baseUrl) {
+        try { return parse(new StringReader(text), baseUrl); }
+        catch (IOException impossible) { throw new java.io.UncheckedIOException(impossible); }
+    }
+    public static List<Channel> parse(Reader source, String baseUrl) throws IOException {
+        BufferedReader reader = source instanceof BufferedReader ? (BufferedReader) source : new BufferedReader(source);
         List<Channel> channels = new ArrayList<>();
         String name = "", group = "Bez kategorii", epg = "";
-        for (String raw : text.replace("\uFEFF", "").split("\\r?\\n")) {
-            String line = raw.trim();
+        String raw;
+        while ((raw = reader.readLine()) != null) {
+            String line = raw.replace("\uFEFF", "").trim();
             if (line.startsWith("#EXTINF:")) {
                 int comma = -1;
                 boolean quoted = false;

@@ -167,7 +167,7 @@ public class MainActivity extends Activity {
             load(() -> {
                 try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
                     if (in == null) throw new java.io.IOException("Nie można otworzyć pliku.");
-                    return M3uParser.parse(SourceClient.readLimited(in), null);
+                    return M3uParser.parse(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8), null);
                 }
             });
         }
