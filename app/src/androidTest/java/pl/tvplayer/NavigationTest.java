@@ -65,9 +65,15 @@ public class NavigationTest {
         store.saveFavorites(Collections.singleton(tv.get(0).url()));
         assertTrue(Arrays.equals(before,java.nio.file.Files.readAllBytes(movie.toPath())));
         assertEquals(40000,store.loadSection("movie",new HashSet<>()).size());
+        List<Channel> ranked=Collections.singletonList(new Channel("Ranked TV","https://example.com/ranked.ts","News","","tv","",0,"UTC",3));
+        store.updateSection("tv",ranked);
+        assertEquals(3,store.loadSection("tv",new HashSet<>()).get(0).bouquetOrder());
+        assertEquals(40000,store.loadSection("movie",new HashSet<>()).size());
         // An unrelated damaged VOD file must not prevent TV from opening.
+        generation=new String(java.nio.file.Files.readAllBytes(new java.io.File(context.getFilesDir(),"catalog.current").toPath()),java.nio.charset.StandardCharsets.UTF_8);
+        movie=new java.io.File(context.getFilesDir(),"catalog-"+generation+"-movie.enc");
         try(java.io.FileOutputStream out=new java.io.FileOutputStream(movie)) { out.write(new byte[]{1,2,3}); }
-        assertEquals(1000,store.loadSection("tv",new HashSet<>()).size());
+        assertEquals(1,store.loadSection("tv",new HashSet<>()).size());
         boolean rejected=false; try { store.loadSection("movie",new HashSet<>()); } catch(Exception expected) { rejected=true; }
         assertTrue(rejected);
         store.save(Collections.emptyList(),Collections.emptySet());
@@ -88,6 +94,11 @@ public class NavigationTest {
         assertTrue(new java.io.File(context.getFilesDir(),"catalog.current").exists());
         assertFalse(new java.io.File(context.getFilesDir(),"library.enc").exists());
         assertEquals("Legacy",store.loadSection("tv",new HashSet<>()).get(0).name());
+        LibraryStore stale=new LibraryStore(context); List<Channel> oldRows=stale.loadSection("tv",new HashSet<>());
+        Channel fresh=new Channel("Fresh","https://example.com/fresh.ts","New","","tv","",0,"UTC",5);
+        store.save(Collections.singletonList(fresh),Collections.singleton(fresh.url()));
+        stale.updateSection("tv",oldRows);
+        assertEquals("Fresh",store.loadSection("tv",new HashSet<>()).get(0).name());
         store.save(Collections.emptyList(),Collections.emptySet());
     }
     private void clickGridText(View root,String text) {
@@ -105,29 +116,92 @@ public class NavigationTest {
         }
         bitmap.recycle();
     }
-    @Test public void testHomeDashboardAndVisibleBouquets() throws Exception {
+    private View description(View root,String text) {
+        if(text.contentEquals(root.getContentDescription()==null?"":root.getContentDescription())) return root;
+        if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { View found=description(((ViewGroup)root).getChildAt(i),text); if(found!=null) return found; }
+        return null;
+    }
+    private android.widget.GridView grid(View root) {
+        if(root instanceof android.widget.GridView) return (android.widget.GridView)root;
+        if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { android.widget.GridView found=grid(((ViewGroup)root).getChildAt(i)); if(found!=null) return found; }
+        return null;
+    }
+    private void clickDialog(String text) throws Exception {
+        java.util.List<android.view.accessibility.AccessibilityNodeInfo> nodes=new ArrayList<>();
+        long deadline=System.currentTimeMillis()+4000;
+        while(nodes.isEmpty() && System.currentTimeMillis()<deadline) {
+            Thread.sleep(100);
+            android.view.accessibility.AccessibilityNodeInfo root=getInstrumentation().getUiAutomation().getRootInActiveWindow();
+            if(root!=null) nodes=root.findAccessibilityNodeInfosByText(text);
+        }
+        assertFalse(nodes.isEmpty()); android.graphics.Rect bounds=new android.graphics.Rect(); nodes.get(0).getBoundsInScreen(bounds);
+        long now=android.os.SystemClock.uptimeMillis();
+        getInstrumentation().sendPointerSync(android.view.MotionEvent.obtain(now,now,android.view.MotionEvent.ACTION_DOWN,bounds.centerX(),bounds.centerY(),0));
+        getInstrumentation().sendPointerSync(android.view.MotionEvent.obtain(now,now+30,android.view.MotionEvent.ACTION_UP,bounds.centerX(),bounds.centerY(),0));
+        getInstrumentation().waitForIdleSync();
+    }
+    @Test public void testHomeWithoutBouquetsAndProviderSorting() throws Exception {
         Context context=getInstrumentation().getTargetContext();
+        context.getSharedPreferences("catalog-ui",Context.MODE_PRIVATE).edit().clear().commit();
         new LibraryStore(context).save(Arrays.asList(
-            new Channel("Sport 1","https://example.com/sport.ts","Sport","","tv"),
-            new Channel("Sport 2","https://example.com/sport2.ts","Sport","","tv"),
-            new Channel("Kids 1","https://example.com/kids.ts","Dzieci","","tv")),Collections.emptySet());
+            new Channel("Sport 1","https://example.com/sport.ts","Sport","","tv","",0,"UTC",0),
+            new Channel("Sport 2","https://example.com/sport2.ts","Sport","","tv","",0,"UTC",0),
+            new Channel("Kids 1","https://example.com/kids.ts","Dzieci","","tv","",0,"UTC",1)),Collections.emptySet());
         HomeActivity home=(HomeActivity)getInstrumentation().startActivitySync(new Intent(context,HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        View root=home.getWindow().getDecorView(); waitForText(root,"Sport");
-        assertNotNull(find(root,"Telewizja na żywo")); assertNotNull(find(root,"Filmy")); assertNotNull(find(root,"Seriale"));
-        assertNotNull(find(root,"Konto")); assertNotNull(find(root,"Zmień źródło")); assertNotNull(find(root,"Ustawienia"));
-        assertNotNull(find(root,"Odśwież widok")); assertNotNull(find(root,"Wyjście")); assertNotNull(find(root,"Dzieci"));
+        View root=home.getWindow().getDecorView(); waitForText(root,"Telewizja na żywo");
+        assertNotNull(find(root,"Filmy")); assertNotNull(find(root,"Seriale")); assertNotNull(find(root,"Konto")); assertNotNull(find(root,"Zmień źródło"));
+        assertNull(find(root,"Sport")); assertNull(find(root,"Dzieci")); assertNull(find(root,"BUKIETY TV"));
         screenshot("home-portrait.png");
         android.app.Instrumentation.ActivityMonitor monitor=getInstrumentation().addMonitor(MainActivity.class.getName(),null,false);
-        getInstrumentation().runOnMainSync(() -> ((View)find(root,"Sport").getParent()).performClick());
+        getInstrumentation().runOnMainSync(() -> ((View)find(root,"Telewizja na żywo").getParent()).performClick());
         MainActivity catalog=(MainActivity)monitor.waitForActivityWithTimeout(5000); assertNotNull(catalog);
-        waitForText(catalog.getWindow().getDecorView(),"Sport 1");
-        assertNull(find(catalog.getWindow().getDecorView(),"Kids 1")); screenshot("sport-bouquet.png");
+        View catalogRoot=catalog.getWindow().getDecorView(); waitForText(catalogRoot,"Sport");
+        assertEquals("Sport",grid(catalogRoot).getAdapter().getItem(1)); assertEquals("Dzieci",grid(catalogRoot).getAdapter().getItem(2));
+        getInstrumentation().runOnMainSync(() -> description(catalogRoot,"Sortuj bukiety").performClick());
+        clickDialog("Nazwa A–Z");
+        assertEquals("Dzieci",grid(catalogRoot).getAdapter().getItem(1));
+        assertEquals("az",context.getSharedPreferences("catalog-ui",Context.MODE_PRIVATE).getString("sort-tv",""));
+        getInstrumentation().runOnMainSync(() -> description(catalogRoot,"Sortuj bukiety").performClick());
+        clickDialog("Kolejność dostawcy");
+        assertEquals("Sport",grid(catalogRoot).getAdapter().getItem(1));
+        screenshot("bouquets-grid.png");
+        getInstrumentation().runOnMainSync(() -> clickGridText(catalogRoot,"Sport"));
+        waitForText(catalogRoot,"Sport 1"); assertNull(find(catalogRoot,"Kids 1")); screenshot("sport-bouquet.png");
         getInstrumentation().removeMonitor(monitor);
-        getInstrumentation().runOnMainSync(catalog::finish);
-        getInstrumentation().waitForIdleSync();
+        getInstrumentation().runOnMainSync(catalog::finish); getInstrumentation().waitForIdleSync();
         getInstrumentation().runOnMainSync(() -> home.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));
         Thread.sleep(1000); getInstrumentation().waitForIdleSync(); screenshot("home-landscape.png");
         getInstrumentation().runOnMainSync(home::finish);
+    }
+    private void shell(String command) throws Exception {
+        try(android.os.ParcelFileDescriptor.AutoCloseInputStream stream=new android.os.ParcelFileDescriptor.AutoCloseInputStream(getInstrumentation().getUiAutomation().executeShellCommand(command))) {
+            byte[] buffer=new byte[1024]; while(stream.read(buffer)!=-1) {}
+        }
+    }
+    @Test public void testFullscreenWithSystemRotationLocked() throws Exception {
+        Context context=getInstrumentation().getTargetContext();
+        int original=android.provider.Settings.System.getInt(context.getContentResolver(),android.provider.Settings.System.ACCELEROMETER_ROTATION,1);
+        PlayerActivity player=null;
+        java.io.File ready=new java.io.File(context.getFilesDir(),"rotation-ready"),landscape=new java.io.File(context.getFilesDir(),"rotation-landscape-ok");
+        try {
+            shell("settings put system accelerometer_rotation 0");
+            player=(PlayerActivity)getInstrumentation().startActivitySync(new Intent(context,PlayerActivity.class).putExtra("url","https://example.com/test.mp4").putExtra("name","Rotation lock test").putExtra("kind","movie").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            getInstrumentation().waitForIdleSync(); Thread.sleep(500); ready.createNewFile();
+            long deadline=System.currentTimeMillis()+20000;
+            while(player.getResources().getConfiguration().orientation!=android.content.res.Configuration.ORIENTATION_LANDSCAPE && System.currentTimeMillis()<deadline) Thread.sleep(100);
+            assertEquals("Physical rotation did not reach landscape",android.content.res.Configuration.ORIENTATION_LANDSCAPE,player.getResources().getConfiguration().orientation);
+            int requested=player.getRequestedOrientation();
+            assertTrue(requested==ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE || requested==ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
+            assertEquals(0,android.provider.Settings.System.getInt(context.getContentResolver(),android.provider.Settings.System.ACCELEROMETER_ROTATION,1));
+            landscape.createNewFile(); deadline=System.currentTimeMillis()+20000;
+            while(player.getResources().getConfiguration().orientation!=android.content.res.Configuration.ORIENTATION_PORTRAIT && System.currentTimeMillis()<deadline) Thread.sleep(100);
+            assertEquals("Physical rotation did not return to portrait",android.content.res.Configuration.ORIENTATION_PORTRAIT,player.getResources().getConfiguration().orientation);
+            assertEquals(0,android.provider.Settings.System.getInt(context.getContentResolver(),android.provider.Settings.System.ACCELEROMETER_ROTATION,1));
+            android.util.Log.i("RotationTest","Landscape and portrait passed with accelerometer_rotation=0");
+        } finally {
+            ready.delete(); landscape.delete(); shell("settings put system accelerometer_rotation "+original);
+            final PlayerActivity closing=player; if(closing!=null) getInstrumentation().runOnMainSync(closing::finish);
+        }
     }
     private View find(View root,String text) {
         if(root instanceof TextView && text.equals(((TextView)root).getText().toString())) return root;
@@ -160,7 +234,7 @@ public class NavigationTest {
         waitForText(root,"Test Serial"); assertNotNull(find(root,"Test Serial")); assertNull(find(root,"Test Film"));
         PlayerActivity player=(PlayerActivity)getInstrumentation().startActivitySync(new Intent(context,PlayerActivity.class).putExtra("url","https://example.com/movie.mp4").putExtra("name","Test Film").putExtra("kind","movie").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         getInstrumentation().waitForIdleSync();
-        assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR,player.getRequestedOrientation());
+        assertTrue((player.getWindow().getDecorView().getSystemUiVisibility() & View.SYSTEM_UI_FLAG_FULLSCREEN)!=0);
         getInstrumentation().runOnMainSync(() -> find(player.getWindow().getDecorView(),"↙").performClick());
         getInstrumentation().waitForIdleSync(); assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,player.getRequestedOrientation());
         getInstrumentation().runOnMainSync(() -> find(player.getWindow().getDecorView(),"⤢").performClick());

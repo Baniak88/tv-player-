@@ -1,6 +1,9 @@
 package pl.tvplayer;
 
-public record Channel(String name, String url, String group, String epgId, String kind, String guideUrl, int archiveDays, String timezone) {
+public record Channel(String name, String url, String group, String epgId, String kind, String guideUrl, int archiveDays, String timezone, int bouquetOrder) {
+    public Channel(String name,String url,String group,String epgId,String kind,String guideUrl,int archiveDays,String timezone) {
+        this(name,url,group,epgId,kind,guideUrl,archiveDays,timezone,Integer.MAX_VALUE);
+    }
     public Channel(String name,String url,String group,String epgId,String kind) {
         this(name,url,group,epgId,kind,"",0,"UTC");
     }

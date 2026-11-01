@@ -21,7 +21,9 @@ public class PlayerActivity extends Activity {
     private Button full;
     private String url, bookmark;
     private long position;
-    private boolean fullscreen=true, onDemand;
+    private boolean fullscreen=true, onDemand, resumed, enteringPip;
+    private OrientationEventListener rotation;
+    private int sensorOrientation=ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR;
     private LinearLayout toolbar;
     private final java.util.concurrent.ExecutorService guideWorker=java.util.concurrent.Executors.newSingleThreadExecutor();
     private static final int RECORD_FILE=72;
@@ -67,10 +69,19 @@ public class PlayerActivity extends Activity {
         Button retry=action("Spróbuj ponownie"); error.addView(retry);
         retry.setOnClickListener(v -> { if(player!=null) { error.setVisibility(View.GONE); player.prepare(); player.play(); } });
         error.setVisibility(View.GONE); root.addView(error,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
+        rotation=new OrientationEventListener(this,android.hardware.SensorManager.SENSOR_DELAY_NORMAL) {
+            @Override public void onOrientationChanged(int angle) {
+                if(!resumed || !fullscreen || enteringPip || isInPictureInPictureMode()) return;
+                int requested=FullscreenRotation.requested(angle,sensorOrientation);
+                if(requested!=sensorOrientation) { sensorOrientation=requested; setRequestedOrientation(requested); }
+            }
+        };
         setContentView(root); updateFullscreen();
     }
     private void updateFullscreen() {
-        setRequestedOrientation(fullscreen?ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR:ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        if(enteringPip || isInPictureInPictureMode()) return;
+        setRequestedOrientation(fullscreen?sensorOrientation:ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        if(rotation!=null) { if(fullscreen && resumed && !enteringPip && !isInPictureInPictureMode()) rotation.enable(); else rotation.disable(); }
         int flags=fullscreen?View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION:0;
         getWindow().getDecorView().setSystemUiVisibility(flags);
         FrameLayout.LayoutParams size=(FrameLayout.LayoutParams)view.getLayoutParams();
@@ -111,14 +122,16 @@ public class PlayerActivity extends Activity {
         if(!getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
             Toast.makeText(this,"Ten telefon nie udostępnia PiP.",Toast.LENGTH_LONG).show(); return;
         }
+        enteringPip=true; if(rotation!=null) rotation.disable();
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         try {
             boolean entered=enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new android.util.Rational(16,9)).build());
-            if(!entered) { updateFullscreen(); Toast.makeText(this,"Włącz zgodę Obraz w obrazie w ustawieniach aplikacji.",Toast.LENGTH_LONG).show(); }
-        } catch(IllegalStateException | IllegalArgumentException e) { updateFullscreen(); Toast.makeText(this,"Nie można włączyć PiP. Sprawdź ustawienia aplikacji.",Toast.LENGTH_LONG).show(); }
+            if(!entered) { enteringPip=false; updateFullscreen(); Toast.makeText(this,"Włącz zgodę Obraz w obrazie w ustawieniach aplikacji.",Toast.LENGTH_LONG).show(); }
+        } catch(IllegalStateException | IllegalArgumentException e) { enteringPip=false; updateFullscreen(); Toast.makeText(this,"Nie można włączyć PiP. Sprawdź ustawienia aplikacji.",Toast.LENGTH_LONG).show(); }
     }
     @Override public void onPictureInPictureModeChanged(boolean inPip,Configuration config) {
         super.onPictureInPictureModeChanged(inPip,config); toolbar.setVisibility(inPip?View.GONE:View.VISIBLE); view.setUseController(!inPip);
+        enteringPip=false; if(inPip && rotation!=null) rotation.disable();
         if(!inPip) updateFullscreen();
     }
     private void chooseRecording() {
@@ -145,6 +158,8 @@ public class PlayerActivity extends Activity {
             } catch(RuntimeException e) { Toast.makeText(this,"Nie można uruchomić nagrywania. Sprawdź uprawnienia i plik.",Toast.LENGTH_LONG).show(); }
         }
     }
+    @Override protected void onResume() { super.onResume(); resumed=true; if(!isInPictureInPictureMode()) updateFullscreen(); }
+    @Override protected void onPause() { resumed=false; if(rotation!=null) rotation.disable(); super.onPause(); }
     @Override protected void onStart() {
         super.onStart(); if(url==null) return;
         if(player!=null) return;
@@ -195,7 +210,7 @@ public class PlayerActivity extends Activity {
     }
     @Override protected void onDestroy() {
         if(player!=null) { view.setPlayer(null); player.release(); player=null; }
-        guideWorker.shutdown(); super.onDestroy();
+        if(rotation!=null) rotation.disable(); guideWorker.shutdown(); super.onDestroy();
     }
     @Override protected void onSaveInstanceState(Bundle out) {
         out.putLong("position",player==null?position:player.getCurrentPosition()); out.putBoolean("fullscreen",fullscreen); super.onSaveInstanceState(out);

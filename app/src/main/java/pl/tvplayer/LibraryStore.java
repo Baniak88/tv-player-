@@ -17,6 +17,7 @@ final class LibraryStore {
     private static final Object LOCK=new Object();
     private final Context context;
     private javax.crypto.SecretKey cachedKey;
+    private final Map<String,byte[]> loadedFingerprints=new HashMap<>();
     LibraryStore(Context context) { this.context=context.getApplicationContext(); }
     private javax.crypto.SecretKey key() throws Exception {
         if(cachedKey!=null) return cachedKey;
@@ -48,6 +49,9 @@ final class LibraryStore {
         // One bulk operation avoids a hardware-keystore IPC for every 512-byte CipherInputStream read.
         return cipher.doFinal(bytes,12,bytes.length-12);
     }
+    private byte[] fingerprint(String name) throws Exception {
+        return java.security.MessageDigest.getInstance("SHA-256").digest(file(name).readFully());
+    }
     private String generation() throws IOException {
         AtomicFile current=file("catalog.current");
         try {
@@ -59,10 +63,10 @@ final class LibraryStore {
     private void writeChannel(JsonWriter writer,Channel c) throws IOException {
         writer.beginObject().name("name").value(c.name()).name("url").value(c.url()).name("group").value(c.group())
             .name("epg").value(c.epgId()).name("kind").value(c.kind()).name("guide").value(c.guideUrl())
-            .name("archiveDays").value(c.archiveDays()).name("timezone").value(c.timezone()).endObject();
+            .name("archiveDays").value(c.archiveDays()).name("timezone").value(c.timezone()).name("bouquetOrder").value(c.bouquetOrder()).endObject();
     }
     private Channel readChannel(JsonReader reader) throws IOException {
-        String name="",url="",group="Bez kategorii",epg="",kind="",guide="",timezone="UTC"; int days=0;
+        String name="",url="",group="Bez kategorii",epg="",kind="",guide="",timezone="UTC"; int days=0,order=Integer.MAX_VALUE;
         reader.beginObject();
         while(reader.hasNext()) {
             switch(reader.nextName()) {
@@ -73,11 +77,12 @@ final class LibraryStore {
                 case "kind": kind=SourceClient.value(reader); break;
                 case "guide": guide=SourceClient.value(reader); break;
                 case "timezone": timezone=SourceClient.value(reader); break;
+                case "bouquetOrder": try { order=Integer.parseInt(SourceClient.value(reader)); } catch(NumberFormatException ignored) {} break;
                 case "archiveDays": try { days=Integer.parseInt(SourceClient.value(reader)); } catch(NumberFormatException ignored) {} break;
                 default: reader.skipValue();
             }
         }
-        reader.endObject(); return new Channel(name,url,group,epg,kind,guide,days,timezone);
+        reader.endObject(); return new Channel(name,url,group,epg,kind,guide,days,timezone,order);
     }
     void save(List<Channel> channels,Set<String> favorites) throws Exception {
         synchronized(LOCK) {
@@ -102,7 +107,37 @@ final class LibraryStore {
                 String name=entry.getName();
                 if(name.startsWith("catalog-") && !name.startsWith("catalog-"+next+"-") && name.endsWith(".enc")) file(name).delete();
             }
-            file("library.enc").delete();
+            file("library.enc").delete(); loadedFingerprints.clear();
+        }
+    }
+    void updateSection(String section,List<Channel> items) throws Exception {
+        synchronized(LOCK) {
+            if(!Arrays.asList("tv","movie","series").contains(section)) throw new IllegalArgumentException("Nieprawidłowa sekcja.");
+            String previous=generation(); if(previous==null) return;
+            byte[] expected=loadedFingerprints.get(section);
+            if(expected!=null && !java.security.MessageDigest.isEqual(expected,fingerprint("catalog-"+previous+"-"+section+".enc"))) return;
+            String next=UUID.randomUUID().toString();
+            try {
+                for(String part:new String[]{"tv","movie","series"}) {
+                    String destination="catalog-"+next+"-"+part+".enc";
+                    if(part.equals(section)) {
+                        ByteArrayOutputStream compressed=new ByteArrayOutputStream();
+                        try(JsonWriter writer=new JsonWriter(new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(compressed),StandardCharsets.UTF_8)))) {
+                            writer.beginArray(); for(Channel c:items) writeChannel(writer,c); writer.endArray();
+                        }
+                        encryptedWrite(destination,compressed.toByteArray());
+                    } else {
+                        // Copy unchanged encrypted sections without decrypting or scanning VOD.
+                        write(file(destination),file("catalog-"+previous+"-"+part+".enc").readFully());
+                    }
+                }
+                write(file("catalog.current"),next.getBytes(StandardCharsets.UTF_8));
+            } catch(Exception e) {
+                for(String part:new String[]{"tv","movie","series"}) file("catalog-"+next+"-"+part+".enc").delete();
+                throw e;
+            }
+            loadedFingerprints.put(section,fingerprint("catalog-"+next+"-"+section+".enc"));
+            for(String part:new String[]{"tv","movie","series"}) file("catalog-"+previous+"-"+part+".enc").delete();
         }
     }
     void saveFavorites(Set<String> favorites) throws Exception {
@@ -128,7 +163,7 @@ final class LibraryStore {
             String current=generation();
             if(current==null) {
                 List<Channel> old=loadLegacy(favorites);
-                if(!old.isEmpty() || !favorites.isEmpty()) save(old,favorites);
+                if(!old.isEmpty() || !favorites.isEmpty()) { save(old,favorites); loadedFingerprints.put(section,fingerprint("catalog-"+generation()+"-"+section+".enc")); }
                 List<Channel> result=new ArrayList<>(); for(Channel c:old) if(c.section().equals(section)) result.add(c);
                 return result;
             }
@@ -138,6 +173,7 @@ final class LibraryStore {
                 reader.beginArray(); while(reader.hasNext()) result.add(readChannel(reader)); reader.endArray();
                 if(reader.peek()!=JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowy zapis katalogu.");
             }
+            loadedFingerprints.put(section,fingerprint("catalog-"+current+"-"+section+".enc"));
             readFavorites(favorites); return result;
         }
     }

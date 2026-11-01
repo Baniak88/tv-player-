@@ -44,7 +44,7 @@ public final class SourceClient {
     }
     static Map<String, String> readCategories(Reader source) throws IOException {
         JsonReader reader = new JsonReader(source);
-        Map<String, String> result = new HashMap<>();
+        Map<String, String> result = new LinkedHashMap<>();
         reader.beginArray();
         while (reader.hasNext()) {
             String id = "", name = "Bez kategorii";
@@ -67,6 +67,8 @@ public final class SourceClient {
     }
     static List<Channel> readCatalog(Reader source, HttpUrl base, String user, String pass, Map<String,String> categories, String kind) throws IOException {
         JsonReader reader = new JsonReader(source);
+        Map<String,Integer> ranks=new HashMap<>(); int order=0;
+        for(String id:categories.keySet()) ranks.put(id,order++);
         List<Channel> result = new ArrayList<>();
         reader.beginArray();
         while (reader.hasNext()) {
@@ -97,7 +99,7 @@ public final class SourceClient {
                     .addPathSegment(id + (kind.equals("tv") ? ".ts" : "." + extension)).build().toString();
             }
             String guide=kind.equals("tv")?api(base,user,pass,"get_simple_data_table").newBuilder().addQueryParameter("stream_id",id).build().toString():"";
-            result.add(new Channel(name,url,categories.getOrDefault(category,"Bez kategorii"),epg,kind,guide,archive==1?Math.max(0,days):0,"UTC"));
+            result.add(new Channel(name,url,categories.getOrDefault(category,"Bez kategorii"),epg,kind,guide,archive==1?Math.max(0,days):0,"UTC",ranks.getOrDefault(category,Integer.MAX_VALUE)));
         }
         reader.endArray();
         if (reader.peek() != JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowa odpowiedź serwera.");
@@ -118,12 +120,40 @@ public final class SourceClient {
         String timezone="UTC";
         if(root.has("server_info") && root.get("server_info").isJsonObject())
             timezone=Guide.field(root.getAsJsonObject("server_info"),"timezone","UTC");
-        for(int i=0;i<all.size();i++) { Channel c=all.get(i); all.set(i,new Channel(c.name(),c.url(),c.group(),c.epgId(),c.kind(),c.guideUrl(),c.archiveDays(),timezone)); }
+        for(int i=0;i<all.size();i++) { Channel c=all.get(i); all.set(i,new Channel(c.name(),c.url(),c.group(),c.epgId(),c.kind(),c.guideUrl(),c.archiveDays(),timezone,c.bouquetOrder())); }
         Map<String,String> movieCategories = get(api(base,user,pass,"get_vod_categories"),SourceClient::readCategories);
         all.addAll(get(api(base,user,pass,"get_vod_streams"),reader -> readCatalog(reader,streamBase,user,pass,movieCategories,"movie")));
         Map<String,String> seriesCategories = get(api(base,user,pass,"get_series_categories"),SourceClient::readCategories);
         all.addAll(get(api(base,user,pass,"get_series"),reader -> readCatalog(reader,streamBase,user,pass,seriesCategories,"series")));
         return all;
+    }
+    static HttpUrl accountEndpoint(Channel c) throws IOException {
+        if(!c.guideUrl().isEmpty()) return validate(c.guideUrl());
+        HttpUrl url=validate(c.url());
+        if(url.queryParameter("username")!=null && url.queryParameter("password")!=null && url.encodedPath().endsWith("/player_api.php")) return url;
+        List<String> parts=url.pathSegments(); int index=-1;
+        for(int i=0;i<parts.size();i++) if(parts.get(i).equals("live") || parts.get(i).equals("movie") || parts.get(i).equals("series")) { index=i; break; }
+        if(index<0 || parts.size()!=index+4) return null;
+        HttpUrl.Builder base=url.newBuilder().query(null);
+        for(int i=parts.size()-1;i>=index;i--) base.removePathSegment(i);
+        return base.addPathSegment("player_api.php").addQueryParameter("username",parts.get(index+1)).addQueryParameter("password",parts.get(index+2)).build();
+    }
+    public List<Channel> refreshCategoryOrder(List<Channel> items,String section) throws IOException {
+        if(items.isEmpty()) return items;
+        HttpUrl account=accountEndpoint(items.get(0)); if(account==null) return items;
+        String action=section.equals("tv")?"get_live_categories":section.equals("movie")?"get_vod_categories":"get_series_categories";
+        HttpUrl endpoint=account.newBuilder().removeAllQueryParameters("stream_id").removeAllQueryParameters("series_id").setQueryParameter("action",action).build();
+        Map<String,String> categories=get(endpoint,SourceClient::readCategories);
+        if(categories.isEmpty()) return items;
+        return BouquetOrder.applyRanks(items,categories);
+    }
+    public List<Channel> refreshCatalog(List<Channel> items) throws Exception {
+        if(items.isEmpty()) throw new IOException("Brak zapisanego konta. Dodaj źródło.");
+        HttpUrl account=accountEndpoint(items.get(0));
+        if(account==null) throw new IOException("Tej listy nie można odświeżyć przez Xtream. Dodaj ponownie adres M3U.");
+        String user=account.queryParameter("username"),pass=account.queryParameter("password");
+        HttpUrl server=account.newBuilder().query(null).removePathSegment(account.pathSize()-1).build();
+        return xtream(server.toString(),user,pass);
     }
     public List<Guide.Program> guide(Channel channel) throws IOException {
         return get(Guide.endpoint(channel),reader -> Guide.parse(reader,channel.timezone()));

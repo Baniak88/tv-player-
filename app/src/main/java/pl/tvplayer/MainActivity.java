@@ -14,6 +14,10 @@ import java.util.concurrent.*;
 public class MainActivity extends Activity {
     private static final int FILE_REQUEST = 41;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private final ExecutorService network = Executors.newFixedThreadPool(2);
+    private final Set<String> orderRequested=new HashSet<>();
+    private int catalogGeneration;
+    private boolean syncingOrder;
     private List<Channel> channels = new ArrayList<>(), shown = new ArrayList<>();
     private final Set<String> loadedSections = new HashSet<>();
     private final Map<String,List<Channel>> sectionIndex = new HashMap<>();
@@ -27,10 +31,11 @@ public class MainActivity extends Activity {
     private GridView bouquets;
     private TextView catalogTitle;
     private Button bouquetButton;
+    private Button sortButton;
     private LinearLayout emptyPanel;
     private boolean showingBouquets=true;
     private List<String> bouquetNames=new ArrayList<>();
-    private final Map<String,Integer> bouquetCounts=new TreeMap<>();
+    private final Map<String,Integer> bouquetCounts=new LinkedHashMap<>();
     private ListView list;
     private Button favoriteButton, addButton;
     private boolean onlyFavorites, busy;
@@ -62,7 +67,11 @@ public class MainActivity extends Activity {
         home.setOnClickListener(v -> { startActivity(new Intent(this,HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)); finish(); });
         TextView brand=label("TV PLAYER",16); brand.setTypeface(null,Typeface.BOLD); brand.setGravity(Gravity.END);
         top.addView(brand,new LinearLayout.LayoutParams(0,-2,1)); brand.setVisibility(wide?View.GONE:View.VISIBLE); root.addView(top);
-        TextView title=label("Twoje bukiety",26); catalogTitle=title; title.setTypeface(null,Typeface.BOLD); root.addView(title); title.setVisibility(wide?View.GONE:View.VISIBLE);
+        TextView title=label("Twoje bukiety",26); catalogTitle=title; title.setTypeface(null,Typeface.BOLD); LinearLayout titleBar=new LinearLayout(this); titleBar.setGravity(Gravity.CENTER_VERTICAL);
+        titleBar.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        sortButton=button("↕"); sortButton.setTextSize(24); sortButton.setContentDescription("Sortuj bukiety");
+        titleBar.addView(sortButton,new LinearLayout.LayoutParams(dp(48),dp(44))); sortButton.setOnClickListener(v -> chooseSort());
+        root.addView(titleBar); titleBar.setVisibility(wide?View.GONE:View.VISIBLE);
         TextView sub=label("Wybierz temat, potem to, co chcesz oglądać.",13); sub.setTextColor(0xFFBA9CAA); sub.setPadding(0,dp(5),0,dp(16)); root.addView(sub); sub.setVisibility(wide?View.GONE:View.VISIBLE);
         LinearLayout tabs=new LinearLayout(this);
         String[][] sections={{"tv","TV"},{"series","Seriale"},{"movie","Filmy"}};
@@ -75,7 +84,7 @@ public class MainActivity extends Activity {
                 for(java.util.Map.Entry<String,Button> item:sectionButtons.entrySet()) primary(item.getValue(),item.getKey().equals(section));
                 search.setText(""); if(loadedSections.contains(section)) refreshGroups(); else loadCachedSection(section); });
         }
-        LinearLayout.LayoutParams tabSize=new LinearLayout.LayoutParams(-1,-2); tabSize.bottomMargin=dp(12); if(wide) top.addView(tabs,new LinearLayout.LayoutParams(0,dp(44),1)); else root.addView(tabs,tabSize);
+        LinearLayout.LayoutParams tabSize=new LinearLayout.LayoutParams(-1,-2); tabSize.bottomMargin=dp(12); if(wide) { top.addView(tabs,new LinearLayout.LayoutParams(0,dp(44),1)); titleBar.removeView(sortButton); top.addView(sortButton,new LinearLayout.LayoutParams(dp(48),dp(44))); } else root.addView(tabs,tabSize);
         search=input("Szukaj w wybranej sekcji…",false); if(!wide) root.addView(search);
         LinearLayout tools=new LinearLayout(this); tools.setGravity(Gravity.CENTER_VERTICAL);
         if(wide) tools.addView(search,new LinearLayout.LayoutParams(0,dp(46),1));
@@ -133,7 +142,12 @@ public class MainActivity extends Activity {
                     channels.removeIf(c -> c.section().equals(requested)); channels.addAll(loaded); sectionIndex.put(requested,loaded);
                     if(loadedSections.isEmpty()) { favorites.clear(); favorites.addAll(savedFavorites); }
                     loadedSections.add(requested); busy=false; addButton.setEnabled(true); refreshGroups();
+                    if(loaded.stream().anyMatch(c -> c.bouquetOrder()==Integer.MAX_VALUE)) syncOrder(requested,false);
                     if(getIntent().getBooleanExtra("open_source",false)) { getIntent().removeExtra("open_source"); sourceMenu(); }
+                    if(getIntent().getBooleanExtra("refresh_source",false)) {
+                        getIntent().removeExtra("refresh_source");
+                        load(() -> new SourceClient().refreshCatalog(loaded));
+                    }
                 });
             } catch(Exception e) {
                 runOnUiThread(() -> {
@@ -158,10 +172,41 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2); size.bottomMargin=dp(10); e.setLayoutParams(size); return e;
     }
     private ScrollView scroll(LinearLayout form) { ScrollView s=new ScrollView(this); s.addView(form); return s; }
+    private String sortMode() { return getSharedPreferences("catalog-ui",MODE_PRIVATE).getString("sort-"+section,"provider"); }
+    private void chooseSort() {
+        String mode=sortMode(); int selected=0;
+        for(int i=0;i<BouquetOrder.MODES.length;i++) if(BouquetOrder.MODES[i].equals(mode)) selected=i;
+        new AlertDialog.Builder(this).setTitle("Sortowanie bukietów").setSingleChoiceItems(BouquetOrder.LABELS,selected,(dialog,index) -> {
+            getSharedPreferences("catalog-ui",MODE_PRIVATE).edit().putString("sort-"+section,BouquetOrder.MODES[index]).apply();
+            showingBouquets=true; onlyFavorites=false; primary(libraryButton,true); primary(favoriteButton,false); selectedGroup="Wszystkie kategorie"; search.setText(""); dialog.dismiss(); refreshGroups();
+            if(index==0) syncOrder(section,true);
+        }).setNegativeButton("Anuluj",null).show();
+    }
+    private void syncOrder(String requested,boolean force) {
+        if(!force && !orderRequested.add(requested)) return;
+        final int generation=catalogGeneration;
+        List<Channel> snapshot=new ArrayList<>(sectionIndex.getOrDefault(requested,Collections.emptyList()));
+        if(snapshot.isEmpty()) return;
+        syncingOrder=true; filter();
+        network.execute(() -> {
+            try {
+                List<Channel> updated=new SourceClient().refreshCategoryOrder(snapshot,requested);
+                runOnUiThread(() -> {
+                    if(isDestroyed() || generation!=catalogGeneration) return;
+                    syncingOrder=false;
+                    if(!updated.equals(snapshot)) {
+                        channels.removeIf(c -> c.section().equals(requested)); channels.addAll(updated); sectionIndex.put(requested,updated);
+                        if(!worker.isShutdown()) worker.execute(() -> { try { store.updateSection(requested,updated); } catch(Exception ignored) {} });
+                    }
+                    refreshGroups();
+                });
+            } catch(Exception e) { runOnUiThread(() -> { if(!isDestroyed() && generation==catalogGeneration) { syncingOrder=false; filter(); } }); }
+        });
+    }
     private void refreshGroups() {
         bouquetCounts.clear();
         List<Channel> items=sectionIndex.getOrDefault(section,Collections.emptyList());
-        for(Channel c:items) bouquetCounts.put(c.group(),bouquetCounts.getOrDefault(c.group(),0)+1);
+        bouquetCounts.putAll(BouquetOrder.counts(items,sortMode()));
         bouquetNames=new ArrayList<>(); bouquetNames.add("Wszystkie kategorie"); bouquetNames.addAll(bouquetCounts.keySet());
         if(!bouquetNames.contains(selectedGroup)) selectedGroup="Wszystkie kategorie";
         bouquets.setAdapter(new BaseAdapter() {
@@ -215,7 +260,7 @@ public class MainActivity extends Activity {
                 star.setOnClickListener(v -> { if(!favorites.remove(c.url())) favorites.add(c.url()); filter(); persistFavorites(); });
                 Button guide=(Button)row.getChildAt(3); guide.setVisibility(c.kind().equals("tv")?View.VISIBLE:View.GONE);
                 guide.setContentDescription("Program TV i archiwum: "+c.name());
-                guide.setOnClickListener(v -> GuideDialog.open(MainActivity.this,c,worker,MainActivity.this::play));
+                guide.setOnClickListener(v -> GuideDialog.open(MainActivity.this,c,network,MainActivity.this::play));
                 return row;
             }
         });
@@ -232,7 +277,7 @@ public class MainActivity extends Activity {
         emptyPanel.setVisibility(busy || total==0 || (!grid && shown.isEmpty())?View.VISIBLE:View.GONE);
         bouquetButton.setText(grid?"▦ Bukiety ("+bouquetCounts.size()+")":"‹ Bukiety");
         if(!busy) status.setText(total==0?"Brak pozycji w tej sekcji. Dodaj lub zmień źródło."
-            :grid?bouquetCounts.size()+" bukietów  ·  "+total+" pozycji"
+            :grid?bouquetCounts.size()+" bukietów  ·  "+total+" pozycji"+(syncingOrder?" · sprawdzam kolejność":sortMode().equals("provider")?" · dostawca":"")
             :(selectedGroup.equals("Wszystkie kategorie")?"Cała oferta":selectedGroup)+"  ·  "+shown.size()+" pozycji");
     }
     @Override protected void onSaveInstanceState(Bundle out) {
@@ -251,7 +296,7 @@ public class MainActivity extends Activity {
     private void openSeries(Channel series) {
         android.app.ProgressDialog dialog=new android.app.ProgressDialog(this);
         dialog.setMessage("Wczytywanie sezonów i odcinków…"); dialog.setCancelable(true); dialog.show();
-        worker.execute(() -> {
+        network.execute(() -> {
             try {
                 List<Channel> episodes=new SourceClient().episodes(series);
                 runOnUiThread(() -> {
@@ -283,7 +328,7 @@ public class MainActivity extends Activity {
                     if (which == 1) startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE), FILE_REQUEST);
                     if (which == 2) xtreamDialog();
                     if (which == 3) new AlertDialog.Builder(this).setMessage("Usunąć zapisane kanały i ulubione z telefonu?")
-                            .setNegativeButton("Anuluj", null).setPositiveButton("Usuń", (a, b) -> { channels.clear(); sectionIndex.clear(); favorites.clear(); loadedSections.addAll(Arrays.asList("tv","movie","series")); persist(); refreshGroups(); }).show();
+                            .setNegativeButton("Anuluj", null).setPositiveButton("Usuń", (a, b) -> { catalogGeneration++; syncingOrder=false; orderRequested.clear(); channels.clear(); sectionIndex.clear(); favorites.clear(); loadedSections.addAll(Arrays.asList("tv","movie","series")); persist(); refreshGroups(); }).show();
                 }).show();
     }
     private LinearLayout form() { LinearLayout form = column(); form.setPadding(dp(20), dp(8), dp(20), 0); return form; }
@@ -310,8 +355,9 @@ public class MainActivity extends Activity {
         })); dialog.show();
     }
     private void load(Callable<List<Channel>> task) {
+        catalogGeneration++; syncingOrder=false; orderRequested.clear();
         busy = true; addButton.setEnabled(false); loadingMessage="Pobieranie katalogu od dostawcy…"; status.setText(loadingMessage); filter();
-        worker.execute(() -> {
+        network.execute(() -> {
             try {
                 List<Channel> result = task.call();
                 if (result.isEmpty()) throw new java.io.IOException("Źródło nie zawiera obsługiwanych kanałów HTTP/HTTPS.");
@@ -356,5 +402,5 @@ public class MainActivity extends Activity {
         worker.execute(() -> { try { store.save(copy, stars); } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) error("Nie udało się zapisać biblioteki na urządzeniu."); }); } });
     }
     private void error(String message) { if (!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK", null).show(); }
-    @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); super.onDestroy(); }
+    @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }
 }

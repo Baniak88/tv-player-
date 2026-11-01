@@ -14,11 +14,7 @@ import java.util.concurrent.*;
 public final class HomeActivity extends Activity {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private List<Channel> tv=new ArrayList<>();
-    private List<String> names=new ArrayList<>();
-    private final Map<String,Integer> counts=new TreeMap<>();
-    private ListView page;
-    private TextView summary;
-    private boolean loading;
+    private boolean loadingAccount;
     private int dp(int n) { return (int)(n*getResources().getDisplayMetrics().density); }
     private LinearLayout column() { LinearLayout l=new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
     private TextView text(String s,int size,int color) { TextView t=new TextView(this); t.setText(s); t.setTextSize(size); t.setTextColor(color); return t; }
@@ -35,17 +31,17 @@ public final class HomeActivity extends Activity {
         return states;
     }
     private View tile(String label,String icon,boolean large,Runnable click) {
-        LinearLayout box=column(); box.setGravity(Gravity.CENTER); box.setPadding(dp(3),dp(6),dp(3),dp(6));
+        LinearLayout box=column(); box.setGravity(Gravity.CENTER); box.setPadding(dp(12),dp(10),dp(12),dp(10));
         box.setBackground(interactive(large)); box.setFocusable(true); box.setClickable(true); box.setContentDescription(label);
-        Icon image=new Icon(this,icon); box.addView(image,new LinearLayout.LayoutParams(dp(large?62:30),dp(large?62:30)));
-        TextView name=text(label,large?16:12,Color.WHITE); name.setGravity(Gravity.CENTER); name.setMaxLines(2);
-        name.setPadding(0,dp(large?16:6),0,0); box.addView(name); box.setOnClickListener(v -> click.run()); return box;
+        Icon image=new Icon(this,icon); box.addView(image,new LinearLayout.LayoutParams(dp(large?54:36),dp(large?54:36)));
+        TextView name=text(label,large?22:18,Color.WHITE); name.setGravity(Gravity.CENTER); name.setMaxLines(2);
+        name.setPadding(0,dp(large?12:10),0,0); box.addView(name); box.setOnClickListener(v -> click.run()); return box;
     }
     private View action(String label,String icon,Runnable click) {
-        LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(6),dp(4),dp(4),dp(4));
+        LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(14),dp(8),dp(12),dp(8));
         row.setBackground(interactive(false)); row.setFocusable(true); row.setClickable(true); row.setContentDescription(label);
-        row.addView(new Icon(this,icon),new LinearLayout.LayoutParams(dp(18),dp(18)));
-        TextView t=text(label,12,0xFFF1DBE0); t.setPadding(dp(5),0,0,0); t.setMaxLines(label.equals("Ustawienia")?1:2); t.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP); row.addView(t,new LinearLayout.LayoutParams(0,-2,1));
+        row.addView(new Icon(this,icon),new LinearLayout.LayoutParams(dp(24),dp(24)));
+        TextView t=text(label,16,0xFFF1DBE0); t.setPadding(dp(12),0,0,0); t.setMaxLines(2); row.addView(t,new LinearLayout.LayoutParams(0,-2,1));
         row.setOnClickListener(v -> click.run()); return row;
     }
     @Override public void onCreate(Bundle state) { super.onCreate(state); build(); }
@@ -63,82 +59,76 @@ public final class HomeActivity extends Activity {
             view.setPadding(dp(14)+insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),dp(14)+insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
             return insets.consumeSystemWindowInsets();
         });
-        page=new ListView(this); page.setDivider(null); page.setCacheColorHint(Color.TRANSPARENT); page.setSelector(new ColorDrawable(Color.TRANSPARENT));
+        ScrollView page=new ScrollView(this); page.setFillViewport(true); page.setClipToPadding(false);
         LinearLayout header=column();
         LinearLayout top=new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(2),dp(12),dp(2),dp(4));
-        TextView version=text("TV PLAYER  /  0.5",11,0xFFB98997); version.setLetterSpacing(.1f); top.addView(version,new LinearLayout.LayoutParams(0,-2,1));
-        TextClock clock=new TextClock(this); clock.setFormat24Hour("HH:mm"); clock.setFormat12Hour("HH:mm"); clock.setTextColor(0xFFCFB9C5); clock.setTextSize(12); top.addView(clock); header.addView(top);
-        TextView brand=text("TV PLAYER",wide?24:32,Color.WHITE); brand.setTypeface(null,Typeface.BOLD); brand.setLetterSpacing(.13f); brand.setGravity(Gravity.CENTER);
-        brand.setPadding(0,dp(wide?10:36),0,dp(8)); header.addView(brand);
-        TextView tag=text("TELEWIZJA  •  FILMY  •  SERIALE",10,0xFFB18C9B); tag.setLetterSpacing(.12f); tag.setGravity(Gravity.CENTER); tag.setPadding(0,0,0,dp(wide?14:30)); header.addView(tag);
-        int gap=dp(7), height=dp(wide?152:196);
-        LinearLayout menu=new LinearLayout(this);
-        LinearLayout.LayoutParams liveSize=new LinearLayout.LayoutParams(0,height,1.05f); liveSize.rightMargin=gap;
-        menu.addView(tile("Telewizja na żywo","tv",true,() -> open("tv",null,false)),liveSize);
-        LinearLayout middle=column(); LinearLayout first=new LinearLayout(this),second=new LinearLayout(this);
-        LinearLayout.LayoutParams left=new LinearLayout.LayoutParams(0,-1,1); left.rightMargin=gap;
-        first.addView(tile("Filmy","movie",false,() -> open("movie",null,false)),left);
-        first.addView(tile("Seriale","series",false,() -> open("series",null,false)),new LinearLayout.LayoutParams(0,-1,1));
-        second.addView(tile("Konto","account",false,this::account),new LinearLayout.LayoutParams(0,-1,1));
-        LinearLayout.LayoutParams sourceSize=new LinearLayout.LayoutParams(0,-1,1); sourceSize.leftMargin=gap;
-        second.addView(tile("Zmień źródło","source",false,() -> open("tv",null,true)),sourceSize);
-        LinearLayout.LayoutParams row1=new LinearLayout.LayoutParams(-1,0,1); row1.bottomMargin=gap; middle.addView(first,row1);
-        middle.addView(second,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout.LayoutParams midSize=new LinearLayout.LayoutParams(0,height,1.25f); midSize.rightMargin=gap; menu.addView(middle,midSize);
-        LinearLayout actions=column();
-        View[] buttons={action("Ustawienia","settings",this::settings),action("Odśwież widok","refresh",this::reload),action("Wyjście","exit",this::finish)};
-        for(int i=0;i<buttons.length;i++) { LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,0,1); if(i<2) size.bottomMargin=gap; actions.addView(buttons[i],size); }
-        menu.addView(actions,new LinearLayout.LayoutParams(0,height,1.05f)); header.addView(menu);
-        TextView heading=text("BUKIETY TV",14,Color.WHITE); heading.setTypeface(null,Typeface.BOLD); heading.setLetterSpacing(.08f); heading.setPadding(dp(2),dp(30),0,dp(7)); header.addView(heading);
-        summary=text(loading?"Wczytywanie zapisanych bukietów…":"",12,0xFFAD8C9A); summary.setPadding(dp(2),0,0,dp(16)); header.addView(summary);
-        page.addHeaderView(header,null,false); root.addView(page,new LinearLayout.LayoutParams(-1,0,1)); setContentView(root); bind();
-    }
-    private void bind() {
-        counts.clear(); for(Channel channel:tv) counts.put(channel.group(),counts.getOrDefault(channel.group(),0)+1);
-        names=new ArrayList<>(counts.keySet());
-        summary.setText(loading?"Wczytywanie zapisanych bukietów…":names.isEmpty()?"Brak bukietów. Wybierz „Zmień źródło”, aby dodać listę.":names.size()+" bukietów  ·  "+tv.size()+" kanałów  ·  wybierz temat");
-        page.setAdapter(new BaseAdapter() {
-            public int getCount() { return (names.size()+1)/2; }
-            public Object getItem(int position) { return position; }
-            public long getItemId(int position) { return position; }
-            public View getView(int position,View convert,ViewGroup parent) {
-                LinearLayout row=convert instanceof LinearLayout?(LinearLayout)convert:new LinearLayout(HomeActivity.this); row.removeAllViews();
-                for(int col=0;col<2;col++) {
-                    int index=position*2+col;
-                    LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(0,dp(98),1); size.bottomMargin=dp(10); if(col==0) size.rightMargin=dp(10);
-                    if(index>=names.size()) { row.addView(new View(HomeActivity.this),size); continue; }
-                    String name=names.get(index);
-                    LinearLayout card=column(); card.setPadding(dp(14),dp(14),dp(10),dp(10)); card.setBackground(interactive(false)); card.setFocusable(true); card.setClickable(true);
-                    TextView title=text(name,16,Color.WHITE); title.setTypeface(null,Typeface.BOLD); title.setMaxLines(2); title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    card.addView(title,new LinearLayout.LayoutParams(-1,0,1));
-                    card.addView(text(counts.get(name)+" kanałów   ›",12,0xFFD6A0AE)); card.setContentDescription("Bukiet "+name);
-                    card.setOnClickListener(v -> open("tv",name,false)); row.addView(card,size);
-                }
-                return row;
+        TextView version=text("TV PLAYER  /  0.6",12,0xFFB98997); version.setLetterSpacing(.08f); top.addView(version,new LinearLayout.LayoutParams(0,-2,1));
+        TextClock clock=new TextClock(this); clock.setFormat24Hour("HH:mm"); clock.setFormat12Hour("HH:mm"); clock.setTextColor(0xFFCFB9C5); clock.setTextSize(14); top.addView(clock); header.addView(top);
+        TextView brand=text("TV PLAYER",wide?24:28,Color.WHITE); brand.setTypeface(null,Typeface.BOLD); brand.setLetterSpacing(.1f); brand.setGravity(Gravity.CENTER);
+        brand.setPadding(0,dp(wide?8:18),0,dp(8)); header.addView(brand);
+        TextView tag=text("Wybierz, co chcesz oglądać",14,0xFFC3A7B5); tag.setGravity(Gravity.CENTER); tag.setPadding(0,0,0,dp(wide?12:22)); header.addView(tag);
+        int gap=dp(12);
+        if(wide) {
+            int height=dp(176);
+            LinearLayout menu=new LinearLayout(this);
+            LinearLayout.LayoutParams liveSize=new LinearLayout.LayoutParams(0,height,1.15f); liveSize.rightMargin=gap;
+            menu.addView(tile("Telewizja na żywo","tv",true,() -> open("tv",null,false)),liveSize);
+            LinearLayout middle=column(); LinearLayout films=new LinearLayout(this), account=new LinearLayout(this);
+            LinearLayout.LayoutParams first=new LinearLayout.LayoutParams(0,-1,1); first.rightMargin=gap;
+            films.addView(tile("Filmy","movie",false,() -> open("movie",null,false)),first);
+            films.addView(tile("Seriale","series",false,() -> open("series",null,false)),new LinearLayout.LayoutParams(0,-1,1));
+            account.addView(action("Konto","account",this::account),new LinearLayout.LayoutParams(0,-1,1));
+            LinearLayout.LayoutParams sourceSize=new LinearLayout.LayoutParams(0,-1,1); sourceSize.leftMargin=gap;
+            account.addView(action("Źródło","source",() -> open("tv",null,true)),sourceSize);
+            LinearLayout.LayoutParams filmsSize=new LinearLayout.LayoutParams(-1,0,1.4f); filmsSize.bottomMargin=gap;
+            middle.addView(films,filmsSize); middle.addView(account,new LinearLayout.LayoutParams(-1,0,1));
+            LinearLayout.LayoutParams midSize=new LinearLayout.LayoutParams(0,height,1.6f); midSize.rightMargin=gap; menu.addView(middle,midSize);
+            LinearLayout actions=column();
+            View[] buttons={action("Ustawienia","settings",this::settings),action("Odśwież źródło","refresh",this::refreshSource),action("Wyjście","exit",this::finish)};
+            for(int i=0;i<buttons.length;i++) { LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,0,1); if(i<2) size.bottomMargin=gap; actions.addView(buttons[i],size); }
+            menu.addView(actions,new LinearLayout.LayoutParams(0,height,1.15f)); header.addView(menu);
+        } else {
+            header.addView(tile("Telewizja na żywo","tv",true,() -> open("tv",null,false)),new LinearLayout.LayoutParams(-1,dp(136)));
+            LinearLayout films=new LinearLayout(this);
+            LinearLayout.LayoutParams filmSize=new LinearLayout.LayoutParams(0,dp(124),1); filmSize.rightMargin=gap;
+            films.addView(tile("Filmy","movie",false,() -> open("movie",null,false)),filmSize);
+            films.addView(tile("Seriale","series",false,() -> open("series",null,false)),new LinearLayout.LayoutParams(0,dp(124),1));
+            LinearLayout.LayoutParams rowSize=new LinearLayout.LayoutParams(-1,-2); rowSize.topMargin=gap; header.addView(films,rowSize);
+            LinearLayout account=new LinearLayout(this);
+            LinearLayout.LayoutParams accountSize=new LinearLayout.LayoutParams(0,dp(56),1); accountSize.rightMargin=gap;
+            account.addView(action("Konto","account",this::account),accountSize);
+            account.addView(action("Zmień źródło","source",() -> open("tv",null,true)),new LinearLayout.LayoutParams(0,dp(56),1));
+            LinearLayout.LayoutParams accountRow=new LinearLayout.LayoutParams(-1,-2); accountRow.topMargin=gap; accountRow.bottomMargin=gap; header.addView(account,accountRow);
+            for(View action:new View[]{action("Ustawienia","settings",this::settings),action("Odśwież źródło","refresh",this::refreshSource),action("Wyjście","exit",this::finish)}) {
+                LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,dp(52)); size.bottomMargin=dp(8); header.addView(action,size);
             }
-        });
+        }
+        header.setPadding(0,0,0,dp(14)); page.addView(header); root.addView(page,new LinearLayout.LayoutParams(-1,0,1)); setContentView(root);
     }
-    @Override protected void onResume() { super.onResume(); reload(); }
-    private void reload() {
-        if(loading) return; loading=true; bind();
+    private void refreshSource() {
+        startActivity(new Intent(this,MainActivity.class).putExtra("section","tv").putExtra("refresh_source",true));
+    }
+    private void account() {
+        if(loadingAccount) return; loadingAccount=true;
+        ProgressDialog waiting=new ProgressDialog(this); waiting.setMessage("Odczyt konta i biblioteki…"); waiting.show();
         worker.execute(() -> {
             try {
                 List<Channel> loaded=new LibraryStore(this).loadSection("tv",new HashSet<>());
-                runOnUiThread(() -> { if(!isDestroyed()) { tv=loaded; loading=false; bind(); } });
-            } catch(Exception e) { runOnUiThread(() -> { if(!isDestroyed()) { loading=false; bind(); summary.setText("Nie udało się odczytać bukietów. Wybierz „Zmień źródło”."); } }); }
+                runOnUiThread(() -> { if(!isDestroyed()) { tv=loaded; loadingAccount=false; waiting.dismiss(); showAccount(); } });
+            } catch(Exception e) { runOnUiThread(() -> { if(!isDestroyed()) { loadingAccount=false; waiting.dismiss(); new AlertDialog.Builder(this).setMessage("Nie można odczytać biblioteki.").setPositiveButton("OK",null).show(); } }); }
         });
     }
-    private void account() {
+    private void showAccount() {
         String host="Lista z telefonu lub adres M3U";
         if(!tv.isEmpty()) { android.net.Uri uri=android.net.Uri.parse(tv.get(0).url()); if(uri.getHost()!=null) host=uri.getHost(); }
-        new AlertDialog.Builder(this).setTitle("Konto i biblioteka").setMessage("Źródło: "+host+"\nKanały TV: "+tv.size()+"\nBukiety TV: "+counts.size()+"\n\nDane dostępu są przechowywane w zaszyfrowanej bibliotece.")
+        new AlertDialog.Builder(this).setTitle("Konto i biblioteka").setMessage("Źródło: "+host+"\nKanały TV: "+tv.size()+"\nBukiety TV: "+new HashSet<String>(tv.stream().map(Channel::group).collect(java.util.stream.Collectors.toList())).size()+"\n\nDane dostępu są przechowywane w zaszyfrowanej bibliotece.")
             .setPositiveButton("Zmień źródło",(d,w) -> open("tv",null,true)).setNegativeButton("Zamknij",null).show();
     }
     private void settings() {
         new AlertDialog.Builder(this).setTitle("Ustawienia").setItems(new String[]{"Dodaj lub zmień źródło","Uprawnienia aplikacji i PiP","Informacje o wersji"},(d,index) -> {
             if(index==0) open("tv",null,true);
             if(index==1) startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName())));
-            if(index==2) new AlertDialog.Builder(this).setTitle("TV Player Preview 0.5.1").setMessage("TV, filmy, seriale i widoczne bukiety.\nEPG i archiwum zależą od źródła.").setPositiveButton("OK",null).show();
+            if(index==2) new AlertDialog.Builder(this).setTitle("TV Player Preview 0.6.0").setMessage("TV, filmy i seriale. Bukiety oraz sortowanie wewnątrz katalogów.\nEPG i archiwum zależą od źródła.").setPositiveButton("OK",null).show();
         }).show();
     }
     @Override public void onConfigurationChanged(Configuration configuration) { super.onConfigurationChanged(configuration); build(); }

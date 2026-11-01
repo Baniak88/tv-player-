@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p smoke-output
-trap 'adb logcat -d -v brief -s AndroidRuntime LibraryBenchmark TestRunner ActivityManager > smoke-output/diagnostics.txt 2>&1; tail -n 180 smoke-output/diagnostics.txt' EXIT
+trap 'adb logcat -d -v brief -s AndroidRuntime LibraryBenchmark RotationTest TestRunner ActivityManager > smoke-output/diagnostics.txt 2>&1; tail -n 180 smoke-output/diagnostics.txt' EXIT
 adb install apk/debug/app-debug.apk
 adb shell am start -W -n pl.tvplayer.preview/pl.tvplayer.HomeActivity
 sleep 5
@@ -24,9 +24,28 @@ if grep -q 'FATAL EXCEPTION' smoke-output/runtime.txt; then
 fi
 
 adb install apk/androidTest/debug/app-debug-androidTest.apk
-adb shell am instrument -w -r pl.tvplayer.preview.test/androidx.test.runner.AndroidJUnitRunner | tee smoke-output/navigation-test.txt
-grep -q 'OK (5 tests)' smoke-output/navigation-test.txt
+adb shell run-as pl.tvplayer.preview rm -f files/rotation-ready files/rotation-landscape-ok
+adb emu sensor set acceleration 0:9.81:0
+adb shell am instrument -w -r pl.tvplayer.preview.test/androidx.test.runner.AndroidJUnitRunner | tee smoke-output/navigation-test.txt &
+test_pid=$!
+landscape_sent=0
+portrait_sent=0
+while kill -0 "$test_pid" 2>/dev/null; do
+  if [ "$landscape_sent" = 0 ] && adb shell run-as pl.tvplayer.preview test -f files/rotation-ready >/dev/null 2>&1; then
+    adb emu sensor set acceleration 9.81:0:0
+    landscape_sent=1
+  fi
+  if [ "$landscape_sent" = 1 ] && [ "$portrait_sent" = 0 ] && adb shell run-as pl.tvplayer.preview test -f files/rotation-landscape-ok >/dev/null 2>&1; then
+    adb emu sensor set acceleration 0:9.81:0
+    portrait_sent=1
+  fi
+  sleep 0.3
+done
+wait "$test_pid"
+test "$landscape_sent" = 1
+test "$portrait_sent" = 1
+grep -q 'OK (6 tests)' smoke-output/navigation-test.txt
 
-for name in home-portrait home-landscape sport-bouquet; do
+for name in home-portrait home-landscape sport-bouquet bouquets-grid; do
   adb exec-out run-as pl.tvplayer.preview cat "files/$name.png" > "smoke-output/$name.png"
 done
