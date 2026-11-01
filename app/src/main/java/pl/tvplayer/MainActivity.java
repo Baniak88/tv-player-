@@ -26,6 +26,8 @@ public class MainActivity extends Activity {
     private TextView emptyText;
     private ProgressBar progress;
     private Button libraryButton;
+    private String section = "tv";
+    private final java.util.Map<String, Button> sectionButtons = new java.util.HashMap<>();
     private String selectedGroup = "Wszystkie kategorie";
 
     @Override public void onCreate(Bundle state) {
@@ -44,7 +46,19 @@ public class MainActivity extends Activity {
         TextView badge=label("PREVIEW",10); badge.setTextColor(0xFF747B8A); chrome.addView(badge); root.addView(chrome);
         TextView title=label("Twoja biblioteka",30); title.setTypeface(null,Typeface.BOLD); root.addView(title);
         TextView sub=label("Telewizja w swoim rytmie.",14); sub.setTextColor(0xFF747B8A); sub.setPadding(0,dp(6),0,dp(18)); root.addView(sub);
-        search=input("Szukaj kanału…",false); root.addView(search);
+        LinearLayout tabs=new LinearLayout(this);
+        String[][] sections={{"tv","TV"},{"series","Seriale"},{"movie","Filmy"}};
+        for(String[] entry:sections) {
+            Button tab=button(entry[1]); sectionButtons.put(entry[0],tab);
+            tabs.addView(tab,new LinearLayout.LayoutParams(0,dp(46),1));
+            primary(tab,entry[0].equals(section));
+            tab.setOnClickListener(v -> { section=entry[0]; onlyFavorites=false;
+                primary(libraryButton,true); primary(favoriteButton,false);
+                for(java.util.Map.Entry<String,Button> item:sectionButtons.entrySet()) primary(item.getValue(),item.getKey().equals(section));
+                search.setText(""); refreshGroups(); });
+        }
+        LinearLayout.LayoutParams tabSize=new LinearLayout.LayoutParams(-1,-2); tabSize.bottomMargin=dp(12); root.addView(tabs,tabSize);
+        search=input("Szukaj w wybranej sekcji…",false); root.addView(search);
         LinearLayout tools=new LinearLayout(this); tools.setGravity(Gravity.CENTER_VERTICAL);
         groups=new Spinner(this); groups.setBackground(surface(Color.WHITE,12,0xFFE3E6ED)); tools.addView(groups,new LinearLayout.LayoutParams(0,dp(46),1));
         addButton=button("＋ Źródło"); primary(addButton,true); LinearLayout.LayoutParams sourceSize=new LinearLayout.LayoutParams(dp(118),dp(46)); sourceSize.leftMargin=dp(10); tools.addView(addButton,sourceSize); root.addView(tools);
@@ -75,7 +89,7 @@ public class MainActivity extends Activity {
         });
         list.setOnItemClickListener((p, v, pos, id) -> {
             Channel c = shown.get(pos);
-            startActivity(new Intent(this, PlayerActivity.class).putExtra("url", c.url()).putExtra("name", c.name()));
+            if(c.kind().equals("series")) openSeries(c); else play(c);
         });
         list.setOnItemLongClickListener((p, v, pos, id) -> {
             String url = shown.get(pos).url();
@@ -105,7 +119,7 @@ public class MainActivity extends Activity {
     }
     private ScrollView scroll(LinearLayout form) { ScrollView s=new ScrollView(this); s.addView(form); return s; }
     private void refreshGroups() {
-        TreeSet<String> set = new TreeSet<>(); for (Channel c : channels) set.add(c.group());
+        TreeSet<String> set = new TreeSet<>(); for (Channel c : channels) if(c.section().equals(section)) set.add(c.group());
         List<String> values = new ArrayList<>(); values.add("Wszystkie kategorie"); values.addAll(set);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, values);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item); groups.setAdapter(adapter);
@@ -115,7 +129,7 @@ public class MainActivity extends Activity {
         if (list == null) return;
         String query = search.getText().toString().toLowerCase(Locale.ROOT);
         shown = new ArrayList<>();
-        for (Channel c : channels) if ((!onlyFavorites || favorites.contains(c.url()))
+        for (Channel c : channels) if (c.section().equals(section) && (!onlyFavorites || favorites.contains(c.url()))
                 && (selectedGroup.equals("Wszystkie kategorie") || selectedGroup.equals(c.group()))
                 && c.name().toLowerCase(Locale.ROOT).contains(query)) shown.add(c);
         list.setAdapter(new BaseAdapter() {
@@ -143,8 +157,38 @@ public class MainActivity extends Activity {
         emptyText.setText(busy?"Wczytywanie kanałów…\nDuża lista może wymagać chwili."
             :channels.isEmpty()?"Dodaj swoją telewizję\n\nWybierz ＋ Źródło i połącz konto Xtream Codes lub listę M3U."
             :onlyFavorites?"Jeszcze nic tutaj nie ma\n\nDotknij ☆ obok kanału, aby zapisać go w ulubionych."
-            :"Brak wyników\n\nZmień nazwę lub kategorię i spróbuj ponownie.");
+            :"Brak wyników\n\nZmień nazwę lub kategorię. Jeśli katalog jest pusty, zaimportuj konto Xtream ponownie.");
         if(!busy) status.setText(channels.isEmpty()?"Dodaj pierwsze źródło, aby zacząć.":shown.size()+" z "+channels.size()+" kanałów");
+    }
+    private void play(Channel c) {
+        startActivity(new Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()));
+    }
+    private void openSeries(Channel series) {
+        android.app.ProgressDialog dialog=new android.app.ProgressDialog(this);
+        dialog.setMessage("Wczytywanie sezonów i odcinków…"); dialog.setCancelable(true); dialog.show();
+        worker.execute(() -> {
+            try {
+                List<Channel> episodes=new SourceClient().episodes(series);
+                runOnUiThread(() -> {
+                    if(isDestroyed() || !dialog.isShowing()) return;
+                    dialog.dismiss();
+                    if(episodes.isEmpty()) { error("Dostawca nie udostępnił odcinków tego serialu."); return; }
+                    java.util.TreeMap<String,List<Channel>> seasons=new java.util.TreeMap<>((left,right) -> {
+                        try { return Integer.compare(Integer.parseInt(left.replace("Sezon ","")),Integer.parseInt(right.replace("Sezon ",""))); }
+                        catch(NumberFormatException e) { return left.compareTo(right); }
+                    });
+                    for(Channel episode:episodes) seasons.computeIfAbsent(episode.group(),key -> new ArrayList<>()).add(episode);
+                    List<String> names=new ArrayList<>(seasons.keySet());
+                    new AlertDialog.Builder(this).setTitle(series.name()).setItems(names.toArray(new String[0]),(d,index) -> {
+                        List<Channel> selected=seasons.get(names.get(index)); String[] labels=new String[selected.size()];
+                        for(int i=0;i<selected.size();i++) labels[i]=selected.get(i).name();
+                        new AlertDialog.Builder(this).setTitle(names.get(index)).setItems(labels,(e,n) -> play(selected.get(n))).setNegativeButton("Zamknij",null).show();
+                    }).setNegativeButton("Zamknij",null).show();
+                });
+            } catch(Exception e) {
+                runOnUiThread(() -> { if(!isDestroyed() && dialog.isShowing()) { dialog.dismiss(); error("Nie udało się pobrać odcinków. Sprawdź połączenie i dostępność serialu."); } });
+            }
+        });
     }
     private void sourceMenu() {
         if (busy) return;
@@ -171,7 +215,7 @@ public class MainActivity extends Activity {
     private void xtreamDialog() {
         LinearLayout form = form(); EditText server = input("Serwer: https://dostawca:port", false), user = input("Nazwa użytkownika", false), pass = input("Hasło", true);
         server.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI); form.addView(server); form.addView(user); form.addView(pass);
-        form.addView(label("Import kanałów TV na żywo zastąpi bieżącą listę.", 13));
+        form.addView(label("Import TV, filmów i seriali zastąpi bieżącą bibliotekę.", 13));
         AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Xtream Codes").setView(scroll(form)).setNegativeButton("Anuluj", null).setPositiveButton("Połącz", null).create();
         dialog.setOnShowListener(x -> dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(v -> {
             try { SourceClient.validate(server.getText().toString()); } catch (Exception e) { server.setError("Podaj adres HTTP lub HTTPS"); return; }
