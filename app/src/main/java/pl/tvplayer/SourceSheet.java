@@ -33,8 +33,8 @@ final class SourceSheet {
         void onClearLibrary();
     }
 
-    private static final int SHEET = 0xFF170E1C, CARD = 0xFF241321, CARD_BORDER = 0xFF4A2234, ACCENT = 0xFFD63150,
-        TEXT = 0xFFF5E9ED, MUTED = 0xFFB89AA8, HINT = 0xFF8E7180, DANGER = 0xFFFF6B7F;
+    private static final int SHEET = Ui.SURFACE, CARD = Ui.SURFACE_HIGH, CARD_BORDER = Ui.BORDER, ACCENT = Ui.ACCENT,
+        TEXT = Ui.TEXT, MUTED = Ui.MUTED, HINT = Ui.FAINT, DANGER = Ui.DANGER;
     private final Activity activity;
     private final Listener listener;
     private boolean hasLibrary;
@@ -67,7 +67,7 @@ final class SourceSheet {
     private void confirmClear() {
         Dialog dialog = dialog();
         LinearLayout sheet = sheet(dialog, "Usunąć bibliotekę?", "Kanały, filmy, seriale i ulubione zostaną usunięte z telefonu. Konto u dostawcy pozostaje bez zmian.", null);
-        Button delete = primary("Usuń wszystko", 0xFFB3243F);
+        Button delete = primary("Usuń wszystko", DANGER);
         delete.setOnClickListener(v -> { dialog.dismiss(); listener.onClearLibrary(); });
         sheet.addView(delete, matchWrap(dp(8)));
         Button cancel = flat("Anuluj", MUTED); cancel.setOnClickListener(v -> dialog.dismiss());
@@ -134,7 +134,7 @@ final class SourceSheet {
         Field(EditText input, TextView error, LinearLayout row) { this.input = input; this.error = error; this.row = row; }
         void error(String message) {
             error.setText(message == null ? "" : message); error.setVisibility(message == null ? View.GONE : View.VISIBLE);
-            row.setBackground(box(row.getContext(), message == null ? 0xFF5A2B3C : DANGER));
+            row.setBackground(box(row.getContext(), message == null ? Ui.BORDER : DANGER));
             if (message != null) input.requestFocus();
         }
     }
@@ -142,14 +142,14 @@ final class SourceSheet {
     private Field field(LinearLayout parent, String label, String hint, int variation, boolean pasteButton) {
         TextView caption = text(label, 13, MUTED); caption.setTypeface(null, Typeface.BOLD);
         caption.setPadding(dp(4), dp(6), 0, dp(6)); parent.addView(caption);
-        LinearLayout row = new LinearLayout(activity); row.setGravity(Gravity.CENTER_VERTICAL); row.setBackground(box(activity, 0xFF5A2B3C));
+        LinearLayout row = new LinearLayout(activity); row.setGravity(Gravity.CENTER_VERTICAL); row.setBackground(box(activity, Ui.BORDER));
         EditText input = new EditText(activity); input.setHint(hint); input.setSingleLine(true); input.setTextSize(16);
         input.setTextColor(TEXT); input.setHintTextColor(HINT); input.setBackground(null); input.setPadding(dp(14), dp(12), dp(8), dp(12));
         input.setInputType(InputType.TYPE_CLASS_TEXT | variation | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         input.setImeOptions(EditorInfo.IME_ACTION_NEXT); input.setMinHeight(dp(50));
         row.addView(input, new LinearLayout.LayoutParams(0, -2, 1));
         if (pasteButton) {
-            Button paste = flat("Wklej", ACCENT); paste.setTextSize(13);
+            Button paste = flat("Wklej", MUTED); paste.setTextSize(13);
             paste.setOnClickListener(v -> { String clip = clipboardText(); if (clip != null) { input.setText(clip.trim()); input.setSelection(input.getText().length()); } });
             row.addView(paste, new LinearLayout.LayoutParams(-2, dp(44)));
         }
@@ -166,7 +166,7 @@ final class SourceSheet {
     }
 
     private void addReveal(Field field) {
-        Button reveal = flat("Pokaż", ACCENT); reveal.setTextSize(13);
+        Button reveal = flat("Pokaż", MUTED); reveal.setTextSize(13);
         reveal.setOnClickListener(v -> {
             boolean hidden = (field.input.getInputType() & InputType.TYPE_MASK_VARIATION) == InputType.TYPE_TEXT_VARIATION_PASSWORD;
             int position = field.input.getSelectionEnd();
@@ -180,18 +180,18 @@ final class SourceSheet {
 
     private View option(String badge, String title, String description, boolean recommended, Runnable action) {
         LinearLayout card = new LinearLayout(activity); card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(14), dp(14), dp(12), dp(14)); card.setBackground(pressable(recommended ? 0xFF3A1226 : CARD, recommended ? 0xFF8C2C45 : CARD_BORDER));
+        card.setPadding(dp(14), dp(14), dp(12), dp(14)); card.setBackground(pressable(CARD, recommended ? 0xFF4A4D55 : CARD_BORDER));
         card.setClickable(true); card.setFocusable(true); card.setOnClickListener(v -> action.run());
-        TextView icon = text(badge, badge.length() > 1 ? 13 : 20, Color.WHITE); icon.setTypeface(null, Typeface.BOLD); icon.setGravity(Gravity.CENTER);
-        GradientDrawable circle = new GradientDrawable(); circle.setShape(GradientDrawable.OVAL); circle.setColor(recommended ? ACCENT : 0xFF4F1A2E); icon.setBackground(circle);
+        TextView icon = text(badge, badge.length() > 1 ? 12 : 18, recommended ? Ui.ON_ACCENT : TEXT); icon.setTypeface(null, Typeface.BOLD); icon.setGravity(Gravity.CENTER);
+        GradientDrawable circle = new GradientDrawable(); circle.setShape(GradientDrawable.OVAL); circle.setColor(recommended ? ACCENT : Ui.BORDER); icon.setBackground(circle);
         card.addView(icon, new LinearLayout.LayoutParams(dp(44), dp(44)));
         LinearLayout copy = new LinearLayout(activity); copy.setOrientation(LinearLayout.VERTICAL); copy.setPadding(dp(14), 0, dp(8), 0);
         LinearLayout heading = new LinearLayout(activity); heading.setGravity(Gravity.CENTER_VERTICAL);
         TextView name = text(title, 16, TEXT); name.setTypeface(null, Typeface.BOLD); name.setMaxLines(1); name.setEllipsize(TextUtils.TruncateAt.END);
         heading.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
         if (recommended) {
-            TextView tag = text("POLECANE", 10, Color.WHITE); tag.setTypeface(null, Typeface.BOLD); tag.setPadding(dp(7), dp(2), dp(7), dp(2));
-            tag.setBackground(rounded(0xFF8C2C45, 10, 0xFF8C2C45));
+            TextView tag = text("POLECANE", 10, MUTED); tag.setTypeface(null, Typeface.BOLD); tag.setPadding(dp(7), dp(2), dp(7), dp(2));
+            tag.setBackground(rounded(0x00000000, 10, CARD_BORDER));
             LinearLayout.LayoutParams tagSize = new LinearLayout.LayoutParams(-2, -2); tagSize.leftMargin = dp(6); heading.addView(tag, tagSize);
         }
         copy.addView(heading);
@@ -213,7 +213,7 @@ final class SourceSheet {
     private LinearLayout sheet(Dialog dialog, String title, String subtitle, Runnable back) {
         LinearLayout sheet = new LinearLayout(activity); sheet.setOrientation(LinearLayout.VERTICAL);
         sheet.setPadding(dp(18), dp(10), dp(18), dp(18));
-        View handle = new View(activity); handle.setBackground(rounded(0xFF5A3445, 3, 0xFF5A3445));
+        View handle = new View(activity); handle.setBackground(rounded(Ui.BORDER, 3, Ui.BORDER));
         LinearLayout.LayoutParams handleSize = new LinearLayout.LayoutParams(dp(40), dp(5)); handleSize.gravity = Gravity.CENTER_HORIZONTAL; handleSize.bottomMargin = dp(14);
         sheet.addView(handle, handleSize);
         LinearLayout header = new LinearLayout(activity); header.setGravity(Gravity.CENTER_VERTICAL);
@@ -230,7 +230,7 @@ final class SourceSheet {
         ScrollView scroll = new ScrollView(activity); scroll.setFillViewport(true); scroll.addView(sheet);
         FrameLayout frame = new FrameLayout(activity);
         GradientDrawable background = new GradientDrawable(); background.setColor(SHEET);
-        float r = dp(20); background.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0}); background.setStroke(dp(1), 0xFF3A1C2B);
+        float r = dp(20); background.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0}); background.setStroke(dp(1), Ui.BORDER);
         frame.setBackground(background);
         frame.addView(scroll, new FrameLayout.LayoutParams(-1, -2));
         frame.setOnApplyWindowInsetsListener((v, insets) -> { v.setPadding(0, 0, 0, insets.getSystemWindowInsetBottom()); return insets; });
@@ -276,7 +276,7 @@ final class SourceSheet {
 
     private Button primary(String label, int color) {
         Button button = new Button(activity); button.setText(label); button.setAllCaps(false); button.setTextSize(16);
-        button.setTypeface(null, Typeface.BOLD); button.setTextColor(Color.WHITE); button.setStateListAnimator(null);
+        button.setTypeface(null, Typeface.BOLD); button.setTextColor(Ui.ON_ACCENT); button.setStateListAnimator(null);
         button.setMinHeight(dp(52)); button.setMinimumHeight(dp(52)); button.setBackground(pressable(color, color));
         return button;
     }
@@ -303,7 +303,7 @@ final class SourceSheet {
 
     private static GradientDrawable box(Context context, int border) {
         float density = context.getResources().getDisplayMetrics().density;
-        GradientDrawable bg = new GradientDrawable(); bg.setColor(0xFF1F1426); bg.setCornerRadius(10 * density); bg.setStroke((int) (density * 1.5f), border); return bg;
+        GradientDrawable bg = new GradientDrawable(); bg.setColor(Ui.BG); bg.setCornerRadius(10 * density); bg.setStroke((int) (density * 1.5f), border); return bg;
     }
 
     private android.graphics.drawable.Drawable pressable(int color, int border) {

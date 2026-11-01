@@ -21,9 +21,13 @@ public record Channel(String name, String url, String group, String epgId, Strin
     public Channel {
         if(url==null) url=""; if(group==null) group="Bez kategorii"; if(name==null) name="";
         if (kind == null || kind.isEmpty()) kind = infer(url, group, name);
-        // Older versions classified live channels such as "Polsat Film" as movies; repair stored items.
-        else if ((kind.equals("movie") || kind.equals("episode")) && infer(url, group, name).equals("tv")) kind = "tv";
         if(guideUrl==null) guideUrl=""; if(timezone==null || timezone.isEmpty()) timezone="UTC";
+    }
+    /** Older versions classified live channels such as "Polsat Film" as movies; used once when migrating. */
+    static Channel repairKind(Channel c) {
+        if ((c.kind.equals("movie") || c.kind.equals("episode")) && infer(c.url, c.group, c.name).equals("tv"))
+            return new Channel(c.name, c.url, c.group, c.epgId, "tv", c.guideUrl, c.archiveDays, c.timezone, c.bouquetOrder);
+        return c;
     }
     public String section() { return kind.equals("episode") ? "series" : kind; }
     /**

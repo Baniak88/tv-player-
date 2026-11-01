@@ -38,9 +38,9 @@ public class CatalogTest {
         assertEquals("series",new Channel("Serial S01 E02","https://example.com/u/p/78.mp4","Dramat","").section());
     }
     @Test public void storedMisclassifiedLiveChannelsMoveBackToTv() {
-        assertEquals("tv",new Channel("Polsat Film","http://host/u/p/12.ts","PL| FILMOWE","","movie").section());
-        assertEquals("movie",new Channel("Film","https://example.com/movie/u/p/12.mkv","Kino","","movie").section());
-        assertEquals("series",new Channel("Serial","https://example.com/player_api.php?action=get_series_info","Dramat","","series").section());
+        assertEquals("tv",Channel.repairKind(new Channel("Polsat Film","http://host/u/p/12.ts","PL| FILMOWE","","movie")).section());
+        assertEquals("movie",Channel.repairKind(new Channel("Film","https://example.com/movie/u/p/12.mkv","Kino","","movie")).section());
+        assertEquals("series",Channel.repairKind(new Channel("Serial","https://example.com/player_api.php?action=get_series_info","Dramat","","series")).section());
     }
     @Test public void sourceAddressGetsSchemeWhenMissing() {
         assertEquals("http://dostawca.tv:8080",SourceSheet.normalize("  dostawca.tv:8080 "));

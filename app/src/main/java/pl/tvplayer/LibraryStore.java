@@ -17,6 +17,13 @@ final class LibraryStore {
     private static final Object LOCK=new Object();
     /** Bumped when Channel classification changes and saved sections must be re-partitioned. */
     private static final String KINDS_VERSION="2";
+    /** Decrypted sections shared by all screens; keyed by file name and validated by size and time. */
+    private static final Map<String,Cached> CACHE=Collections.synchronizedMap(new HashMap<>());
+    private static final class Cached {
+        final long length,modified; final java.lang.ref.SoftReference<List<Channel>> items;
+        Cached(File file,List<Channel> items) { length=file.length(); modified=file.lastModified(); this.items=new java.lang.ref.SoftReference<>(items); }
+        List<Channel> valid(File file) { return file.length()==length && file.lastModified()==modified ? items.get() : null; }
+    }
     private final Context context;
     private javax.crypto.SecretKey cachedKey;
     private final Map<String,byte[]> loadedFingerprints=new HashMap<>();
@@ -97,6 +104,11 @@ final class LibraryStore {
                     }
                     encryptedWrite("catalog-"+next+"-"+section+".enc",compressed.toByteArray());
                 }
+                CACHE.clear();
+                for(String section:new String[]{"tv","movie","series"}) {
+                    List<Channel> part=new ArrayList<>(); for(Channel c:channels) if(c.section().equals(section)) part.add(c);
+                    remember(next,section,part);
+                }
                 saveFavorites(favorites);
                 write(file("catalog.current"),next.getBytes(StandardCharsets.UTF_8));
                 write(file("catalog.kinds"),KINDS_VERSION.getBytes(StandardCharsets.UTF_8));
@@ -140,7 +152,12 @@ final class LibraryStore {
                 throw e;
             }
             loadedFingerprints.put(section,fingerprint("catalog-"+next+"-"+section+".enc"));
-            for(String part:new String[]{"tv","movie","series"}) file("catalog-"+previous+"-"+part+".enc").delete();
+            for(String part:new String[]{"tv","movie","series"}) {
+                Cached old=CACHE.remove("catalog-"+previous+"-"+part+".enc");
+                List<Channel> kept=part.equals(section)?items:old==null?null:old.items.get();
+                if(kept!=null) remember(next,part,kept);
+                file("catalog-"+previous+"-"+part+".enc").delete();
+            }
         }
     }
     void saveFavorites(Set<String> favorites) throws Exception {
@@ -173,7 +190,7 @@ final class LibraryStore {
             if(!kindsCurrent()) {
                 // One-time repair: live channels named "… Film" were stored in the movie section.
                 List<Channel> all=new ArrayList<>(); Set<String> stars=new HashSet<>();
-                for(String part:new String[]{"tv","movie","series"}) all.addAll(readSection(current,part));
+                for(String part:new String[]{"tv","movie","series"}) for(Channel c:decodeSection(current,part)) all.add(Channel.repairKind(c));
                 readFavorites(stars); save(all,stars); current=generation();
             }
             List<Channel> result=readSection(current,section);
@@ -181,11 +198,39 @@ final class LibraryStore {
             readFavorites(favorites); return result;
         }
     }
+    /** Decrypts a section into the shared cache without holding the library lock, so screens never wait for it. */
+    void warm(String section) {
+        String generation,name; File source;
+        synchronized(LOCK) {
+            try { generation=generation(); } catch(IOException e) { return; }
+            if(generation==null || !kindsCurrent()) return;
+            name="catalog-"+generation+"-"+section+".enc"; source=new File(context.getFilesDir(),name);
+            Cached cached=CACHE.get(name); if(cached!=null && cached.valid(source)!=null) return;
+        }
+        List<Channel> items;
+        try { items=decodeSection(generation,section); } catch(Exception e) { return; }
+        synchronized(LOCK) {
+            Cached cached=CACHE.get(name);
+            if(source.exists() && (cached==null || cached.valid(source)==null)) CACHE.put(name,new Cached(source,items));
+        }
+    }
     private boolean kindsCurrent() {
         try { return KINDS_VERSION.equals(new String(file("catalog.kinds").readFully(),StandardCharsets.UTF_8).trim()); }
         catch(IOException missing) { return false; }
     }
     private List<Channel> readSection(String generation,String section) throws Exception {
+        String name="catalog-"+generation+"-"+section+".enc"; File source=new File(context.getFilesDir(),name);
+        Cached cached=CACHE.get(name); List<Channel> hit=cached==null?null:cached.valid(source);
+        if(hit!=null) return new ArrayList<>(hit);
+        List<Channel> result=decodeSection(generation,section);
+        CACHE.put(name,new Cached(source,result));
+        return new ArrayList<>(result);
+    }
+    private void remember(String generation,String section,List<Channel> items) {
+        String name="catalog-"+generation+"-"+section+".enc";
+        CACHE.put(name,new Cached(new File(context.getFilesDir(),name),new ArrayList<>(items)));
+    }
+    private List<Channel> decodeSection(String generation,String section) throws Exception {
         byte[] compressed=decryptedRead("catalog-"+generation+"-"+section+".enc");
         List<Channel> result=new ArrayList<>();
         try(JsonReader reader=new JsonReader(new BufferedReader(new InputStreamReader(new GZIPInputStream(new ByteArrayInputStream(compressed)),StandardCharsets.UTF_8)))) {

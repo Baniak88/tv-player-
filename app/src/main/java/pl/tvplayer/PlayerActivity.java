@@ -37,7 +37,7 @@ public class PlayerActivity extends Activity {
         Button b=new Button(this); b.setText(text); b.setTextColor(-1); b.setTextSize(13); b.setAllCaps(false);
         b.setMinWidth(0); b.setMinimumWidth(0); b.setPadding(dp(10),0,dp(10),0);
         android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();
-        shape.setColor(0xCC263246); shape.setCornerRadius(dp(14)); b.setBackground(shape);
+        shape.setColor(0x33FFFFFF); shape.setCornerRadius(dp(12)); b.setBackground(shape);
         return b;
     }
     @Override public void onCreate(Bundle state) {
@@ -52,10 +52,10 @@ public class PlayerActivity extends Activity {
         position=onDemand?getPreferences(MODE_PRIVATE).getLong(bookmark,0):0;
         if(state!=null) { position=state.getLong("position"); fullscreen=state.getBoolean("fullscreen",true); }
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON | WindowManager.LayoutParams.FLAG_SECURE);
-        FrameLayout root=new FrameLayout(this); root.setBackgroundColor(0xFF080D16);
+        FrameLayout root=new FrameLayout(this); root.setBackgroundColor(0xFF000000);
         view=new PlayerView(this); view.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING);
         root.addView(view,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout top=new LinearLayout(this); toolbar=top; top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(10),dp(24),dp(10),dp(6)); top.setBackgroundColor(0x99080D16);
+        LinearLayout top=new LinearLayout(this); toolbar=top; top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(10),dp(24),dp(10),dp(6)); top.setBackgroundColor(0x99000000);
         Button back=action("‹"); back.setContentDescription("Wróć do biblioteki"); top.addView(back,new LinearLayout.LayoutParams(dp(46),dp(44))); back.setOnClickListener(v -> finish());
         TextView title=new TextView(this); title.setText(getIntent().getStringExtra("name")); title.setTextColor(-1); title.setTextSize(15); title.setMaxLines(2); title.setPadding(dp(10),0,dp(6),0); top.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         Button settings=action("Audio / CC"); top.addView(settings,new LinearLayout.LayoutParams(dp(92),dp(44)));
@@ -64,7 +64,7 @@ public class PlayerActivity extends Activity {
         full.setOnClickListener(v -> { fullscreen=!fullscreen; updateFullscreen(); });
         root.addView(top,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
         error=new LinearLayout(this); error.setOrientation(LinearLayout.VERTICAL); error.setGravity(Gravity.CENTER);
-        error.setBackgroundColor(0xEE142033); error.setPadding(dp(24),dp(20),dp(24),dp(20));
+        error.setBackgroundColor(0xEE16171A); error.setPadding(dp(24),dp(20),dp(24),dp(20));
         message=new TextView(this); message.setTextColor(-1); message.setTextSize(17); error.addView(message);
         Button retry=action("Spróbuj ponownie"); error.addView(retry);
         retry.setOnClickListener(v -> { if(player!=null) { error.setVisibility(View.GONE); player.prepare(); player.play(); } });
