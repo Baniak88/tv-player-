@@ -86,7 +86,10 @@ public final class GuideRepository {
                 while(cache.size()>400) cache.remove(cache.keySet().iterator().next());
                 callbacks=pending.remove(key);
             }
-            if(callbacks!=null) ui.post(() -> { for(Consumer<Data> ready:callbacks) ready.accept(result); });
+            if(callbacks!=null) ui.post(() -> {
+                Data latest=streamData(channel);
+                for(Consumer<Data> ready:callbacks) ready.accept(latest==null?result:latest);
+            });
         });
     }
     private Data load(Channel channel,boolean full) {
