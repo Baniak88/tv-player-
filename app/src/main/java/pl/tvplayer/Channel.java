@@ -1,11 +1,15 @@
 package pl.tvplayer;
 
-public record Channel(String name, String url, String group, String epgId, String kind) {
+public record Channel(String name, String url, String group, String epgId, String kind, String guideUrl, int archiveDays, String timezone) {
+    public Channel(String name,String url,String group,String epgId,String kind) {
+        this(name,url,group,epgId,kind,"",0,"UTC");
+    }
     public Channel(String name, String url, String group, String epgId) {
         this(name, url, group, epgId, infer(url, group, name));
     }
     public Channel {
         if (kind == null || kind.isEmpty()) kind = infer(url, group, name);
+        if(guideUrl==null) guideUrl=""; if(timezone==null || timezone.isEmpty()) timezone="UTC";
     }
     public String section() { return kind.equals("episode") ? "series" : kind; }
     static String infer(String url, String group, String name) {

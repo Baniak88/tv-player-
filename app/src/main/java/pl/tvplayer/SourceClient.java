@@ -31,7 +31,7 @@ public final class SourceClient {
         HttpUrl address = validate(url);
         return get(address, reader -> M3uParser.parse(reader, address.toString()));
     }
-    private HttpUrl api(HttpUrl base, String user, String pass, String action) {
+    private static HttpUrl api(HttpUrl base, String user, String pass, String action) {
         HttpUrl.Builder builder = base.newBuilder().addPathSegment("player_api.php")
                 .addQueryParameter("username", user).addQueryParameter("password", pass);
         if (action != null) builder.addQueryParameter("action", action);
@@ -71,11 +71,14 @@ public final class SourceClient {
         reader.beginArray();
         while (reader.hasNext()) {
             String id = "", name = "Kanał", category = "", epg = "", extension = "mp4";
+            int archive=0,days=0;
             reader.beginObject();
             while (reader.hasNext()) {
                 switch (reader.nextName()) {
                     case "stream_id": case "series_id": id = value(reader); break;
                     case "container_extension": extension = value(reader); break;
+                    case "tv_archive": try { archive=Integer.parseInt(value(reader)); } catch(NumberFormatException ignored) {} break;
+                    case "tv_archive_duration": try { days=Integer.parseInt(value(reader)); } catch(NumberFormatException ignored) {} break;
                     case "name": name = value(reader); break;
                     case "category_id": category = value(reader); break;
                     case "epg_channel_id": epg = value(reader); break;
@@ -93,7 +96,8 @@ public final class SourceClient {
                 url = base.newBuilder().addPathSegment(kind.equals("tv") ? "live" : "movie").addPathSegment(user).addPathSegment(pass)
                     .addPathSegment(id + (kind.equals("tv") ? ".ts" : "." + extension)).build().toString();
             }
-            result.add(new Channel(name, url, categories.getOrDefault(category, "Bez kategorii"), epg, kind));
+            String guide=kind.equals("tv")?api(base,user,pass,"get_simple_data_table").newBuilder().addQueryParameter("stream_id",id).build().toString():"";
+            result.add(new Channel(name,url,categories.getOrDefault(category,"Bez kategorii"),epg,kind,guide,archive==1?Math.max(0,days):0,"UTC"));
         }
         reader.endArray();
         if (reader.peek() != JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowa odpowiedź serwera.");
@@ -111,11 +115,18 @@ public final class SourceClient {
         Map<String, String> categories = get(api(base, user, pass, "get_live_categories"), SourceClient::readCategories);
         final HttpUrl streamBase = base;
         List<Channel> all = get(api(base, user, pass, "get_live_streams"), reader -> readStreams(reader, streamBase, user, pass, categories));
+        String timezone="UTC";
+        if(root.has("server_info") && root.get("server_info").isJsonObject())
+            timezone=Guide.field(root.getAsJsonObject("server_info"),"timezone","UTC");
+        for(int i=0;i<all.size();i++) { Channel c=all.get(i); all.set(i,new Channel(c.name(),c.url(),c.group(),c.epgId(),c.kind(),c.guideUrl(),c.archiveDays(),timezone)); }
         Map<String,String> movieCategories = get(api(base,user,pass,"get_vod_categories"),SourceClient::readCategories);
         all.addAll(get(api(base,user,pass,"get_vod_streams"),reader -> readCatalog(reader,streamBase,user,pass,movieCategories,"movie")));
         Map<String,String> seriesCategories = get(api(base,user,pass,"get_series_categories"),SourceClient::readCategories);
         all.addAll(get(api(base,user,pass,"get_series"),reader -> readCatalog(reader,streamBase,user,pass,seriesCategories,"series")));
         return all;
+    }
+    public List<Guide.Program> guide(Channel channel) throws IOException {
+        return get(Guide.endpoint(channel),reader -> Guide.parse(reader,channel.timezone()));
     }
     public List<Channel> episodes(Channel series) throws IOException {
         HttpUrl address = validate(series.url());

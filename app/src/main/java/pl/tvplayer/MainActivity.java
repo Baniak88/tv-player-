@@ -145,11 +145,15 @@ public class MainActivity extends Activity {
                     LinearLayout text=column(); text.setPadding(dp(12),0,dp(8),0); TextView name=label("",16); name.setTypeface(null,Typeface.BOLD); name.setMaxLines(1); name.setEllipsize(android.text.TextUtils.TruncateAt.END); text.addView(name);
                     TextView group=label("",12); group.setTextColor(0xFF818897); group.setMaxLines(1); group.setEllipsize(android.text.TextUtils.TruncateAt.END); group.setPadding(0,dp(5),0,0); text.addView(group); row.addView(text,new LinearLayout.LayoutParams(0,-2,1));
                     Button star=button("☆"); star.setFocusable(false); row.addView(star,new LinearLayout.LayoutParams(dp(48),dp(48)));
+                    Button guide=button("EPG"); guide.setFocusable(false); row.addView(guide,new LinearLayout.LayoutParams(dp(48),dp(48)));
                 }
                 LinearLayout text=(LinearLayout)row.getChildAt(1); ((TextView)text.getChildAt(0)).setText(c.name()); ((TextView)text.getChildAt(1)).setText(c.group());
                 Button star=(Button)row.getChildAt(2); boolean saved=favorites.contains(c.url()); star.setText(saved?"★":"☆"); star.setTextSize(23); star.setTextColor(saved?0xFFFFA000:0xFF8C93A2);
                 star.setContentDescription((saved?"Usuń z ulubionych: ":"Dodaj do ulubionych: ")+c.name());
                 star.setOnClickListener(v -> { if(!favorites.remove(c.url())) favorites.add(c.url()); filter(); persist(); });
+                Button guide=(Button)row.getChildAt(3); guide.setVisibility(c.kind().equals("tv")?View.VISIBLE:View.GONE);
+                guide.setContentDescription("Program TV i archiwum: "+c.name());
+                guide.setOnClickListener(v -> GuideDialog.open(MainActivity.this,c,worker,MainActivity.this::play));
                 return row;
             }
         });
@@ -161,7 +165,7 @@ public class MainActivity extends Activity {
         if(!busy) status.setText(channels.isEmpty()?"Dodaj pierwsze źródło, aby zacząć.":shown.size()+" z "+channels.size()+" kanałów");
     }
     private void play(Channel c) {
-        startActivity(new Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()));
+        startActivity(new Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()).putExtra("guide",c.guideUrl()).putExtra("days",c.archiveDays()).putExtra("timezone",c.timezone()));
     }
     private void openSeries(Channel series) {
         android.app.ProgressDialog dialog=new android.app.ProgressDialog(this);

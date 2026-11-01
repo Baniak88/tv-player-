@@ -42,7 +42,7 @@ final class LibraryStore {
                 writer.beginObject().name("channels").beginArray();
                 for (Channel c : channels) {
                     writer.beginObject().name("name").value(c.name()).name("url").value(c.url())
-                            .name("group").value(c.group()).name("epg").value(c.epgId()).name("kind").value(c.kind()).endObject();
+                            .name("group").value(c.group()).name("epg").value(c.epgId()).name("kind").value(c.kind()).name("guide").value(c.guideUrl()).name("archiveDays").value(c.archiveDays()).name("timezone").value(c.timezone()).endObject();
                 }
                 writer.endArray().name("favorites").beginArray();
                 for (String url : favorites) writer.value(url);
@@ -74,7 +74,7 @@ final class LibraryStore {
                         case "channels":
                             reader.beginArray();
                             while (reader.hasNext()) {
-                                String name = "", url = "", group = "Bez kategorii", epg = "", kind = "";
+                                String name = "", url = "", group = "Bez kategorii", epg = "", kind = "", guide = "", timezone = "UTC"; int archiveDays=0;
                                 reader.beginObject();
                                 while (reader.hasNext()) {
                                     switch (reader.nextName()) {
@@ -83,10 +83,13 @@ final class LibraryStore {
                                         case "group": group = SourceClient.value(reader); break;
                                         case "epg": epg = SourceClient.value(reader); break;
                                         case "kind": kind = SourceClient.value(reader); break;
+                                        case "guide": guide = SourceClient.value(reader); break;
+                                        case "timezone": timezone = SourceClient.value(reader); break;
+                                        case "archiveDays": try { archiveDays=Integer.parseInt(SourceClient.value(reader)); } catch(NumberFormatException ignored) {} break;
                                         default: reader.skipValue();
                                     }
                                 }
-                                reader.endObject(); channels.add(new Channel(name, url, group, epg, kind));
+                                reader.endObject(); channels.add(new Channel(name,url,group,epg,kind,guide,archiveDays,timezone));
                             }
                             reader.endArray(); break;
                         case "favorites":

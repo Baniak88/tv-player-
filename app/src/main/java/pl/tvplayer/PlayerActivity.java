@@ -8,6 +8,7 @@ import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import androidx.media3.common.*;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.ui.PlayerView;
 import java.util.*;
 
@@ -21,6 +22,14 @@ public class PlayerActivity extends Activity {
     private String url, bookmark;
     private long position;
     private boolean fullscreen=true, onDemand;
+    private LinearLayout toolbar;
+    private final java.util.concurrent.ExecutorService guideWorker=java.util.concurrent.Executors.newSingleThreadExecutor();
+    private static final int RECORD_FILE=72;
+    private int recordingMinutes=60;
+    private Channel liveChannel() {
+        return new Channel(getIntent().getStringExtra("name"),url,"","",onDemand?"movie":"tv",
+            getIntent().getStringExtra("guide"),getIntent().getIntExtra("days",0),getIntent().getStringExtra("timezone"));
+    }
     private int dp(int value) { return (int)(value*getResources().getDisplayMetrics().density); }
     private Button action(String text) {
         Button b=new Button(this); b.setText(text); b.setTextColor(-1); b.setTextSize(13); b.setAllCaps(false);
@@ -44,15 +53,11 @@ public class PlayerActivity extends Activity {
         FrameLayout root=new FrameLayout(this); root.setBackgroundColor(0xFF080D16);
         view=new PlayerView(this); view.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING);
         root.addView(view,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout top=new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(10),dp(24),dp(10),dp(6)); top.setBackgroundColor(0x99080D16);
+        LinearLayout top=new LinearLayout(this); toolbar=top; top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(10),dp(24),dp(10),dp(6)); top.setBackgroundColor(0x99080D16);
         Button back=action("‹"); back.setContentDescription("Wróć do biblioteki"); top.addView(back,new LinearLayout.LayoutParams(dp(46),dp(44))); back.setOnClickListener(v -> finish());
         TextView title=new TextView(this); title.setText(getIntent().getStringExtra("name")); title.setTextColor(-1); title.setTextSize(15); title.setMaxLines(2); title.setPadding(dp(10),0,dp(6),0); top.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         Button settings=action("Audio / CC"); top.addView(settings,new LinearLayout.LayoutParams(dp(92),dp(44)));
-        settings.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle("Odtwarzanie")
-            .setItems(new String[]{"Ścieżka audio","Napisy","Odtwórz od początku"},(d,i) -> {
-                if(i==0) chooseTrack(C.TRACK_TYPE_AUDIO); else if(i==1) chooseTrack(C.TRACK_TYPE_TEXT);
-                else if(player!=null) player.seekTo(0);
-            }).show());
+        settings.setText("Opcje"); settings.setOnClickListener(v -> showOptions());
         full=action("↙"); full.setContentDescription("Włącz lub wyłącz pełny ekran"); top.addView(full,new LinearLayout.LayoutParams(dp(46),dp(44)));
         full.setOnClickListener(v -> { fullscreen=!fullscreen; updateFullscreen(); });
         root.addView(top,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
@@ -72,10 +77,78 @@ public class PlayerActivity extends Activity {
         size.height=fullscreen?-1:dp(240); size.gravity=Gravity.CENTER; view.setLayoutParams(size);
         full.setText(fullscreen?"↙":"⤢");
     }
-    @Override public void onConfigurationChanged(Configuration config) { super.onConfigurationChanged(config); updateFullscreen(); }
+    @Override public void onConfigurationChanged(Configuration config) { super.onConfigurationChanged(config); if(!isInPictureInPictureMode()) updateFullscreen(); }
+    private void showOptions() {
+        List<String> labels=new ArrayList<>(Arrays.asList("Ścieżka audio","Napisy","Odtwórz od początku","Obraz w obrazie (PiP)"));
+        if(!onDemand) { labels.add("Program TV i archiwum"); labels.add(RecordingService.active?"Zatrzymaj nagrywanie":"Nagraj kanał do pliku"); }
+        labels.add("Cofnij o 30 sekund");
+        new AlertDialog.Builder(this).setTitle("Odtwarzanie").setItems(labels.toArray(new String[0]),(d,i) -> {
+            if(labels.get(i).equals("Cofnij o 30 sekund")) {
+                if(player!=null && player.isCurrentMediaItemSeekable()) player.seekTo(Math.max(0,player.getCurrentPosition()-30000));
+                else Toast.makeText(this,"Źródło nie udostępnia przewijania. Dla TV sprawdź archiwum w EPG.",Toast.LENGTH_LONG).show();
+                return;
+            }
+            switch(i) {
+                case 0: chooseTrack(C.TRACK_TYPE_AUDIO); break;
+                case 1: chooseTrack(C.TRACK_TYPE_TEXT); break;
+                case 2:
+                    if(!onDemand) openGuide(); else if(player!=null) player.seekTo(0);
+                    break;
+                case 3: enterPip(); break;
+                case 4: openGuide(); break;
+                case 5: if(RecordingService.active) stopService(new android.content.Intent(this,RecordingService.class)); else chooseRecording(); break;
+            }
+        }).show();
+    }
+    private void openGuide() {
+        GuideDialog.open(this,liveChannel(),guideWorker,c -> {
+            if(c.kind().equals("tv")) { if(player!=null) { player.seekToDefaultPosition(); player.play(); } return; }
+            startActivity(new android.content.Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()));
+        });
+    }
+    private void enterPip() {
+        if(player==null) return;
+        if(!getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
+            Toast.makeText(this,"Ten telefon nie udostępnia PiP.",Toast.LENGTH_LONG).show(); return;
+        }
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+        try {
+            boolean entered=enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new android.util.Rational(16,9)).build());
+            if(!entered) { updateFullscreen(); Toast.makeText(this,"Włącz zgodę Obraz w obrazie w ustawieniach aplikacji.",Toast.LENGTH_LONG).show(); }
+        } catch(IllegalStateException | IllegalArgumentException e) { updateFullscreen(); Toast.makeText(this,"Nie można włączyć PiP. Sprawdź ustawienia aplikacji.",Toast.LENGTH_LONG).show(); }
+    }
+    @Override public void onPictureInPictureModeChanged(boolean inPip,Configuration config) {
+        super.onPictureInPictureModeChanged(inPip,config); toolbar.setVisibility(inPip?View.GONE:View.VISIBLE); view.setUseController(!inPip);
+        if(!inPip) updateFullscreen();
+    }
+    private void chooseRecording() {
+        String path=android.net.Uri.parse(url).getPath();
+        if(path==null || !path.endsWith(".ts")) { Toast.makeText(this,"Nagrywanie tej wersji obsługuje bezpośrednie kanały MPEG-TS.",Toast.LENGTH_LONG).show(); return; }
+        if(android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},73);
+        new AlertDialog.Builder(this).setTitle("Czas nagrania").setMessage("Nagranie otwiera dodatkowe połączenie do dostawcy. Wybierz czas i plik.")
+            .setPositiveButton("Dalej",(dialog,which) -> new AlertDialog.Builder(this).setTitle("Maksymalny czas")
+                .setItems(new String[]{"30 minut","60 minut","120 minut"},(d,index) -> {
+                    recordingMinutes=new int[]{30,60,120}[index];
+                    startActivityForResult(new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT)
+                        .addCategory(android.content.Intent.CATEGORY_OPENABLE).setType("video/mp2t")
+                        .putExtra(android.content.Intent.EXTRA_TITLE,"TV-"+System.currentTimeMillis()+".ts"),RECORD_FILE);
+                }).show()).setNegativeButton("Anuluj",null).show();
+    }
+    @Override protected void onActivityResult(int request,int result,android.content.Intent data) {
+        super.onActivityResult(request,result,data);
+        if(request==RECORD_FILE && result==RESULT_OK && data!=null && data.getData()!=null) {
+            try {
+                android.content.Intent service=new android.content.Intent(this,RecordingService.class).setData(data.getData())
+                    .putExtra("url",url).putExtra("name",getIntent().getStringExtra("name")).putExtra("minutes",recordingMinutes);
+                startForegroundService(service); Toast.makeText(this,"Rozpoczynam nagrywanie. Zatrzymasz je w Opcjach lub powiadomieniu.",Toast.LENGTH_LONG).show();
+            } catch(RuntimeException e) { Toast.makeText(this,"Nie można uruchomić nagrywania. Sprawdź uprawnienia i plik.",Toast.LENGTH_LONG).show(); }
+        }
+    }
     @Override protected void onStart() {
         super.onStart(); if(url==null) return;
-        player=new ExoPlayer.Builder(this).build(); view.setPlayer(player);
+        if(player!=null) return;
+        player=new ExoPlayer.Builder(this).setLoadControl(new DefaultLoadControl.Builder().setBackBuffer(30000,true).build()).build(); view.setPlayer(player);
         player.addListener(new Player.Listener() {
             @Override public void onPlayerError(PlaybackException e) {
                 message.setText("Nie można odtworzyć materiału. Sprawdź internet, dostępność źródła lub kodeki telefonu.\nKod: "+e.getErrorCodeName());
@@ -86,7 +159,7 @@ public class PlayerActivity extends Activity {
         String path=android.net.Uri.parse(url).getPath();
         if(path!=null && path.endsWith(".ts")) item.setMimeType(MimeTypes.VIDEO_MP2T);
         player.setMediaItem(item.build()); player.seekTo(position); player.prepare(); player.play();
-        if(onDemand && position>5000) Toast.makeText(this,"Wznawiam oglądanie. Od początku: Audio / CC.",Toast.LENGTH_LONG).show();
+        if(onDemand && position>5000) Toast.makeText(this,"Wznawiam oglądanie. Od początku: Opcje.",Toast.LENGTH_LONG).show();
     }
     private void chooseTrack(int type) {
         if(player==null) return;
@@ -111,7 +184,7 @@ public class PlayerActivity extends Activity {
         new AlertDialog.Builder(this).setTitle(type==C.TRACK_TYPE_TEXT?"Napisy":"Audio").setItems(labels.toArray(new String[0]),(d,i) -> { if(player!=null) actions.get(i).run(); }).show();
     }
     @Override protected void onStop() {
-        if(player!=null) {
+        if(player!=null && !isInPictureInPictureMode()) {
             position=onDemand?player.getCurrentPosition():0;
             long duration=player.getDuration();
             if(player.getPlaybackState()==Player.STATE_ENDED || (duration>0 && position>=duration-2000)) position=0;
@@ -119,6 +192,10 @@ public class PlayerActivity extends Activity {
             view.setPlayer(null); player.release(); player=null;
         }
         super.onStop();
+    }
+    @Override protected void onDestroy() {
+        if(player!=null) { view.setPlayer(null); player.release(); player=null; }
+        guideWorker.shutdown(); super.onDestroy();
     }
     @Override protected void onSaveInstanceState(Bundle out) {
         out.putLong("position",player==null?position:player.getCurrentPosition()); out.putBoolean("fullscreen",fullscreen); super.onSaveInstanceState(out);
