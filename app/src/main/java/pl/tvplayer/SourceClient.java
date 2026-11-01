@@ -12,6 +12,7 @@ public final class SourceClient {
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS)
             .callTimeout(5, TimeUnit.MINUTES).build();
+    private final OkHttpClient guideClient=new OkHttpClient.Builder().connectTimeout(10,TimeUnit.SECONDS).readTimeout(15,TimeUnit.SECONDS).callTimeout(12,TimeUnit.SECONDS).build();
     public static HttpUrl validate(String value) {
         HttpUrl url = HttpUrl.parse(value.trim());
         if (url == null || !url.username().isEmpty() || !url.password().isEmpty())
@@ -19,8 +20,9 @@ public final class SourceClient {
         return url;
     }
     private interface ReaderTask<T> { T read(Reader reader) throws IOException; }
-    private <T> T get(HttpUrl url, ReaderTask<T> task) throws IOException {
-        try (Response response = client.newCall(new Request.Builder().url(url).header("User-Agent", "TVPlayer/0.3.0").build()).execute()) {
+    private <T> T get(HttpUrl url, ReaderTask<T> task) throws IOException { return request(client,url,task); }
+    private <T> T request(OkHttpClient http,HttpUrl url,ReaderTask<T> task) throws IOException {
+        try (Response response = http.newCall(new Request.Builder().url(url).header("User-Agent", "TVPlayer/0.3.0").build()).execute()) {
             if (!response.isSuccessful() || response.body() == null)
                 throw new IOException("Serwer zwrócił błąd HTTP " + response.code() + ".");
             // Parse directly from the response: no size-based rejection or full-body copy.
@@ -136,11 +138,16 @@ public final class SourceClient {
         return all;
     }
     static HttpUrl accountEndpoint(Channel c) throws IOException {
-        if(!c.guideUrl().isEmpty()) return validate(c.guideUrl());
+        if(!c.guideUrl().isEmpty() && !c.guideUrl().startsWith("xmltv:")) return validate(c.guideUrl());
         HttpUrl url=validate(c.url());
         if(url.queryParameter("username")!=null && url.queryParameter("password")!=null && url.encodedPath().endsWith("/player_api.php")) return url;
         List<String> parts=url.pathSegments(); int index=-1;
         for(int i=0;i<parts.size();i++) if(parts.get(i).equals("live") || parts.get(i).equals("movie") || parts.get(i).equals("series")) { index=i; break; }
+        if(index<0 && parts.size()>=3 && parts.get(parts.size()-1).matches("[0-9]+(?:\\.[a-zA-Z0-9]+)?")) {
+            int tail=parts.size()-3; HttpUrl.Builder base=url.newBuilder().query(null);
+            for(int i=parts.size()-1;i>=tail;i--) base.removePathSegment(i);
+            return base.addPathSegment("player_api.php").addQueryParameter("username",parts.get(tail)).addQueryParameter("password",parts.get(tail+1)).build();
+        }
         if(index<0 || parts.size()!=index+4) return null;
         HttpUrl.Builder base=url.newBuilder().query(null);
         for(int i=parts.size()-1;i>=index;i--) base.removePathSegment(i);
@@ -164,8 +171,17 @@ public final class SourceClient {
         HttpUrl server=account.newBuilder().query(null).removePathSegment(account.pathSize()-1).build();
         return xtream(server.toString(),user,pass,progress);
     }
-    public List<Guide.Program> guide(Channel channel) throws IOException {
-        return get(Guide.endpoint(channel),reader -> Guide.parse(reader,channel.timezone()));
+    public List<Guide.Program> guide(Channel channel) throws IOException { return guide(channel,true); }
+    List<Guide.Program> guide(Channel channel,boolean full) throws IOException {
+        HttpUrl base=Guide.endpoint(channel); IOException failure=null; boolean responded=false;
+        for(String action:full?new String[]{"get_simple_data_table","get_short_epg"}:new String[]{"get_short_epg","get_simple_data_table"}) {
+            HttpUrl url=base.newBuilder().setQueryParameter("action",action).setQueryParameter("limit",full?"100":"4").build();
+            try {
+                List<Guide.Program> items=request(guideClient,url,reader -> Guide.parse(reader,channel.timezone()));
+                responded=true; if(!items.isEmpty()) return items;
+            } catch(IOException e) { failure=e; }
+        }
+        if(!responded && failure!=null) throw failure; return new ArrayList<>();
     }
     public List<Channel> episodes(Channel series) throws IOException {
         HttpUrl address = validate(series.url());

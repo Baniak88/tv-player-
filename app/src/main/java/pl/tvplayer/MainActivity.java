@@ -27,6 +27,9 @@ public class MainActivity extends Activity {
     private String loadingMessage = "Wczytywanie…";
     private final android.os.Handler searchHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable searchTask = () -> filter(true);
+    private final Runnable epgTick=new Runnable() {
+        public void run() { if(rows!=null && section.equals("tv") && list.getVisibility()==View.VISIBLE) rows.notifyDataSetChanged(); searchHandler.postDelayed(this,60000); }
+    };
     private final Set<String> favorites = new HashSet<>();
     private LibraryStore store;
     private TextView status;
@@ -293,6 +296,7 @@ public class MainActivity extends Activity {
             LinearLayout text=column(); text.setPadding(dp(12),0,dp(6),0);
             TextView name=Ui.text(this,"",15,Ui.TEXT); name.setMaxLines(1); name.setEllipsize(TextUtils.TruncateAt.END); text.addView(name);
             TextView group=Ui.text(this,"",12,Ui.MUTED); group.setMaxLines(1); group.setEllipsize(TextUtils.TruncateAt.END); group.setPadding(0,dp(3),0,0); text.addView(group);
+            TextView next=Ui.text(this,"",11,Ui.FAINT); next.setMaxLines(1); next.setEllipsize(TextUtils.TruncateAt.END); next.setPadding(0,dp(3),0,0); text.addView(next);
             row.addView(text,new LinearLayout.LayoutParams(0,-2,1));
             Button guide=Ui.button(this,"EPG"); guide.setFocusable(false); guide.setTextSize(12); Ui.ghost(guide,Ui.MUTED); row.addView(guide,new LinearLayout.LayoutParams(dp(48),dp(44)));
             Button star=Ui.button(this,"☆"); star.setFocusable(false); star.setTextSize(20); Ui.ghost(star,Ui.FAINT); row.addView(star,new LinearLayout.LayoutParams(dp(44),dp(44)));
@@ -302,7 +306,17 @@ public class MainActivity extends Activity {
         String initial=c.name().replaceAll("^[^\\p{L}\\p{N}]*(?:[A-Z]{2,3}\\s*[|:]\\s*)?","");
         icon.setText(c.kind().equals("tv")?(initial.isEmpty()?"▶":initial.substring(0,Math.min(2,initial.length())).toUpperCase(Locale.ROOT)):c.kind().equals("series")?"▤":"▶");
         LinearLayout text=(LinearLayout)row.getChildAt(1); ((TextView)text.getChildAt(0)).setText(c.name());
-        ((TextView)text.getChildAt(1)).setText(c.group());
+        TextView detail=(TextView)text.getChildAt(1),next=(TextView)text.getChildAt(2); detail.setMaxLines(1);
+        if(c.kind().equals("tv")) {
+            GuideRepository repository=GuideRepository.get(this);
+            bindSchedule(detail,next,repository.peek(c,false)); row.setTag(c.url());
+            java.lang.ref.WeakReference<TextView> target=new java.lang.ref.WeakReference<>(detail),following=new java.lang.ref.WeakReference<>(next);
+            java.lang.ref.WeakReference<LinearLayout> holder=new java.lang.ref.WeakReference<>(row);
+            repository.request(c,false,data -> {
+                TextView view=target.get(),after=following.get(); LinearLayout owner=holder.get();
+                if(view!=null && after!=null && owner!=null && c.url().equals(owner.getTag())) bindSchedule(view,after,data);
+            });
+        } else { detail.setText(c.group()); next.setVisibility(View.GONE); }
         Button guide=(Button)row.getChildAt(2); guide.setVisibility(c.kind().equals("tv")?View.VISIBLE:View.GONE);
         guide.setContentDescription("Program TV i archiwum: "+c.name());
         guide.setOnClickListener(v -> GuideDialog.open(MainActivity.this,c,network,MainActivity.this::play));
@@ -310,6 +324,10 @@ public class MainActivity extends Activity {
         star.setContentDescription((saved?"Usuń z ulubionych: ":"Dodaj do ulubionych: ")+c.name());
         star.setOnClickListener(v -> toggleFavorite(c));
         return row;
+    }
+    private static void bindSchedule(TextView now,TextView next,GuideRepository.Data data) {
+        String[] lines=GuideRepository.summary(data,System.currentTimeMillis()/1000).split("\\n",2);
+        now.setText(lines[0]); next.setText(lines.length>1?lines[1]:""); next.setVisibility(lines.length>1?View.VISIBLE:View.GONE);
     }
     private void filter() { filter(true); }
     /** Hiding an adapter view also drops its old rows, so hidden screens never keep stale items. */
@@ -653,5 +671,7 @@ public class MainActivity extends Activity {
         worker.execute(() -> { try { store.save(copy, stars); } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) error("Nie udało się zapisać biblioteki na urządzeniu."); }); } });
     }
     private void error(String message) { if (!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK", null).show(); }
+    @Override protected void onResume() { super.onResume(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
+    @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); super.onPause(); }
     @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }
 }

@@ -11,6 +11,7 @@ public record Channel(String name, String url, String group, String epgId, Strin
     Channel withOrder(int order) { return new Channel(name,url,group,epgId,kind,guideUrl,archiveDays,timezone,order,logo); }
     Channel withTimezone(String zone) { return new Channel(name,url,group,epgId,kind,guideUrl,archiveDays,zone,bouquetOrder,logo); }
     Channel withLogo(String image) { return new Channel(name,url,group,epgId,kind,guideUrl,archiveDays,timezone,bouquetOrder,image==null?"":image.trim()); }
+    Channel withGuideSource(String source) { return new Channel(name,url,group,epgId,kind,source,archiveDays,timezone,bouquetOrder,logo); }
     private static final Pattern EPISODE = Pattern.compile(".*\\bs[0-9]{1,2}\\s?e[0-9]{1,3}\\b.*");
     private static final Pattern VIDEO_FILE = Pattern.compile(".*\\.(mp4|mkv|avi|mov|webm|m4v|wmv|flv|mpg|mpeg)$");
     private static final Pattern LIVE_FILE = Pattern.compile(".*\\.(ts|m3u8?)$");

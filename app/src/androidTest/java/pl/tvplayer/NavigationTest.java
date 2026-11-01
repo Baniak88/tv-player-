@@ -226,6 +226,56 @@ public class NavigationTest {
             final PlayerActivity closing=player; if(closing!=null) getInstrumentation().runOnMainSync(closing::finish);
         }
     }
+    @Test public void testXmltvFallbackAndInlineGuide() throws Exception {
+        Context context=getInstrumentation().getTargetContext();
+        okhttp3.mockwebserver.MockWebServer server=new okhttp3.mockwebserver.MockWebServer();
+        long now=System.currentTimeMillis()/1000;
+        java.time.format.DateTimeFormatter stamp=java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss Z").withZone(java.time.ZoneOffset.UTC);
+        String xml="<tv><channel id=\"tvn.pl\"><display-name>TVN</display-name></channel><channel id=\"tvn7.pl\"><display-name>TVN 7</display-name></channel>";
+        for(String id:new String[]{"tvn.pl","tvn7.pl"}) {
+            xml+="<programme channel=\""+id+"\" start=\""+stamp.format(java.time.Instant.ofEpochSecond(now-900))+"\" stop=\""+stamp.format(java.time.Instant.ofEpochSecond(now+900))+"\"><title>Fakty testowe</title><desc>Opis programu testowego.</desc></programme>";
+            xml+="<programme channel=\""+id+"\" start=\""+stamp.format(java.time.Instant.ofEpochSecond(now+900))+"\" stop=\""+stamp.format(java.time.Instant.ofEpochSecond(now+3600))+"\"><title>Pogoda testowa</title></programme>";
+        }
+        xml+="</tv>";
+        java.io.ByteArrayOutputStream compressed=new java.io.ByteArrayOutputStream();
+        try(java.util.zip.GZIPOutputStream gzip=new java.util.zip.GZIPOutputStream(compressed)) { gzip.write(xml.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+        final byte[] payload=compressed.toByteArray();
+        server.setDispatcher(new okhttp3.mockwebserver.Dispatcher() {
+            public okhttp3.mockwebserver.MockResponse dispatch(okhttp3.mockwebserver.RecordedRequest request) {
+                return new okhttp3.mockwebserver.MockResponse().setHeader("Content-Type","application/gzip").setBody(new okio.Buffer().write(payload));
+            }
+        });
+        server.start(); MainActivity activity=null;
+        try {
+            String feed="xmltv:"+server.url("/epg.xml.gz");
+            List<Channel> channels=Arrays.asList(
+                new Channel("PL-VIP| TVN RAW",server.url("/stream1.ts").toString(),"Test EPG","tvn.pl","tv",feed,0,"UTC",0),
+                new Channel("PL-VIP| TVN 7 RAW",server.url("/stream2.ts").toString(),"Test EPG","tvn7.pl","tv",feed,0,"UTC",0));
+            new LibraryStore(context).save(channels,Collections.emptySet());
+            activity=(MainActivity)getInstrumentation().startActivitySync(new Intent(context,MainActivity.class).putExtra("section","tv").putExtra("bouquet","Test EPG").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            View root=activity.getWindow().getDecorView();
+            long deadline=System.currentTimeMillis()+12000;
+            while(System.currentTimeMillis()<deadline && findContaining(root,"Fakty testowe")==null) { Thread.sleep(100); getInstrumentation().waitForIdleSync(); }
+            assertNotNull("Current programme missing from channel row",findContaining(root,"Fakty testowe"));
+            assertNotNull("Next programme missing from channel row",findContaining(root,"Pogoda testowa"));
+            screenshot("epg-channel-list.png");
+            GuideRepository.Data second=GuideRepository.get(context).peek(channels.get(1),false);
+            if(second==null) { Thread.sleep(500); second=GuideRepository.get(context).peek(channels.get(1),false); }
+            assertNotNull(second); assertFalse(second.programs().isEmpty()); assertEquals(1,server.getRequestCount());
+            final MainActivity opened=activity;
+            getInstrumentation().runOnMainSync(() -> GuideDialog.open(opened,channels.get(0),Runnable::run,c -> {}));
+            Thread.sleep(700); getInstrumentation().waitForIdleSync();
+            android.view.accessibility.AccessibilityNodeInfo window=getInstrumentation().getUiAutomation().getRootInActiveWindow();
+            assertFalse(window.findAccessibilityNodeInfosByText("Fakty testowe").isEmpty());
+            screenshot("epg-program-dialog.png"); assertEquals(1,server.getRequestCount());
+            getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+        } finally { if(activity!=null) { final MainActivity closing=activity; getInstrumentation().runOnMainSync(closing::finish); } server.shutdown(); }
+    }
+    private View findContaining(View root,String text) {
+        if(root instanceof TextView && ((TextView)root).getText().toString().contains(text)) return root;
+        if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { View found=findContaining(((ViewGroup)root).getChildAt(i),text); if(found!=null) return found; }
+        return null;
+    }
     private View find(View root,String text) {
         if(root instanceof TextView && text.equals(((TextView)root).getText().toString())) return root;
         if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) {

@@ -16,11 +16,21 @@ public final class M3uParser {
     public static List<Channel> parse(Reader source, String baseUrl) throws IOException {
         BufferedReader reader = source instanceof BufferedReader ? (BufferedReader) source : new BufferedReader(source);
         List<Channel> channels = new ArrayList<>();
-        String name = "", group = "Bez kategorii", epg = "", logo = "";
+        String name = "", group = "Bez kategorii", epg = "", logo = "", xmltv = "";
         String raw;
         while ((raw = reader.readLine()) != null) {
             String line = raw.replace("\uFEFF", "").trim();
-            if (line.startsWith("#EXTINF:")) {
+            if (line.startsWith("#EXTM3U")) {
+                Matcher header=ATTRIBUTE.matcher(line);
+                while(header.find()) if(header.group(1).equalsIgnoreCase("x-tvg-url") || header.group(1).equalsIgnoreCase("url-tvg")) {
+                    for(String candidate:header.group(2).trim().split("[,\\s]+")) {
+                        try {
+                            URI uri=baseUrl==null?URI.create(candidate):URI.create(baseUrl).resolve(candidate);
+                            if("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) { xmltv="xmltv:"+uri; break; }
+                        } catch(IllegalArgumentException ignored) {}
+                    }
+                }
+            } else if (line.startsWith("#EXTINF:")) {
                 int comma = -1;
                 boolean quoted = false;
                 for (int i = 0; i < line.length(); i++) {
@@ -43,7 +53,7 @@ public final class M3uParser {
                     URI uri = baseUrl == null ? URI.create(line) : URI.create(baseUrl).resolve(line);
                     if ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) {
                         channels.add(new Channel(name.isEmpty() ? "Kanał " + (channels.size() + 1) : name,
-                                uri.toString(), group.isEmpty() ? "Bez kategorii" : group, epg).withLogo(logo));
+                                uri.toString(), group.isEmpty() ? "Bez kategorii" : group, epg).withLogo(logo).withGuideSource(xmltv));
                     }
                 } catch (IllegalArgumentException ignored) { }
                 name = ""; group = "Bez kategorii"; epg = ""; logo = "";
