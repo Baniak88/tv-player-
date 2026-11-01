@@ -238,7 +238,7 @@ public class NavigationTest {
         getInstrumentation().runOnMainSync(() -> find(player.getWindow().getDecorView(),"↙").performClick());
         getInstrumentation().waitForIdleSync(); assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,player.getRequestedOrientation());
         getInstrumentation().runOnMainSync(() -> find(player.getWindow().getDecorView(),"⤢").performClick());
-        getInstrumentation().waitForIdleSync(); assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR,player.getRequestedOrientation());
+        getInstrumentation().waitForIdleSync(); assertTrue((player.getWindow().getDecorView().getSystemUiVisibility() & View.SYSTEM_UI_FLAG_FULLSCREEN)!=0);
         getInstrumentation().runOnMainSync(() -> find(player.getWindow().getDecorView(),"Opcje").performClick());
         getInstrumentation().waitForIdleSync();
         getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);

@@ -68,7 +68,7 @@ jobs:
           heap-size: 512M
           script: bash scripts/smoke-install.sh
       - name: Save UI previews for visual review
-        if: success()
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -76,10 +76,13 @@ jobs:
           python3 - <<'PY'
           import base64, json, pathlib
           for name in ['home-portrait','home-landscape','sport-bouquet','bouquets-grid']:
-              data=pathlib.Path('smoke-output',name+'.png').read_bytes()
+              path=pathlib.Path('smoke-output',name+'.png')
+              if not path.exists(): continue
+              data=path.read_bytes()
               pathlib.Path('/tmp',name+'.json').write_text(json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}))
           PY
           for name in home-portrait home-landscape sport-bouquet bouquets-grid; do
+            if [ ! -f "/tmp/$name.json" ]; then continue; fi
             ref=$(gh api "repos/$GH_REPO/git/blobs" --input "/tmp/$name.json" --jq '.sha')
             echo "UI_PREVIEW $name $ref"
           done

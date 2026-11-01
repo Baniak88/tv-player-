@@ -16,6 +16,7 @@ public final class HomeActivity extends Activity {
     private List<Channel> tv=new ArrayList<>();
     private boolean loadingAccount;
     private int dp(int n) { return (int)(n*getResources().getDisplayMetrics().density); }
+    private int scaled(int n) { return dp(Math.round(n*Math.max(1f,getResources().getConfiguration().fontScale))); }
     private LinearLayout column() { LinearLayout l=new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
     private TextView text(String s,int size,int color) { TextView t=new TextView(this); t.setText(s); t.setTextSize(size); t.setTextColor(color); return t; }
     private GradientDrawable panel(int start,int end,int border) {
@@ -38,11 +39,16 @@ public final class HomeActivity extends Activity {
         name.setPadding(0,dp(large?12:10),0,0); box.addView(name); box.setOnClickListener(v -> click.run()); return box;
     }
     private View action(String label,String icon,Runnable click) {
-        LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(14),dp(8),dp(12),dp(8));
+        LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(14),dp(6),dp(12),dp(6));
         row.setBackground(interactive(false)); row.setFocusable(true); row.setClickable(true); row.setContentDescription(label);
         row.addView(new Icon(this,icon),new LinearLayout.LayoutParams(dp(24),dp(24)));
         TextView t=text(label,16,0xFFF1DBE0); t.setPadding(dp(12),0,0,0); t.setMaxLines(2); row.addView(t,new LinearLayout.LayoutParams(0,-2,1));
         row.setOnClickListener(v -> click.run()); return row;
+    }
+    private View compactAction(String label,String icon,Runnable click) {
+        LinearLayout row=(LinearLayout)action(label,icon,click); row.setPadding(dp(8),dp(6),dp(8),dp(6));
+        ((TextView)row.getChildAt(1)).setTextSize(14);
+        row.getChildAt(0).setLayoutParams(new LinearLayout.LayoutParams(dp(20),dp(20))); return row;
     }
     @Override public void onCreate(Bundle state) { super.onCreate(state); build(); }
     private void open(String section,String group,boolean source) {
@@ -69,7 +75,7 @@ public final class HomeActivity extends Activity {
         TextView tag=text("Wybierz, co chcesz oglądać",14,0xFFC3A7B5); tag.setGravity(Gravity.CENTER); tag.setPadding(0,0,0,dp(wide?12:22)); header.addView(tag);
         int gap=dp(12);
         if(wide) {
-            int height=dp(176);
+            int height=scaled(176);
             LinearLayout menu=new LinearLayout(this);
             LinearLayout.LayoutParams liveSize=new LinearLayout.LayoutParams(0,height,1.15f); liveSize.rightMargin=gap;
             menu.addView(tile("Telewizja na żywo","tv",true,() -> open("tv",null,false)),liveSize);
@@ -77,9 +83,9 @@ public final class HomeActivity extends Activity {
             LinearLayout.LayoutParams first=new LinearLayout.LayoutParams(0,-1,1); first.rightMargin=gap;
             films.addView(tile("Filmy","movie",false,() -> open("movie",null,false)),first);
             films.addView(tile("Seriale","series",false,() -> open("series",null,false)),new LinearLayout.LayoutParams(0,-1,1));
-            account.addView(action("Konto","account",this::account),new LinearLayout.LayoutParams(0,-1,1));
+            account.addView(compactAction("Konto","account",this::account),new LinearLayout.LayoutParams(0,-1,1));
             LinearLayout.LayoutParams sourceSize=new LinearLayout.LayoutParams(0,-1,1); sourceSize.leftMargin=gap;
-            account.addView(action("Źródło","source",() -> open("tv",null,true)),sourceSize);
+            account.addView(compactAction("Źródło","source",() -> open("tv",null,true)),sourceSize);
             LinearLayout.LayoutParams filmsSize=new LinearLayout.LayoutParams(-1,0,1.4f); filmsSize.bottomMargin=gap;
             middle.addView(films,filmsSize); middle.addView(account,new LinearLayout.LayoutParams(-1,0,1));
             LinearLayout.LayoutParams midSize=new LinearLayout.LayoutParams(0,height,1.6f); midSize.rightMargin=gap; menu.addView(middle,midSize);
@@ -88,19 +94,19 @@ public final class HomeActivity extends Activity {
             for(int i=0;i<buttons.length;i++) { LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,0,1); if(i<2) size.bottomMargin=gap; actions.addView(buttons[i],size); }
             menu.addView(actions,new LinearLayout.LayoutParams(0,height,1.15f)); header.addView(menu);
         } else {
-            header.addView(tile("Telewizja na żywo","tv",true,() -> open("tv",null,false)),new LinearLayout.LayoutParams(-1,dp(136)));
+            header.addView(tile("Telewizja na żywo","tv",true,() -> open("tv",null,false)),new LinearLayout.LayoutParams(-1,scaled(136)));
             LinearLayout films=new LinearLayout(this);
-            LinearLayout.LayoutParams filmSize=new LinearLayout.LayoutParams(0,dp(124),1); filmSize.rightMargin=gap;
+            LinearLayout.LayoutParams filmSize=new LinearLayout.LayoutParams(0,scaled(124),1); filmSize.rightMargin=gap;
             films.addView(tile("Filmy","movie",false,() -> open("movie",null,false)),filmSize);
-            films.addView(tile("Seriale","series",false,() -> open("series",null,false)),new LinearLayout.LayoutParams(0,dp(124),1));
+            films.addView(tile("Seriale","series",false,() -> open("series",null,false)),new LinearLayout.LayoutParams(0,scaled(124),1));
             LinearLayout.LayoutParams rowSize=new LinearLayout.LayoutParams(-1,-2); rowSize.topMargin=gap; header.addView(films,rowSize);
             LinearLayout account=new LinearLayout(this);
-            LinearLayout.LayoutParams accountSize=new LinearLayout.LayoutParams(0,dp(56),1); accountSize.rightMargin=gap;
+            LinearLayout.LayoutParams accountSize=new LinearLayout.LayoutParams(0,scaled(56),1); accountSize.rightMargin=gap;
             account.addView(action("Konto","account",this::account),accountSize);
-            account.addView(action("Zmień źródło","source",() -> open("tv",null,true)),new LinearLayout.LayoutParams(0,dp(56),1));
+            account.addView(action("Zmień źródło","source",() -> open("tv",null,true)),new LinearLayout.LayoutParams(0,scaled(56),1));
             LinearLayout.LayoutParams accountRow=new LinearLayout.LayoutParams(-1,-2); accountRow.topMargin=gap; accountRow.bottomMargin=gap; header.addView(account,accountRow);
             for(View action:new View[]{action("Ustawienia","settings",this::settings),action("Odśwież źródło","refresh",this::refreshSource),action("Wyjście","exit",this::finish)}) {
-                LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,dp(52)); size.bottomMargin=dp(8); header.addView(action,size);
+                LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,scaled(52)); size.bottomMargin=dp(8); header.addView(action,size);
             }
         }
         header.setPadding(0,0,0,dp(14)); page.addView(header); root.addView(page,new LinearLayout.LayoutParams(-1,0,1)); setContentView(root);
