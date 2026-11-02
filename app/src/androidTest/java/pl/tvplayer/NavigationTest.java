@@ -201,6 +201,12 @@ public class NavigationTest {
             byte[] buffer=new byte[1024]; while(stream.read(buffer)!=-1) {}
         }
     }
+    private void waitLiveToolbar(PlayerActivity player,int visibility) throws Exception {
+        java.lang.reflect.Field field=PlayerActivity.class.getDeclaredField("toolbar"); field.setAccessible(true); View toolbar=(View)field.get(player);
+        long until=System.currentTimeMillis()+7000;
+        while(toolbar.getVisibility()!=visibility && System.currentTimeMillis()<until) { getInstrumentation().waitForIdleSync(); Thread.sleep(80); }
+        assertEquals("Unexpected live toolbar visibility",visibility,toolbar.getVisibility());
+    }
     @Test public void testFullscreenWithSystemRotationLocked() throws Exception {
         Context context=getInstrumentation().getTargetContext();
         int original=android.provider.Settings.System.getInt(context.getContentResolver(),android.provider.Settings.System.ACCELEROMETER_ROTATION,1);
@@ -208,18 +214,21 @@ public class NavigationTest {
         java.io.File ready=new java.io.File(context.getFilesDir(),"rotation-ready"),landscape=new java.io.File(context.getFilesDir(),"rotation-landscape-ok");
         try {
             shell("settings put system accelerometer_rotation 0");
-            player=(PlayerActivity)getInstrumentation().startActivitySync(new Intent(context,PlayerActivity.class).putExtra("url","https://example.com/test.mp4").putExtra("name","Rotation lock test").putExtra("kind","movie").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            getInstrumentation().waitForIdleSync(); Thread.sleep(500); ready.createNewFile();
+            player=(PlayerActivity)getInstrumentation().startActivitySync(new Intent(context,PlayerActivity.class).putExtra("url","https://example.com/test.mp4").putExtra("name","Rotation lock test").putExtra("kind","tv").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            getInstrumentation().waitForIdleSync(); waitLiveToolbar(player,View.GONE); ready.createNewFile();
             long deadline=System.currentTimeMillis()+20000;
             while(player.getResources().getConfiguration().orientation!=android.content.res.Configuration.ORIENTATION_LANDSCAPE && System.currentTimeMillis()<deadline) Thread.sleep(100);
             assertEquals("Physical rotation did not reach landscape",android.content.res.Configuration.ORIENTATION_LANDSCAPE,player.getResources().getConfiguration().orientation);
+            waitLiveToolbar(player,View.VISIBLE);
             int requested=player.getRequestedOrientation();
             assertTrue(requested==ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE || requested==ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
             assertEquals(0,android.provider.Settings.System.getInt(context.getContentResolver(),android.provider.Settings.System.ACCELEROMETER_ROTATION,1));
+            waitLiveToolbar(player,View.GONE);
             landscape.createNewFile(); deadline=System.currentTimeMillis()+20000;
             while(player.getResources().getConfiguration().orientation!=android.content.res.Configuration.ORIENTATION_PORTRAIT && System.currentTimeMillis()<deadline) Thread.sleep(100);
             assertEquals("Physical rotation did not return to portrait",android.content.res.Configuration.ORIENTATION_PORTRAIT,player.getResources().getConfiguration().orientation);
             assertEquals(0,android.provider.Settings.System.getInt(context.getContentResolver(),android.provider.Settings.System.ACCELEROMETER_ROTATION,1));
+            waitLiveToolbar(player,View.VISIBLE);
             android.util.Log.i("RotationTest","Landscape and portrait passed with accelerometer_rotation=0");
         } finally {
             ready.delete(); landscape.delete(); shell("settings put system accelerometer_rotation "+original);
@@ -381,3 +390,4 @@ public class NavigationTest {
         getInstrumentation().runOnMainSync(() -> { player.finish(); main.finish(); });
     }
 }
+
