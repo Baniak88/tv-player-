@@ -1,1 +1,0 @@
-onmessage=function(event){try{if(event.data.type==='encode'){var bytes=new TextEncoder().encode(JSON.stringify(event.data.value));postMessage({bytes:bytes.buffer},[bytes.buffer]);}else postMessage({value:JSON.parse(new TextDecoder('utf-8').decode(event.data.bytes))});}catch(error){postMessage({error:'Nie można przetworzyć zapisu biblioteki.'});}close();};
