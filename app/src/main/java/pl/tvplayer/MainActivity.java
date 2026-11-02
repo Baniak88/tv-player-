@@ -554,7 +554,9 @@ public class MainActivity extends Activity {
         } else super.onBackPressed();
     }
     private void play(Channel c) {
-        startActivity(new Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()).putExtra("guide",c.guideUrl()).putExtra("epgId",c.epgId()).putExtra("days",c.archiveDays()).putExtra("timezone",c.timezone()));
+        Intent intent=new Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()).putExtra("guide",c.guideUrl()).putExtra("epgId",c.epgId()).putExtra("days",c.archiveDays()).putExtra("timezone",c.timezone()).putExtra("group",c.group()).putExtra("logo",c.logo());
+        if(c.kind().equals("tv")) intent.putExtra("navigation_session",LiveChannelQueue.remember(shown,c.url())).putExtra("navigation_scope",true).putExtra("navigation_group",selectedGroup.equals(ALL)?"":selectedGroup).putExtra("navigation_query",search.getText().toString()).putExtra("navigation_favorites",onlyFavorites);
+        startActivity(intent);
     }
     // MainActivity is a phone screen; keep the phone activity out of the shared TV source set.
     private void openMovie(Channel movie) { startActivity(new Intent().setClassName(this,"pl.tvplayer.MovieActivity").putExtra("url",movie.url()).putExtra("name",movie.name()).putExtra("group",movie.group()).putExtra("logo",movie.logo())); }
@@ -653,5 +655,6 @@ public class MainActivity extends Activity {
     @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); super.onPause(); }
     @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }
 }
+
 
 

@@ -39,7 +39,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: TV-Player-Preview-0.8.6
+          name: TV-Player-Preview-0.8.7
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: TV-Player-Preview-0.8.6
+          name: TV-Player-Preview-0.8.7
           path: apk
       - name: Enable KVM
         run: |
@@ -105,7 +105,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: TV-Player-Preview-0.8.6
+          name: TV-Player-Preview-0.8.7
           path: apk
       - name: Publish directly installable APK
         env:
@@ -113,10 +113,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/app-debug.apk TV-Player-0.8.6.apk
-          gh release view v0.8.6-preview >/dev/null 2>&1 || gh release create v0.8.6-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Preview 0.8.6" --notes "Poprawiony wybór sezonu: pojedynczy sezon bez rozwijanego okna, spójny wybór przy kilku sezonach. Szybsze obrazy i przewijanie odcinków, szyfrowana pamięć opisów filmów i seriali oraz dopracowane paski i przyciski na telefonie. Bezpośredni APK z podpisem aktualizacji."
-          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v0.8.6-preview" -f sha="$SOURCE_SHA" -F force=false >/dev/null
-          gh release upload v0.8.6-preview TV-Player-0.8.6.apk --clobber
+          cp apk/debug/app-debug.apk TV-Player-0.8.7.apk
+          gh release view v0.8.7-preview >/dev/null 2>&1 || gh release create v0.8.7-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Preview 0.8.7" --notes "Strzałki poprzedni/następny na pasku odtwarzacza zmieniają kanały TV na telefonie w obrębie aktualnej listy, bukietu lub ulubionych. Aktualizacja nazwy i danych EPG, przełączanie bez wychodzenia z odtwarzacza oraz przywracanie wybranego kanału. Bezpośredni APK z podpisem aktualizacji."
+          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v0.8.7-preview" -f sha="$SOURCE_SHA" -F force=false >/dev/null
+          gh release upload v0.8.7-preview TV-Player-0.8.7.apk --clobber
+
 
 
 

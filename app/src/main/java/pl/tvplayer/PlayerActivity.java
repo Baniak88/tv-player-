@@ -17,7 +17,8 @@ public class PlayerActivity extends Activity {
     private ExoPlayer player;
     private PlayerView view;
     private LinearLayout error;
-    private TextView message;
+    private TextView message,title;
+    private LiveChannelQueue channelQueue;
     private Button full;
     private String url, bookmark;
     private long position;
@@ -30,7 +31,7 @@ public class PlayerActivity extends Activity {
     private int recordingMinutes=60;
     private boolean streamObserved;
     private Channel liveChannel() {
-        return new Channel(getIntent().getStringExtra("name"),url,"",getIntent().getStringExtra("epgId"),onDemand?"movie":"tv",
+        return new Channel(getIntent().getStringExtra("name"),url,getIntent().getStringExtra("group"),getIntent().getStringExtra("epgId"),onDemand?"movie":"tv",
             getIntent().getStringExtra("guide"),getIntent().getIntExtra("days",0),getIntent().getStringExtra("timezone"));
     }
     private int dp(int value) { return (int)(value*getResources().getDisplayMetrics().density); }
@@ -43,6 +44,7 @@ public class PlayerActivity extends Activity {
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if(state!=null && state.getBundle("live_channel")!=null) getIntent().replaceExtras(state.getBundle("live_channel"));
         url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }
         television=getIntent().getBooleanExtra("television",false) || (getResources().getConfiguration().uiMode & Configuration.UI_MODE_TYPE_MASK)==Configuration.UI_MODE_TYPE_TELEVISION;
         if(television) sensorOrientation=ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
@@ -61,7 +63,7 @@ public class PlayerActivity extends Activity {
         root.addView(view,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout top=new LinearLayout(this); toolbar=top; top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(10),dp(24),dp(10),dp(6)); top.setBackgroundColor(0x99000000);
         Button back=action("‹"); back.setContentDescription("Wróć do biblioteki"); top.addView(back,new LinearLayout.LayoutParams(dp(46),dp(44))); back.setOnClickListener(v -> finish());
-        TextView title=new TextView(this); title.setText(getIntent().getStringExtra("name")); title.setTextColor(-1); title.setTextSize(15); title.setMaxLines(2); title.setPadding(dp(10),0,dp(6),0); top.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        title=new TextView(this); title.setText(getIntent().getStringExtra("name")); title.setTextColor(-1); title.setTextSize(15); title.setMaxLines(2); title.setPadding(dp(10),0,dp(6),0); top.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         Button settings=action("Audio / CC"); top.addView(settings,new LinearLayout.LayoutParams(dp(92),dp(44)));
         settings.setText("Opcje"); settings.setOnClickListener(v -> showOptions());
         full=action("↙"); full.setContentDescription("Włącz lub wyłącz pełny ekran"); top.addView(full,new LinearLayout.LayoutParams(dp(46),dp(44)));
@@ -70,6 +72,7 @@ public class PlayerActivity extends Activity {
         if(television) full.setVisibility(View.GONE);
         if(television || !onDemand) view.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener)(visibility -> { if(!isInPictureInPictureMode()) toolbar.setVisibility(visibility); }));
         if(!television && !onDemand) {
+            view.setShowPreviousButton(true); view.setShowNextButton(true); view.setShowRewindButton(false); view.setShowFastForwardButton(false);
             view.setControllerShowTimeoutMs(4000);
             view.setControllerAutoShow(false);
             view.setControllerHideOnTouch(false);
@@ -88,10 +91,49 @@ public class PlayerActivity extends Activity {
             }
         };
         setContentView(root); updateFullscreen();
+        if(!television && !onDemand) loadChannelQueue();
         // The system may drop the fullscreen flags (focus change, dialogs, rotation); restore them.
         getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(visibility -> {
             if(fullscreen && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN)==0) root.postDelayed(this::restoreImmersive,1500);
         });
+    }
+    private void loadChannelQueue() {
+        channelQueue=LiveChannelQueue.restore(getIntent().getStringExtra("navigation_session"),url); if(channelQueue!=null) return;
+        final String selected=url; final boolean explicit=getIntent().getBooleanExtra("navigation_scope",false);
+        guideWorker.execute(() -> {
+            try {
+                Set<String> favorites=new HashSet<>(); List<Channel> channels=new LibraryStore(this).loadSection("tv",favorites); String group=getIntent().getStringExtra("navigation_group");
+                if(!explicit) { group=""; for(Channel channel:channels) if(channel.url().equals(selected)) { group=channel.group(); break; } }
+                LiveChannelQueue restored=LiveChannelQueue.rebuild(channels,favorites,group,getIntent().getStringExtra("navigation_query"),getIntent().getBooleanExtra("navigation_favorites",false),selected);
+                runOnUiThread(() -> { if(isDestroyed() || !selected.equals(url)) return; channelQueue=restored; if(player!=null && restored.canNavigate()) { view.setPlayer(channelControls(player)); describeChannelButtons(); revealLiveControls(); } });
+            } catch(Exception ignored) { /* Direct streams stay playable without a saved navigation list. */ }
+        });
+    }
+    private Player channelControls(ExoPlayer delegate) {
+        return new ForwardingPlayer(delegate) {
+            private boolean navigationCommand(int command) { return command==Player.COMMAND_SEEK_TO_PREVIOUS || command==Player.COMMAND_SEEK_TO_NEXT || command==Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM || command==Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM; }
+            @Override public boolean isCommandAvailable(int command) { return navigationCommand(command)?channelQueue!=null && channelQueue.canNavigate():super.isCommandAvailable(command); }
+            @Override public Player.Commands getAvailableCommands() {
+                Player.Commands.Builder commands=super.getAvailableCommands().buildUpon();
+                for(int command:new int[]{Player.COMMAND_SEEK_TO_PREVIOUS,Player.COMMAND_SEEK_TO_NEXT,Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM}) { if(channelQueue!=null && channelQueue.canNavigate()) commands.add(command); else commands.remove(command); } return commands.build();
+            }
+            @Override public void seekToPrevious() { changeChannel(-1); }
+            @Override public void seekToPreviousMediaItem() { changeChannel(-1); }
+            @Override public void seekToNext() { changeChannel(1); }
+            @Override public void seekToNextMediaItem() { changeChannel(1); }
+        };
+    }
+    private void describeChannelButtons() {
+        View previous=view.findViewById(androidx.media3.ui.R.id.exo_prev),next=view.findViewById(androidx.media3.ui.R.id.exo_next);
+        if(previous!=null) previous.setContentDescription("Poprzedni kanał"); if(next!=null) next.setContentDescription("Następny kanał");
+    }
+    private void changeChannel(int offset) {
+        if(television || onDemand || channelQueue==null || !resumed || isFinishing() || isDestroyed() || enteringPip || isInPictureInPictureMode()) return; Channel channel=channelQueue.move(offset); if(channel==null) return;
+        // Stop observation while the intent still identifies the old channel.
+        if(player!=null) { view.setPlayer(null); player.release(); player=null; } stopStreamObservation();
+        url=channel.url(); position=0;
+        getIntent().putExtra("url",url).putExtra("name",channel.name()).putExtra("kind","tv").putExtra("group",channel.group()).putExtra("logo",channel.logo()).putExtra("guide",channel.guideUrl()).putExtra("epgId",channel.epgId()).putExtra("days",channel.archiveDays()).putExtra("timezone",channel.timezone());
+        title.setText(channel.name()); error.setVisibility(View.GONE); startPlayback(); revealLiveControls();
     }
     private void restoreImmersive() {
         if(isFinishing() || !fullscreen || enteringPip || isInPictureInPictureMode()) return;
@@ -192,8 +234,9 @@ public class PlayerActivity extends Activity {
     }
     @Override protected void onResume() { super.onResume(); resumed=true; if(!isInPictureInPictureMode()) { updateFullscreen(); revealLiveControls(); } }
     @Override protected void onPause() { resumed=false; saveWatchProgress(); if(rotation!=null) rotation.disable(); super.onPause(); }
-    @Override protected void onStart() {
-        super.onStart(); if(url==null) return;
+    @Override protected void onStart() { super.onStart(); startPlayback(); }
+    private void startPlayback() {
+        if(url==null) return;
         if(player!=null) return;
         ExoPlayer.Builder builder=new ExoPlayer.Builder(this).setLoadControl(new DefaultLoadControl.Builder().setBackBuffer(30000,true).build());
         if(!onDemand) {
@@ -202,9 +245,11 @@ public class PlayerActivity extends Activity {
             builder.setMediaSourceFactory(new androidx.media3.exoplayer.source.DefaultMediaSourceFactory(() -> new EitDataSource(upstream.createDataSource(),channel,repository)));
             repository.streamStarted(channel); streamObserved=true;
         }
-        player=builder.build(); view.setPlayer(player);
+        player=builder.build(); final ExoPlayer current=player; view.setPlayer(!television && !onDemand?channelControls(player):player);
+        if(!television && !onDemand) describeChannelButtons();
         player.addListener(new Player.Listener() {
             @Override public void onPlayerError(PlaybackException e) {
+                if(player!=current) return;
                 message.setText("Nie można odtworzyć materiału. Sprawdź internet, dostępność źródła lub kodeki telefonu.\nKod: "+e.getErrorCodeName());
                 error.setVisibility(View.VISIBLE);
             }
@@ -266,7 +311,9 @@ public class PlayerActivity extends Activity {
     }
     private void stopStreamObservation() { if(streamObserved) { GuideRepository.get(this).streamStopped(liveChannel()); streamObserved=false; } }
     @Override protected void onSaveInstanceState(Bundle out) {
+        if(!television && !onDemand && getIntent().getExtras()!=null) out.putBundle("live_channel",new Bundle(getIntent().getExtras()));
         out.putLong("position",player==null?position:player.getCurrentPosition()); out.putBoolean("fullscreen",fullscreen); super.onSaveInstanceState(out);
     }
 }
+
 

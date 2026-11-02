@@ -47,7 +47,8 @@ for name in home-portrait home-landscape sport-bouquet bouquets-grid epg-channel
   adb exec-out run-as pl.tvplayer.preview cat "files/$name.png" > "smoke-output/$name.png" || true
 done
 
-grep -q 'OK (19 tests)' smoke-output/navigation-test.txt
+grep -q 'OK (21 tests)' smoke-output/navigation-test.txt
+
 
 
 
