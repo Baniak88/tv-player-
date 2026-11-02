@@ -249,8 +249,13 @@ public class NavigationTest {
         java.io.ByteArrayOutputStream compressed=new java.io.ByteArrayOutputStream();
         try(java.util.zip.GZIPOutputStream gzip=new java.util.zip.GZIPOutputStream(compressed)) { gzip.write(xml.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
         final byte[] payload=compressed.toByteArray();
+        final byte[] video;
+        try(java.io.InputStream input=getInstrumentation().getContext().getAssets().open("live-controls.ts");java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream()) { byte[] buffer=new byte[8192]; int count; while((count=input.read(buffer))!=-1) bytes.write(buffer,0,count); video=bytes.toByteArray(); }
+        java.util.concurrent.atomic.AtomicInteger guideDownloads=new java.util.concurrent.atomic.AtomicInteger();
         server.setDispatcher(new okhttp3.mockwebserver.Dispatcher() {
             public okhttp3.mockwebserver.MockResponse dispatch(okhttp3.mockwebserver.RecordedRequest request) {
+                if(!request.getPath().startsWith("/epg.xml.gz")) return new okhttp3.mockwebserver.MockResponse().setHeader("Content-Type","video/mp2t").setChunkedBody(new okio.Buffer().write(video),1880);
+                guideDownloads.incrementAndGet();
                 return new okhttp3.mockwebserver.MockResponse().setHeader("Content-Type","application/gzip").setBody(new okio.Buffer().write(payload));
             }
         });
@@ -270,7 +275,7 @@ public class NavigationTest {
             screenshot("epg-channel-list.png");
             GuideRepository.Data second=GuideRepository.get(context).peek(channels.get(1),false);
             if(second==null) { Thread.sleep(500); second=GuideRepository.get(context).peek(channels.get(1),false); }
-            assertNotNull(second); assertFalse(second.programs().isEmpty()); assertEquals(1,server.getRequestCount());
+            assertNotNull(second); assertFalse(second.programs().isEmpty()); assertEquals(1,guideDownloads.get());
             GuideRepository.get(context).streamStarted(channels.get(0));
             try {
                 final MainActivity opened=activity;
@@ -278,7 +283,7 @@ public class NavigationTest {
                 Thread.sleep(700); getInstrumentation().waitForIdleSync();
                 android.view.accessibility.AccessibilityNodeInfo window=getInstrumentation().getUiAutomation().getRootInActiveWindow();
                 assertFalse("Provider EPG must remain available during playback",window.findAccessibilityNodeInfosByText("Fakty testowe").isEmpty());
-                screenshot("epg-program-dialog.png"); assertEquals(1,server.getRequestCount());
+                screenshot("epg-program-dialog.png"); assertEquals(1,guideDownloads.get());
                 getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
             } finally { GuideRepository.get(context).streamStopped(channels.get(0)); }
         } finally { if(activity!=null) { final MainActivity closing=activity; getInstrumentation().runOnMainSync(closing::finish); } server.shutdown(); }
@@ -335,7 +340,7 @@ public class NavigationTest {
             Thread.sleep(600); getInstrumentation().waitForIdleSync();
             android.view.accessibility.AccessibilityNodeInfo window=getInstrumentation().getUiAutomation().getRootInActiveWindow();
             assertFalse(window.findAccessibilityNodeInfosByText("Wiadomości ze strumienia").isEmpty());
-            screenshot("epg-stream-dialog.png"); assertEquals(1,streamConnections.get());
+            screenshot("epg-stream-dialog.png"); assertEquals("One manual fixture read plus one active bouquet preview; EPG must not open another stream",2,streamConnections.get());
             getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
         } finally {
             watch.cancel(); repository.streamStopped(channel);
@@ -390,4 +395,5 @@ public class NavigationTest {
         getInstrumentation().runOnMainSync(() -> { player.finish(); main.finish(); });
     }
 }
+
 

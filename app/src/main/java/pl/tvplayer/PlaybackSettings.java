@@ -1,0 +1,33 @@
+package pl.tvplayer;
+
+import android.app.*;
+import android.content.Context;
+import androidx.media3.common.TrackSelectionParameters;
+import androidx.media3.exoplayer.DefaultLoadControl;
+
+@androidx.annotation.OptIn(markerClass=androidx.media3.common.util.UnstableApi.class)
+final class PlaybackSettings {
+    static boolean weakInternet(Context context) { return context.getSharedPreferences("playback-network",Context.MODE_PRIVATE).getBoolean("weak",false); }
+    static DefaultLoadControl loadControl(Context context) {
+        boolean weak=weakInternet(context);
+        return new DefaultLoadControl.Builder().setBufferDurationsMs(weak?15000:5000,weak?45000:20000,weak?4000:1500,weak?6000:3000)
+            .setTargetBufferBytes(32*1024*1024).setPrioritizeTimeOverSizeThresholds(false).setBackBuffer(10000,true).build();
+    }
+    static TrackSelectionParameters tracks(Context context,TrackSelectionParameters current) {
+        boolean weak=weakInternet(context);
+        return current.buildUpon().setMaxVideoSize(weak?1280:Integer.MAX_VALUE,weak?720:Integer.MAX_VALUE)
+            .setMaxVideoBitrate(weak?2500000:Integer.MAX_VALUE).build();
+    }
+    static void choose(Activity activity,Runnable changed) {
+        boolean previous=weakInternet(activity);
+        android.widget.TextView note=new android.widget.TextView(activity); note.setTextSize(13); int padding=Ui.dp(activity,20); note.setPadding(padding,Ui.dp(activity,8),padding,Ui.dp(activity,8));
+        note.setText("Większy bufor pomaga przy chwilowych spadkach prędkości, ale wydłuża start. Jeśli źródło oferuje kilka jakości, ogranicza obraz do 720p i 2,5 Mb/s. Przy stałej jakości wybierz kanał SD/HD zamiast FHD/4K.");
+        new AlertDialog.Builder(activity).setTitle("Połączenie internetowe").setView(note)
+            .setSingleChoiceItems(new String[]{"Standard · szybszy start","Słabszy internet · większy bufor"},previous?1:0,(dialog,index) -> {
+                boolean weak=index==1;
+                activity.getSharedPreferences("playback-network",Context.MODE_PRIVATE).edit().putBoolean("weak",weak).apply(); dialog.dismiss();
+                if(weak!=previous) { GuideRepository.get(activity).invalidateFailures(); changed.run(); }
+            })
+            .setNegativeButton("Zamknij",null).show();
+    }
+}

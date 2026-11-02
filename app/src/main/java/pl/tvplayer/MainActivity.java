@@ -11,8 +11,12 @@ import android.text.*;
 import java.util.*;
 import java.util.concurrent.*;
 
+@androidx.annotation.OptIn(markerClass=androidx.media3.common.util.UnstableApi.class)
 public class MainActivity extends Activity {
-    private static final int FILE_REQUEST = 41;
+    private static final int FILE_REQUEST = 41, LIVE_FULLSCREEN=42;
+    private LivePreview preview;
+    private LinearLayout liveArea;
+    private String fullscreenToken;
     private static final java.util.regex.Pattern RECENT=java.util.regex.Pattern.compile(".*(ostatnio|nowo|nowości|nowosci|new|recent|latest|2026|2025).*",java.util.regex.Pattern.CASE_INSENSITIVE|java.util.regex.Pattern.UNICODE_CASE);
     private static final String ALL = "Wszystkie kategorie";
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -119,7 +123,13 @@ public class MainActivity extends Activity {
         FrameLayout content=new FrameLayout(this);
         list=new ListView(this); list.setDivider(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)); list.setDividerHeight(dp(6)); list.setSelector(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)); list.setClipToPadding(false);
         list.setFastScrollEnabled(true);
-        content.addView(list,new FrameLayout.LayoutParams(-1,-1));
+        liveArea=new LinearLayout(this); liveArea.setOrientation(wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);
+        preview=new LivePreview(this,wide,state,this::play,() -> { if(rows!=null) rows.notifyDataSetChanged(); });
+        if(wide) {
+            liveArea.addView(list,new LinearLayout.LayoutParams(0,-1,0.43f));
+            LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(0,-1,0.57f); size.leftMargin=dp(12); liveArea.addView(preview.panel,size);
+        } else { liveArea.addView(preview.panel,new LinearLayout.LayoutParams(-1,-2)); LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,0,1); size.topMargin=dp(10); liveArea.addView(list,size); }
+        liveArea.setVisibility(View.GONE); content.addView(liveArea,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout empty=column(); emptyPanel=empty; empty.setGravity(Gravity.CENTER); empty.setPadding(dp(24),dp(12),dp(24),dp(12));
         progress=new ProgressBar(this); progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Ui.MUTED)); empty.addView(progress,new LinearLayout.LayoutParams(dp(28),dp(28)));
         emptyText=Ui.text(this,"",15,Ui.MUTED); emptyText.setGravity(Gravity.CENTER); emptyText.setLineSpacing(0,1.2f); emptyText.setPadding(0,dp(14),0,dp(18)); empty.addView(emptyText);
@@ -154,7 +164,7 @@ public class MainActivity extends Activity {
         });
         list.setOnItemClickListener((p, v, pos, id) -> {
             Channel c = shown.get(pos);
-            if(c.kind().equals("series")) openSeries(c); else if(c.kind().equals("movie")) openMovie(c); else play(c);
+            if(c.kind().equals("series")) openSeries(c); else if(c.kind().equals("movie")) openMovie(c); else preview.select(c);
         });
         list.setOnItemLongClickListener((p, v, pos, id) -> { toggleFavorite(shown.get(pos)); return true; });
         if(state!=null) search.setText(state.getString("query",""));
@@ -306,6 +316,8 @@ public class MainActivity extends Activity {
             TextView next=Ui.text(this,"",12,Ui.FAINT); next.setMaxLines(1); next.setEllipsize(TextUtils.TruncateAt.END); next.setPadding(0,dp(4),0,0); schedule.addView(next);
             row.addView(schedule,new LinearLayout.LayoutParams(-1,-2));
         }
+        row.setBackground(Ui.touch(this,preview!=null && c.url().equals(preview.selectedUrl())?0xFF243344:Ui.SURFACE,12,0));
+        row.setMinimumHeight(dp(80));
         LinearLayout header=(LinearLayout)row.getChildAt(0),schedule=(LinearLayout)row.getChildAt(1);
         FrameLayout badge=(FrameLayout)header.getChildAt(0); TextView icon=(TextView)badge.getChildAt(0);
         ImageLoader.get(this).load(c.logo(),(ImageView)badge.getChildAt(1),dp(46),dp(40));
@@ -318,12 +330,14 @@ public class MainActivity extends Activity {
             bindSchedule(detail,next,repository.peek(c,false)); row.setTag(c.url());
             java.lang.ref.WeakReference<TextView> target=new java.lang.ref.WeakReference<>(detail),following=new java.lang.ref.WeakReference<>(next);
             java.lang.ref.WeakReference<LinearLayout> holder=new java.lang.ref.WeakReference<>(row);
+            java.lang.ref.WeakReference<LivePreview> previewTarget=new java.lang.ref.WeakReference<>(preview);
             row.postDelayed(() -> {
                 LinearLayout visible=holder.get(); android.graphics.Rect bounds=new android.graphics.Rect();
                 if(isDestroyed() || visible==null || !visible.isShown() || !c.url().equals(visible.getTag()) || !visible.getGlobalVisibleRect(bounds)) return;
                 repository.request(c,false,data -> {
                     TextView view=target.get(),after=following.get(); LinearLayout owner=holder.get();
                     if(view!=null && after!=null && owner!=null && c.url().equals(owner.getTag())) bindSchedule(view,after,data);
+                    LivePreview selected=previewTarget.get(); if(selected!=null) selected.guideChanged(c.url());
                 });
             },180);
         } else { detail.setText(c.group()); next.setVisibility(View.GONE); }
@@ -362,7 +376,10 @@ public class MainActivity extends Activity {
                 next.add(c);
             }
         }
-        shown=next; rows.notifyDataSetChanged(); posterAdapter.notifyDataSetChanged();
+        shown=next;
+        boolean live=!grid && !busy && !shown.isEmpty() && !vod(); liveArea.setVisibility(live?View.VISIBLE:View.GONE);
+        preview.show(shown,live,onlyFavorites?"favorites":selectedGroup+"|"+query);
+        rows.notifyDataSetChanged(); posterAdapter.notifyDataSetChanged();
         if(resetScroll) { list.setSelection(0); posters.setSelection(0); }
         int total=items.size();
         progress.setVisibility(busy?View.VISIBLE:View.GONE);
@@ -459,7 +476,7 @@ public class MainActivity extends Activity {
         posters.setOnItemLongClickListener((parent,v,index,id) -> { toggleFavorite(shown.get(index)); return true; });
         content.addView(posters,new FrameLayout.LayoutParams(-1,-1));
     }
-    private void open(Channel c) { if(c.kind().equals("series")) openSeries(c); else if(c.kind().equals("movie")) openMovie(c); else play(c); }
+    private void open(Channel c) { if(c.kind().equals("series")) openSeries(c); else if(c.kind().equals("movie")) openMovie(c); else preview.select(c); }
     private void prepareShelves(List<Channel> items) {
         shelfItems.clear();
         for(Channel c:items) { List<Channel> row=shelfItems.computeIfAbsent(c.group(),key -> new ArrayList<>()); if(row.size()<12) row.add(c); }
@@ -548,6 +565,7 @@ public class MainActivity extends Activity {
         return card;
     }
     @Override protected void onSaveInstanceState(Bundle out) {
+        if(preview!=null) preview.save(out);
         out.putString("section",section); out.putString("bouquet",selectedGroup); out.putBoolean("showingBouquets",showingBouquets);
         out.putBoolean("onlyFavorites",onlyFavorites); out.putString("query",search.getText().toString()); super.onSaveInstanceState(out);
     }
@@ -560,7 +578,9 @@ public class MainActivity extends Activity {
     private void play(Channel c) {
         Intent intent=new Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()).putExtra("guide",c.guideUrl()).putExtra("epgId",c.epgId()).putExtra("days",c.archiveDays()).putExtra("timezone",c.timezone()).putExtra("group",c.group()).putExtra("logo",c.logo());
         if(c.kind().equals("tv")) intent.putExtra("navigation_session",LiveChannelQueue.remember(shown,c.url())).putExtra("navigation_scope",true).putExtra("navigation_group",selectedGroup.equals(ALL)?"":selectedGroup).putExtra("navigation_query",search.getText().toString()).putExtra("navigation_favorites",onlyFavorites);
-        startActivity(intent);
+        if(c.kind().equals("tv")) {
+            fullscreenToken=preview.handoff(); intent.putExtra("playback_handoff",fullscreenToken).putExtra("return_preview",true); startActivityForResult(intent,LIVE_FULLSCREEN);
+        } else startActivity(intent);
     }
     // MainActivity is a phone screen; keep the phone activity out of the shared TV source set.
     private void openMovie(Channel movie) { startActivity(new Intent().setClassName(this,"pl.tvplayer.MovieActivity").putExtra("url",movie.url()).putExtra("name",movie.name()).putExtra("group",movie.group()).putExtra("logo",movie.logo())); }
@@ -632,6 +652,16 @@ public class MainActivity extends Activity {
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if(request==LIVE_FULLSCREEN && (isFinishing() || isDestroyed())) { if(data!=null) PlaybackHandoff.discard(data.getStringExtra("playback_handoff")); return; }
+        if(request==LIVE_FULLSCREEN) {
+            PlaybackHandoff.discard(fullscreenToken); fullscreenToken=null;
+            if(result==RESULT_OK && data!=null && data.getStringExtra("url")!=null) {
+                String returned=data.getStringExtra("url"),token=data.getStringExtra("playback_handoff"); Channel found=null;
+                for(Channel channel:shown) if(channel.url().equals(returned)) { found=channel; break; }
+                if(found==null) found=new Channel(data.getStringExtra("name"),returned,data.getStringExtra("group"),data.getStringExtra("epgId"),"tv",data.getStringExtra("guide"),data.getIntExtra("days",0),data.getStringExtra("timezone"));
+                if(section.equals("tv")) { preview.receive(token,found); int index=shown.indexOf(found); if(index>=0) list.setSelection(index); } else PlaybackHandoff.discard(token);
+            }
+        }
         if (request == FILE_REQUEST && result == RESULT_OK && data != null && data.getData() != null) {
             android.net.Uri uri = data.getData();
             load(progress -> {
@@ -654,10 +684,10 @@ public class MainActivity extends Activity {
         worker.execute(() -> { try { store.save(copy, stars); } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) error("Nie udało się zapisać biblioteki na urządzeniu."); }); } });
     }
     private void error(String message) { if (!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK", null).show(); }
-    @Override protected void onResume() { super.onResume(); worker.execute(() -> { try { Set<String> saved=store.loadFavorites(); runOnUiThread(() -> { if(!isDestroyed() && !favorites.equals(saved)) { favorites.clear(); favorites.addAll(saved); filter(false); } }); } catch(Exception ignored) {} }); if(rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
+    @Override protected void onResume() { super.onResume(); if(preview!=null) preview.resume(); worker.execute(() -> { try { Set<String> saved=store.loadFavorites(); runOnUiThread(() -> { if(!isDestroyed() && !favorites.equals(saved)) { favorites.clear(); favorites.addAll(saved); filter(false); } }); } catch(Exception ignored) {} }); if(rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
     @Override public void onWindowFocusChanged(boolean focus) { super.onWindowFocusChanged(focus); if(focus && rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); }
-    @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); super.onPause(); }
-    @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }
+    @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); if(preview!=null) preview.pause(); super.onPause(); }
+    @Override protected void onDestroy() { if(preview!=null) preview.destroy(); searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }
 }
 
 

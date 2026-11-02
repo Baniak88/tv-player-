@@ -37,6 +37,7 @@ final class XmltvStore extends SQLiteOpenHelper {
         try { byte[] data=MessageDigest.getInstance("SHA-256").digest(url.toString().getBytes(StandardCharsets.UTF_8)); StringBuilder result=new StringBuilder(); for(byte b:data) result.append(String.format(Locale.ROOT,"%02x",b&255)); return result.toString(); }
         catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
+    List<Guide.Program> cached(Channel channel,HttpUrl url) { return read(channel,key(url)); }
     List<Guide.Program> load(Channel channel,HttpUrl url) throws IOException {
         String source=key(url); Object lock;
         synchronized(locks) { lock=locks.computeIfAbsent(source,k -> new Object()); }

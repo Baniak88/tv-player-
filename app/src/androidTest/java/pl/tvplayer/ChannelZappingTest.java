@@ -32,13 +32,14 @@ public class ChannelZappingTest {
         c=new Channel("Kanał C",server.url("/c.ts").toString(),"Informacje","c.xml","tv",server.url("/guide-c").toString(),1,"Europe/London",1);
         new LibraryStore(context()).save(Arrays.asList(a,new Channel("### Sport ###",server.url("/header.ts").toString(),"Sport","","tv").withOrder(0),b,c),new HashSet<>(Arrays.asList(a.url(),c.url())));
     }
+    private View description(View root,String name) { if(name.contentEquals(root.getContentDescription()==null?"":root.getContentDescription())) return root; if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { View hit=description(((ViewGroup)root).getChildAt(i),name); if(hit!=null) return hit; } return null; }
     private View text(View root,String name) { if(root instanceof TextView && name.equals(((TextView)root).getText().toString())) return root; if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { View hit=text(((ViewGroup)root).getChildAt(i),name); if(hit!=null) return hit; } return null; }
     private void waitText(View root,String name) throws Exception { long until=System.currentTimeMillis()+8000; while(text(root,name)==null && System.currentTimeMillis()<until) { instrument().waitForIdleSync(); Thread.sleep(60); } assertNotNull(name,text(root,name)); }
     private void start(boolean favorites) throws Exception {
         Intent intent=new Intent(context(),MainActivity.class).putExtra("section","tv").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK); if(!favorites) intent.putExtra("bouquet","Sport"); main=(MainActivity)instrument().startActivitySync(intent); View root=main.getWindow().getDecorView();
         if(favorites) { waitText(root,"Sport"); instrument().runOnMainSync(() -> text(root,"☆ Ulubione").performClick()); }
         waitText(root,"Kanał A"); View row=text(root,"Kanał A"); while(row.getParent() instanceof View && !(row.getParent() instanceof AdapterView)) row=(View)row.getParent(); final View chosen=row;
-        android.app.Instrumentation.ActivityMonitor monitor=instrument().addMonitor(PlayerActivity.class.getName(),null,false); instrument().runOnMainSync(() -> { AdapterView<?> parent=(AdapterView<?>)chosen.getParent(); parent.performItemClick(chosen,parent.getPositionForView(chosen),0); }); activity=(PlayerActivity)monitor.waitForActivityWithTimeout(7000); instrument().removeMonitor(monitor); assertNotNull(activity); waitChannel(a);
+        android.app.Instrumentation.ActivityMonitor monitor=instrument().addMonitor(PlayerActivity.class.getName(),null,false); instrument().runOnMainSync(() -> { AdapterView<?> parent=(AdapterView<?>)chosen.getParent(); parent.performItemClick(chosen,parent.getPositionForView(chosen),0); View full=description(root,"Otwórz podgląd na pełnym ekranie"); assertNotNull(full); full.performClick(); }); activity=(PlayerActivity)monitor.waitForActivityWithTimeout(7000); instrument().removeMonitor(monitor); assertNotNull(activity); waitChannel(a);
     }
     private PlayerView video() throws Exception { java.lang.reflect.Field field=PlayerActivity.class.getDeclaredField("view"); field.setAccessible(true); return (PlayerView)field.get(activity); }
     private ExoPlayer engine() throws Exception { java.lang.reflect.Field field=PlayerActivity.class.getDeclaredField("player"); field.setAccessible(true); return (ExoPlayer)field.get(activity); }
@@ -58,3 +59,4 @@ public class ChannelZappingTest {
         android.app.Instrumentation.ActivityMonitor monitor=instrument().addMonitor(PlayerActivity.class.getName(),null,false); PlayerActivity old=activity; instrument().runOnMainSync(old::recreate); PlayerActivity recreated=(PlayerActivity)monitor.waitForActivityWithTimeout(10000); instrument().removeMonitor(monitor); assertNotNull("Player was not recreated",recreated); assertNotSame(old,recreated); activity=recreated; waitChannel(c); click(true); waitChannel(a); click(false); waitChannel(c);
     }
 }
+

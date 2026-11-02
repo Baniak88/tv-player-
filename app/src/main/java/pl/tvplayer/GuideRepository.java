@@ -12,6 +12,7 @@ public final class GuideRepository {
     private static GuideRepository instance;
     static synchronized GuideRepository get(Context context) { if(instance==null) instance=new GuideRepository(context.getApplicationContext()); return instance; }
     private final SourceClient source=new SourceClient();
+    private final Context context;
     private final XmltvStore xml;
     private final StreamGuideStore streamStore;
     private final ExecutorService streamWorker=Executors.newSingleThreadExecutor();
@@ -25,7 +26,7 @@ public final class GuideRepository {
     private final Handler ui=new Handler(Looper.getMainLooper());
     private final Map<String,Entry> cache=new LinkedHashMap<>();
     private final Map<String,List<Consumer<Data>>> pending=new HashMap<>();
-    private GuideRepository(Context context) { xml=new XmltvStore(context); streamStore=new StreamGuideStore(context); disk=new MetadataCache(context,"epg-v1",200); }
+    private GuideRepository(Context context) { this.context=context.getApplicationContext(); xml=new XmltvStore(context); streamStore=new StreamGuideStore(context); disk=new MetadataCache(context,"epg-v1",200); }
     private String key(Channel channel,boolean full) { return channel.url()+"|"+channel.epgId()+"|"+channel.guideUrl()+"|"+full; }
     synchronized Data peek(Channel channel,boolean full) {
         Data stream=streamData(channel); if(stream!=null) return stream;
@@ -105,6 +106,7 @@ public final class GuideRepository {
             });
         });
     }
+    synchronized void invalidateFailures() { cache.entrySet().removeIf(entry -> entry.getValue().data().programs().isEmpty()); }
     private Data load(Channel channel,boolean full) {
         Data stream=streamData(channel); if(stream!=null) return stream;
         try { List<Guide.Program> saved=streamStore.load(channel); if(!saved.isEmpty()) { acceptStream(channel,saved); return streamData(channel); } } catch(RuntimeException ignored) {}
@@ -116,6 +118,11 @@ public final class GuideRepository {
         if(!channel.guideUrl().startsWith("xmltv:")) {
             try { programs=source.guide(channel,full); } catch(java.io.IOException e) { failure="API Xtream: "+safeFailure(e); }
             if(usable(programs)) return persist(diskKey,programs,"Xtream");
+        }
+        if(!full && PlaybackSettings.weakInternet(context)) {
+            try { okhttp3.HttpUrl known=Guide.xmltv(channel); if(known!=null) { List<Guide.Program> stored=xml.cached(channel,known); if(usable(stored)) return persist(diskKey,stored,"XMLTV"); } }
+            catch(java.io.IOException | IllegalArgumentException ignored) {}
+            return new Data(Collections.emptyList(),"Oszczędzanie łącza","Dotknij EPG, aby pobrać pełny program TV.");
         }
         LinkedHashSet<okhttp3.HttpUrl> feeds=new LinkedHashSet<>();
         if(!channel.guideUrl().startsWith("xmltv:")) {
@@ -150,6 +157,7 @@ public final class GuideRepository {
     }
     static String summary(Data data,long now) {
         if(data==null) return "Wczytywanie EPG…";
+        if(data.source().equals("Oszczędzanie łącza") && data.programs().isEmpty()) return "Dotknij EPG, aby pobrać program";
         Guide.Program current=null,next=null;
         for(Guide.Program program:data.programs()) {
             if(program.current(now)) current=program;

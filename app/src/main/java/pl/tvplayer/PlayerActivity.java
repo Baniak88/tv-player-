@@ -15,6 +15,7 @@ import java.util.*;
 @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
 public class PlayerActivity extends Activity {
     private ExoPlayer player;
+    private Player.Listener playbackListener;
     private PlayerView view;
     private LinearLayout error;
     private TextView message,title;
@@ -175,7 +176,12 @@ public class PlayerActivity extends Activity {
         if(!onDemand) { labels.add("Program TV i archiwum"); labels.add(RecordingService.active?"Zatrzymaj nagrywanie":"Nagraj kanał do pliku"); }
         labels.add("Cofnij o 30 sekund");
         if(adjustments!=null) labels.add("Głośność i jasność");
+        if(!television && !onDemand) labels.add("Połączenie internetowe");
         new AlertDialog.Builder(this).setTitle("Odtwarzanie").setItems(labels.toArray(new String[0]),(d,i) -> {
+            if(labels.get(i).equals("Połączenie internetowe")) { PlaybackSettings.choose(this,() -> {
+                boolean playing=player!=null && player.getPlayWhenReady();
+                if(player!=null) { view.setPlayer(null); player.release(); player=null; } stopStreamObservation(); error.setVisibility(View.GONE); startPlayback(); if(player!=null && !playing) player.pause();
+            }); return; }
             if(labels.get(i).equals("Głośność i jasność")) { adjustments.showDialog(); return; }
             if(labels.get(i).equals("Cofnij o 30 sekund")) {
                 if(player!=null && player.isCurrentMediaItemSeekable()) player.seekTo(Math.max(0,player.getCurrentPosition()-30000));
@@ -247,29 +253,45 @@ public class PlayerActivity extends Activity {
     private void startPlayback() {
         if(url==null) return;
         if(player!=null) return;
-        DefaultLoadControl.Builder buffering=new DefaultLoadControl.Builder().setBackBuffer(30000,true);
-        if(!television && !onDemand) buffering.setBufferDurationsMs(5000,15000,1000,2000).setPrioritizeTimeOverSizeThresholds(true).setBackBuffer(10000,true);
-        ExoPlayer.Builder builder=new ExoPlayer.Builder(this).setLoadControl(buffering.build());
-        if(!onDemand) {
-            Channel channel=liveChannel(); GuideRepository repository=GuideRepository.get(this);
-            androidx.media3.datasource.DefaultDataSource.Factory upstream=new androidx.media3.datasource.DefaultDataSource.Factory(this);
-            builder.setMediaSourceFactory(new androidx.media3.exoplayer.source.DefaultMediaSourceFactory(() -> new EitDataSource(upstream.createDataSource(),channel,repository)));
-            repository.streamStarted(channel); streamObserved=true;
+        String token=getIntent().getStringExtra("playback_handoff"); getIntent().removeExtra("playback_handoff");
+        PlaybackHandoff.Transfer transfer=!television && !onDemand?PlaybackHandoff.take(token,url):null;
+        if(transfer!=null) { player=transfer.player(); streamObserved=true; }
+        else {
+            ExoPlayer.Builder builder=new ExoPlayer.Builder(!television && !onDemand?getApplicationContext():this);
+            builder.setLoadControl(!television && !onDemand?PlaybackSettings.loadControl(this):new DefaultLoadControl.Builder().setBackBuffer(30000,true).build());
+            if(!television && !onDemand) builder.setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),true).setHandleAudioBecomingNoisy(true);
+            if(!onDemand) {
+                Channel channel=liveChannel(); GuideRepository repository=GuideRepository.get(this);
+                androidx.media3.datasource.DefaultDataSource.Factory upstream=new androidx.media3.datasource.DefaultDataSource.Factory(!television?getApplicationContext():this);
+                builder.setMediaSourceFactory(new androidx.media3.exoplayer.source.DefaultMediaSourceFactory(() -> new EitDataSource(upstream.createDataSource(),channel,repository)));
+                repository.streamStarted(channel); streamObserved=true;
+            }
+            player=builder.build();
         }
-        player=builder.build(); final ExoPlayer current=player; view.setPlayer(!television && !onDemand?channelControls(player):player);
+        if(!television && !onDemand) player.setTrackSelectionParameters(PlaybackSettings.tracks(this,player.getTrackSelectionParameters()));
+        final ExoPlayer current=player; view.setPlayer(!television && !onDemand?channelControls(player):player);
         if(!television && !onDemand) describeChannelButtons();
-        player.addListener(new Player.Listener() {
+        playbackListener=new Player.Listener() {
             @Override public void onPlayerError(PlaybackException e) {
                 if(player!=current) return;
                 message.setText("Nie można odtworzyć materiału. Sprawdź internet, dostępność źródła lub kodeki telefonu.\nKod: "+e.getErrorCodeName());
                 error.setVisibility(View.VISIBLE);
             }
-        });
+        }; player.addListener(playbackListener);
+        if(transfer!=null) return;
         MediaItem.Builder item=new MediaItem.Builder().setUri(url);
         String path=android.net.Uri.parse(url).getPath();
         if(path!=null && path.endsWith(".ts")) item.setMimeType(MimeTypes.VIDEO_MP2T);
         player.setMediaItem(item.build()); player.seekTo(position); player.prepare(); player.play();
         if(onDemand && position>5000) Toast.makeText(this,"Wznawiam oglądanie. Od początku: Opcje.",Toast.LENGTH_LONG).show();
+    }
+    @Override public void finish() {
+        if(!television && !onDemand && player!=null && getIntent().getBooleanExtra("return_preview",false)) {
+            ExoPlayer transferring=player; view.setPlayer(null); if(playbackListener!=null) transferring.removeListener(playbackListener); player=null; streamObserved=false;
+            String token=PlaybackHandoff.offer(this,transferring,liveChannel());
+            setResult(RESULT_OK,new android.content.Intent().putExtras(getIntent().getExtras()).putExtra("url",url).putExtra("playback_handoff",token));
+        }
+        super.finish();
     }
     @Override public boolean onKeyUp(int code,KeyEvent event) {
         if(television && code==KeyEvent.KEYCODE_MENU) { showOptions(); return true; }
