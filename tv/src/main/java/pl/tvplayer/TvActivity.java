@@ -113,7 +113,7 @@ public final class TvActivity extends Activity {
         bouquets.setOnItemClickListener((p,v,position,id) -> { group=position==0?"":groups.get(position-1); query=""; filter(); (section.equals("tv")||!seriesTitle.isEmpty()?list:posters).requestFocus(); });
         split.addView(bouquets,new LinearLayout.LayoutParams(dp(220),-1));
         FrameLayout catalog=new FrameLayout(this);
-        list=new ListView(this); list.setDividerHeight(dp(8)); list.setSelector(Ui.shape(this,0xFF303640,10,Ui.ACCENT)); list.setItemsCanFocus(false);
+        list=new ListView(this); list.setDividerHeight(dp(8)); list.setSelector(Ui.shape(this,0xFF303640,10,Ui.ACCENT)); list.setItemsCanFocus(false); list.setDrawSelectorOnTop(true); list.setSelector(Ui.shape(this,0x00000000,10,Ui.ACCENT));
         rows=new BaseAdapter() {
             public int getCount() { return shown.size(); } public Object getItem(int p) { return shown.get(p); } public long getItemId(int p) { return p; }
             public View getView(int p,View reused,ViewGroup parent) { return channelRow(shown.get(p)); }
@@ -122,7 +122,7 @@ public final class TvActivity extends Activity {
         covers=new BaseAdapter() {
             public int getCount() { return shown.size(); } public Object getItem(int p) { return shown.get(p); } public long getItemId(int p) { return p; }
             public View getView(int p,View reused,ViewGroup parent) { return poster(shown.get(p)); }
-        }; posters.setAdapter(covers); catalog.addView(posters,new FrameLayout.LayoutParams(-1,-1));
+        }; posters.setDrawSelectorOnTop(true); posters.setSelector(Ui.shape(this,0x00000000,12,Ui.ACCENT)); posters.setAdapter(covers); catalog.addView(posters,new FrameLayout.LayoutParams(-1,-1));
         AdapterView.OnItemClickListener click=(parent,v,position,id) -> select(shown.get(position)); list.setOnItemClickListener(click); posters.setOnItemClickListener(click);
         AdapterView.OnItemLongClickListener menu=(parent,v,position,id) -> { options(shown.get(position)); return true; }; list.setOnItemLongClickListener(menu); posters.setOnItemLongClickListener(menu);
         split.addView(catalog,new LinearLayout.LayoutParams(0,-1,1)); body.addView(split,new LinearLayout.LayoutParams(-1,0,1));

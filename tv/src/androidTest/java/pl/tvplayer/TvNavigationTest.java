@@ -27,13 +27,13 @@ public class TvNavigationTest {
         waitText(activity.getWindow().getDecorView(),"Co oglądamy?"); Thread.sleep(300); return activity;
     }
     private void key(int code) throws Exception { instrument().sendKeyDownUpSync(code); instrument().waitForIdleSync(); Thread.sleep(150); }
-    private void screenshot(String name) throws Exception { android.graphics.Bitmap bitmap=instrument().getUiAutomation().takeScreenshot(); try(java.io.FileOutputStream out=context().openFileOutput(name,Context.MODE_PRIVATE)) { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out); } bitmap.recycle(); }
+    private void screenshot(TvActivity activity,String name) throws Exception { java.util.concurrent.atomic.AtomicReference<android.graphics.Bitmap> image=new java.util.concurrent.atomic.AtomicReference<>(); instrument().runOnMainSync(() -> { View root=activity.getWindow().getDecorView(); android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(root.getWidth(),root.getHeight(),android.graphics.Bitmap.Config.ARGB_8888); root.draw(new android.graphics.Canvas(bitmap)); image.set(bitmap); }); android.graphics.Bitmap bitmap=image.get(); try(java.io.FileOutputStream out=context().openFileOutput(name,Context.MODE_PRIVATE)) { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out); } bitmap.recycle(); }
     @Test public void homeAndMoviesWorkWithRemoteOnly() throws Exception {
         TvActivity activity=start();
         try {
-            assertEquals("Telewizja na żywo",((TextView)activity.getCurrentFocus()).getText().toString().replace("▣\n\n", "")); screenshot("tv-home.png");
+            assertEquals("Telewizja na żywo",((TextView)activity.getCurrentFocus()).getText().toString().replace("▣\n\n", "")); screenshot(activity,"tv-home.png");
             key(KeyEvent.KEYCODE_DPAD_RIGHT); assertTrue(activity.getCurrentFocus() instanceof Button); assertEquals("▶  Filmy",((Button)activity.getCurrentFocus()).getText().toString());
-            key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(activity.getWindow().getDecorView(),"Test Film"); assertNull(find(activity.getWindow().getDecorView(),"Sport 1")); screenshot("tv-movies.png");
+            key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(activity.getWindow().getDecorView(),"Test Film"); assertNull(find(activity.getWindow().getDecorView(),"Sport 1")); screenshot(activity,"tv-movies.png");
             key(KeyEvent.KEYCODE_BACK); waitText(activity.getWindow().getDecorView(),"Co oglądamy?");
         } finally { instrument().runOnMainSync(activity::finish); }
     }
@@ -42,7 +42,7 @@ public class TvNavigationTest {
         try {
             key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(activity.getWindow().getDecorView(),"Sport");
             key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_CENTER);
-            waitText(activity.getWindow().getDecorView(),"Sport 1"); assertNull(find(activity.getWindow().getDecorView(),"Dzieci 1")); screenshot("tv-bouquet.png");
+            waitText(activity.getWindow().getDecorView(),"Sport 1"); assertNull(find(activity.getWindow().getDecorView(),"Dzieci 1")); screenshot(activity,"tv-bouquet.png");
             key(KeyEvent.KEYCODE_MENU);
             android.view.accessibility.AccessibilityNodeInfo root=instrument().getUiAutomation().getRootInActiveWindow();
             assertFalse(root.findAccessibilityNodeInfosByText("Program TV i archiwum").isEmpty());
