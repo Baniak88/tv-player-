@@ -69,6 +69,9 @@ public final class TvActivity extends Activity {
         LinearLayout.LayoutParams large=new LinearLayout.LayoutParams(0,height,1.2f); large.rightMargin=dp(18); tiles.addView(live,large);
         LinearLayout middle=column();
         Button films=button("▶  Filmy",() -> open("movie")),series=button("▤  Seriale",() -> open("series"));
+        live.setId(View.generateViewId()); films.setId(View.generateViewId()); series.setId(View.generateViewId());
+        live.setNextFocusRightId(films.getId()); films.setNextFocusLeftId(live.getId()); series.setNextFocusLeftId(live.getId());
+        films.setNextFocusDownId(series.getId()); series.setNextFocusUpId(films.getId());
         LinearLayout.LayoutParams cell=new LinearLayout.LayoutParams(-1,0,1); cell.bottomMargin=dp(18); middle.addView(films,cell); middle.addView(series,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout.LayoutParams mid=new LinearLayout.LayoutParams(0,height,1); mid.rightMargin=dp(18); tiles.addView(middle,mid);
         LinearLayout actions=column();
