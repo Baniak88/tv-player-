@@ -29,6 +29,7 @@ jobs:
             tv/build/outputs/apk/debug/tv-debug.apk
             tv/build/outputs/apk/androidTest/debug/tv-debug-androidTest.apk
   fire-test:
+    permissions: {contents: write}
     needs: fire-build
     runs-on: ubuntu-latest
     steps:
@@ -47,6 +48,24 @@ jobs:
           disable-animations: true
           ram-size: 2048M
           script: bash scripts/smoke-tv.sh
+      - name: Save native TV previews
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import base64,json,pathlib
+          for name in ['tv-home','tv-movies','tv-bouquet']:
+              image=pathlib.Path('tv-smoke-output',name+'.png')
+              if image.exists():
+                  pathlib.Path('/tmp',name+'.json').write_text(json.dumps({'encoding':'base64','content':base64.b64encode(image.read_bytes()).decode()}))
+          PY
+          for name in tv-home tv-movies tv-bouquet; do
+            if [ ! -f "/tmp/$name.json" ]; then continue; fi
+            ref=$(gh api "repos/$GH_REPO/git/blobs" --input "/tmp/$name.json" --jq '.sha')
+            echo "UI_PREVIEW $name $ref"
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: television-test-report, path: tv-smoke-output/}

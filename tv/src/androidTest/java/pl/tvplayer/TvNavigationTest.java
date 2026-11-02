@@ -24,9 +24,9 @@ public class TvNavigationTest {
         new android.util.AtomicFile(new java.io.File(context().getFilesDir(),"tv-account.enc")).delete();
         new LibraryStore(context()).save(Arrays.asList(new Channel("Sport 1","https://example.com/sport.ts","Sport","","tv").withOrder(0),new Channel("Dzieci 1","https://example.com/kids.ts","Dzieci","","tv").withOrder(1),new Channel("Test Film","https://example.com/film.mp4","Kino","","movie")),Collections.emptySet());
         TvActivity activity=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        waitText(activity.getWindow().getDecorView(),"Co oglądamy?"); Thread.sleep(300); return activity;
+        waitText(activity.getWindow().getDecorView(),"Co oglądamy?"); long focused=System.currentTimeMillis()+5000; while(!activity.hasWindowFocus() && System.currentTimeMillis()<focused) Thread.sleep(100); instrument().waitForIdleSync(); return activity;
     }
-    private void key(int code) throws Exception { instrument().sendKeyDownUpSync(code); instrument().waitForIdleSync(); Thread.sleep(150); }
+    private void key(int code) throws Exception { long now=android.os.SystemClock.uptimeMillis(); instrument().getUiAutomation().injectInputEvent(new KeyEvent(now,now,KeyEvent.ACTION_DOWN,code,0),true); instrument().getUiAutomation().injectInputEvent(new KeyEvent(now,android.os.SystemClock.uptimeMillis(),KeyEvent.ACTION_UP,code,0),true); instrument().waitForIdleSync(); Thread.sleep(150); }
     private void screenshot(TvActivity activity,String name) throws Exception { java.util.concurrent.atomic.AtomicReference<android.graphics.Bitmap> image=new java.util.concurrent.atomic.AtomicReference<>(); instrument().runOnMainSync(() -> { View root=activity.getWindow().getDecorView(); android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(root.getWidth(),root.getHeight(),android.graphics.Bitmap.Config.ARGB_8888); root.draw(new android.graphics.Canvas(bitmap)); image.set(bitmap); }); android.graphics.Bitmap bitmap=image.get(); try(java.io.FileOutputStream out=context().openFileOutput(name,Context.MODE_PRIVATE)) { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out); } bitmap.recycle(); }
     @Test public void homeAndMoviesWorkWithRemoteOnly() throws Exception {
         TvActivity activity=start();
@@ -46,8 +46,11 @@ public class TvNavigationTest {
             key(KeyEvent.KEYCODE_MENU);
             android.view.accessibility.AccessibilityNodeInfo root=instrument().getUiAutomation().getRootInActiveWindow();
             assertFalse(root.findAccessibilityNodeInfosByText("Program TV i archiwum").isEmpty());
-            List<android.view.accessibility.AccessibilityNodeInfo> stars=root.findAccessibilityNodeInfosByText("Dodaj do ulubionych"); assertFalse(stars.isEmpty()); stars.get(0).performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
-            Thread.sleep(500); Set<String> saved=new HashSet<>(); new LibraryStore(context()).loadSection("tv",saved); assertTrue(saved.contains("https://example.com/sport.ts"));
+            assertFalse(root.findAccessibilityNodeInfosByText("Dodaj do ulubionych").isEmpty());
+            key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_CENTER);
+            Set<String> saved=new HashSet<>(); long until=System.currentTimeMillis()+5000;
+            while(!saved.contains("https://example.com/sport.ts") && System.currentTimeMillis()<until) { Thread.sleep(100); new LibraryStore(context()).loadSection("tv",saved); }
+            assertTrue("Favorite was not saved after remote selection",saved.contains("https://example.com/sport.ts"));
         } finally { instrument().runOnMainSync(activity::finish); }
     }
     @Test public void credentialsAreEncryptedAndReadableAfterRestart() throws Exception {
