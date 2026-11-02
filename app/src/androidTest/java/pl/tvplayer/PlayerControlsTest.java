@@ -56,7 +56,18 @@ public class PlayerControlsTest {
             waitToolbar(activity,View.GONE); tap(activity,screen); waitToolbar(activity,View.VISIBLE);
             View options=text(toolbar(activity),"Opcje"); assertNotNull(options); tap(activity,center(options),options);
             long until=SystemClock.elapsedRealtime()+4000; boolean opened=false;
-            while(SystemClock.elapsedRealtime()<until) { android.view.accessibility.AccessibilityNodeInfo root=instrument().getUiAutomation().getRootInActiveWindow(); if(root!=null && !root.findAccessibilityNodeInfosByText("Ścieżka audio").isEmpty()) { opened=true; break; } Thread.sleep(80); }
+            while(SystemClock.elapsedRealtime()<until) {
+                final boolean[] found={false};
+                instrument().runOnMainSync(() -> {
+                    if(android.os.Build.VERSION.SDK_INT>=29) {
+                        for(View window:android.view.inspector.WindowInspector.getGlobalWindowViews()) {
+                            if(window.isShown() && text(window,"Ścieżka audio")!=null) { found[0]=true; break; }
+                        }
+                    }
+                });
+                if(found[0]) { opened=true; break; }
+                Thread.sleep(80);
+            }
             assertTrue("Visible Options button stopped working",opened); instrument().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
         } finally {
             final PlayerActivity closing=activity; if(closing!=null) instrument().runOnMainSync(closing::finish);
