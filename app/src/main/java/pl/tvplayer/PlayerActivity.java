@@ -53,6 +53,7 @@ public class PlayerActivity extends Activity {
             bookmark=android.util.Base64.encodeToString(hash,android.util.Base64.NO_WRAP);
         } catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
         position=onDemand?getPreferences(MODE_PRIVATE).getLong(bookmark,0):0;
+        if(onDemand) { WatchProgress.Entry saved=WatchProgress.read(this,url); if(saved.updated()>0) position=saved.completed()?0:saved.position(); }
         if(state!=null) { position=state.getLong("position"); fullscreen=state.getBoolean("fullscreen",true); }
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON | WindowManager.LayoutParams.FLAG_SECURE);
         FrameLayout root=new FrameLayout(this); root.setBackgroundColor(0xFF000000);
@@ -174,7 +175,7 @@ public class PlayerActivity extends Activity {
         }
     }
     @Override protected void onResume() { super.onResume(); resumed=true; if(!isInPictureInPictureMode()) updateFullscreen(); }
-    @Override protected void onPause() { resumed=false; if(rotation!=null) rotation.disable(); super.onPause(); }
+    @Override protected void onPause() { resumed=false; saveWatchProgress(); if(rotation!=null) rotation.disable(); super.onPause(); }
     @Override protected void onStart() {
         super.onStart(); if(url==null) return;
         if(player!=null) return;
@@ -227,6 +228,9 @@ public class PlayerActivity extends Activity {
         if(labels.size()==1) { Toast.makeText(this,"Źródło nie udostępnia dodatkowych ścieżek.",Toast.LENGTH_LONG).show(); return; }
         new AlertDialog.Builder(this).setTitle(type==C.TRACK_TYPE_TEXT?"Napisy":"Audio").setItems(labels.toArray(new String[0]),(d,i) -> { if(player!=null) actions.get(i).run(); }).show();
     }
+    private void saveWatchProgress() {
+        if(player!=null && onDemand) { long at=player.getCurrentPosition(),duration=player.getDuration(); WatchProgress.save(this,url,at,duration,player.getPlaybackState()==Player.STATE_ENDED || (duration>0 && at>=duration-2000)); }
+    }
     @Override protected void onStop() {
         if(player!=null && !isInPictureInPictureMode()) {
             position=onDemand?player.getCurrentPosition():0;
@@ -240,7 +244,7 @@ public class PlayerActivity extends Activity {
         super.onStop();
     }
     @Override protected void onDestroy() {
-        if(player!=null) { view.setPlayer(null); player.release(); player=null; }
+        if(player!=null) { saveWatchProgress(); view.setPlayer(null); player.release(); player=null; }
         stopStreamObservation();
         if(rotation!=null) rotation.disable(); guideWorker.shutdown(); super.onDestroy();
     }

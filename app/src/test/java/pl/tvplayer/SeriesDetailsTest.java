@@ -21,7 +21,8 @@ public class SeriesDetailsTest {
         assertEquals("Droga S01E03 do domu",SeriesDetails.cleanEpisodeTitle("Droga S01E03 do domu",source().name(),3));
         assertEquals("Rywale",SeriesDetails.cleanEpisodeTitle("KRÓLOWA KLEOPATRA: 1x01 - Rywale",source().name(),1));
     }
-    @Test public void malformedEpisodesAreReportedAndMissingEpisodesRemainEmpty() throws Exception {
+    @Test public void missingEpisodesRemainEmpty() throws Exception {
         assertTrue(parse("{\"episodes\":[]}").allEpisodes().isEmpty());
+        try { parse("{\"episodes\":\"bad\"}"); fail("Malformed episodes accepted"); } catch(IOException expected) {}
     }
 }

@@ -62,7 +62,7 @@ public class SeriesActivityTest {
         String url=server.url("/series/test/test/102.mp4").toString(); WatchProgress.save(context(),url,65000,2820000,false);
         start(false); waitText("▶  Kontynuuj"); assertNotNull(find(root(),"Sezon 1 · Odcinek 2 · Z wizytą w Rzymie"));
         Instrumentation.ActivityMonitor monitor=instrument().addMonitor(PlayerActivity.class.getName(),null,false);
-        instrument().runOnMainSync(() -> find(root(),"▶  Kontynuuj").performClick()); Activity player=monitor.waitForActivityWithTimeout(7000); assertNotNull(player); assertEquals(url,player.getIntent().getStringExtra("url")); assertEquals("episode",player.getIntent().getStringExtra("kind")); instrument().runOnMainSync(player::finish); instrument().removeMonitor(monitor);
+        instrument().runOnMainSync(() -> find(root(),"▶  Kontynuuj").performClick()); Activity player=monitor.waitForActivityWithTimeout(7000); assertNotNull(player); assertEquals(url,player.getIntent().getStringExtra("url")); assertEquals("episode",player.getIntent().getStringExtra("kind")); java.lang.reflect.Field position=PlayerActivity.class.getDeclaredField("position"); position.setAccessible(true); assertEquals(65000L,position.getLong(player)); instrument().runOnMainSync(player::finish); instrument().removeMonitor(monitor);
         WatchProgress.save(context(),url,2820000,2820000,true); SeriesDetails detail=SeriesDetails.parse(new java.io.StringReader(fixture()),source()); assertEquals(201, Integer.parseInt(WatchProgress.next(context(),detail.allEpisodes()).channel().url().replaceFirst(".*[/]","").replace(".mp4","")));
     }
     @Test public void connectionFailureCanRetryAndEmptyProviderDataStaysReadable() throws Exception {

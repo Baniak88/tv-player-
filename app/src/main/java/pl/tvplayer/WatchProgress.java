@@ -7,7 +7,7 @@ import java.util.*;
 final class WatchProgress {
     record Entry(long position,long duration,long updated,boolean completed) {}
     private static String key(String url) {
-        try { byte[] bytes=java.security.MessageDigest.getInstance("SHA-256").digest(url.getBytes(StandardCharsets.UTF_8)); StringBuilder result=new StringBuilder(); for(byte b:bytes) result.append(String.format(Locale.ROOT,"%02x",b&255)); return result.toString(); }
+        try { byte[] bytes=java.security.MessageDigest.getInstance("SHA-256").digest(url.getBytes(StandardCharsets.UTF_8)); StringBuilder result=new StringBuilder(64); String hex="0123456789abcdef"; for(byte b:bytes) result.append(hex.charAt((b&255)>>>4)).append(hex.charAt(b&15)); return result.toString(); }
         catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
     static Entry read(Context context,String url) { android.content.SharedPreferences p=context.getSharedPreferences("watch-progress",Context.MODE_PRIVATE); String k=key(url); return new Entry(p.getLong(k+"-position",0),p.getLong(k+"-duration",0),p.getLong(k+"-updated",0),p.getBoolean(k+"-completed",false)); }
