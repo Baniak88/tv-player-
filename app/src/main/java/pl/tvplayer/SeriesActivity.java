@@ -78,8 +78,8 @@ public final class SeriesActivity extends Activity {
         ImageView artwork=new ImageView(this); artwork.setScaleType(details.backdrop().isEmpty()?ImageView.ScaleType.FIT_CENTER:ImageView.ScaleType.CENTER_CROP); hero.addView(artwork,new FrameLayout.LayoutParams(-1,-1));
         ImageLoader.get(this).load(details.backdrop().isEmpty()?details.cover():details.backdrop(),artwork,getResources().getDisplayMetrics().widthPixels,heroHeight);
         View scrim=new View(this); scrim.setBackground(new GradientDrawable(television?GradientDrawable.Orientation.LEFT_RIGHT:GradientDrawable.Orientation.TOP_BOTTOM,television?new int[]{Ui.BG,0xDD0E0F11,0x220E0F11}:new int[]{0x220E0F11,0x110E0F11,Ui.BG})); hero.addView(scrim,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout copy=column(); copy.setPadding(dp(television?32:18),dp(television?68:0),dp(television?32:18),dp(18));
-        TextView name=text(details.title(),television?34:26,Ui.TEXT); name.setTypeface(null,Typeface.BOLD); name.setMaxLines(television?2:3); copy.addView(name);
+        LinearLayout copy=column(); copy.setPadding(dp(television?32:18),dp(television?58:0),dp(television?32:18),dp(18));
+        TextView name=text(details.title(),television?30:26,Ui.TEXT); name.setTypeface(null,Typeface.BOLD); name.setMaxLines(television?2:3); copy.addView(name);
         List<String> meta=new ArrayList<>(); if(!details.year().isEmpty()) meta.add(details.year()); if(!details.rating().isEmpty()&&!details.rating().equals("0")) meta.add("★ "+details.rating()); if(!details.seasons().isEmpty()) meta.add(details.seasons().size()==1?"1 sezon":details.seasons().size()+((details.seasons().size()%10>=2 && details.seasons().size()%10<=4 && (details.seasons().size()%100<12 || details.seasons().size()%100>14))?" sezony":" sezonów"));
         if(!meta.isEmpty()) { TextView info=text(android.text.TextUtils.join("   ·   ",meta),television?16:14,Ui.MUTED); info.setPadding(0,dp(10),0,dp(4)); copy.addView(info); }
         LinearLayout actions=new LinearLayout(this); actions.setPadding(0,dp(14),0,dp(10));
@@ -91,13 +91,13 @@ public final class SeriesActivity extends Activity {
         if(!details.overview().isEmpty()) { synopsis.setContentDescription("Opis serialu. Wybierz, aby przeczytać całość."); synopsis.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle(details.title()).setMessage(details.overview()).setPositiveButton("Zamknij",null).show()); }
         if(!television && !details.genre().isEmpty()) { TextView genre=text(details.genre(),television?15:13,Ui.MUTED); genre.setPadding(0,dp(12),0,0); copy.addView(genre); }
         if(television) { FrameLayout.LayoutParams infoSize=new FrameLayout.LayoutParams(Math.max(dp(420),getResources().getDisplayMetrics().widthPixels/2),-2,Gravity.LEFT); hero.addView(copy,infoSize); }
-        header.addView(hero,new LinearLayout.LayoutParams(-1,television?-2:heroHeight)); if(!television) header.addView(copy);
+        header.addView(hero,new LinearLayout.LayoutParams(-1,heroHeight)); if(!television) header.addView(copy);
         Button back=back(); FrameLayout.LayoutParams backSize=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT); backSize.leftMargin=dp(television?26:14); backSize.topMargin=dp(12); hero.addView(back,backSize);
         TextView brand=text("TV PLAYER",12,Ui.MUTED); brand.setTypeface(null,Typeface.BOLD); FrameLayout.LayoutParams brandSize=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT); brandSize.rightMargin=dp(18); brandSize.topMargin=dp(26); hero.addView(brand,brandSize);
         LinearLayout seasonBar=new LinearLayout(this); seasonBar.setPadding(dp(television?32:18),dp(16),dp(television?32:18),dp(8)); seasonBar.setGravity(Gravity.CENTER_VERTICAL);
         TextView label=text("Odcinki",television?24:20,Ui.TEXT); label.setTypeface(null,Typeface.BOLD); seasonBar.addView(label,new LinearLayout.LayoutParams(0,-2,1));
         if(!details.seasons().isEmpty()) {
-            Spinner seasons=new Spinner(this); seasons.setFocusable(true); seasons.setFocusableInTouchMode(television); seasons.setContentDescription("Wybierz sezon"); seasons.setBackground(Ui.touch(this,Ui.SURFACE_HIGH,10,Ui.BORDER));
+            Spinner seasons=new Spinner(this,television?Spinner.MODE_DIALOG:Spinner.MODE_DROPDOWN); seasons.setPrompt("Wybierz sezon"); seasons.setFocusable(true); seasons.setFocusableInTouchMode(television); seasons.setContentDescription("Wybierz sezon"); seasons.setBackground(Ui.touch(this,Ui.SURFACE_HIGH,10,Ui.BORDER));
             List<String> names=new ArrayList<>(); for(SeriesDetails.Season season:details.seasons()) names.add(season.title());
             ArrayAdapter<String> choices=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_item,names) {
                 @Override public View getView(int p,View reused,ViewGroup parent) { TextView view=(TextView)super.getView(p,reused,parent); view.setText(names.get(p)+"  ▾"); view.setTextColor(Ui.TEXT); view.setTextSize(television?18:16); view.setPadding(dp(14),dp(8),dp(14),dp(8)); return view; }

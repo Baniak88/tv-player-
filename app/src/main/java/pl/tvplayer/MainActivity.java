@@ -642,7 +642,7 @@ public class MainActivity extends Activity {
         worker.execute(() -> { try { store.save(copy, stars); } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) error("Nie udało się zapisać biblioteki na urządzeniu."); }); } });
     }
     private void error(String message) { if (!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK", null).show(); }
-    @Override protected void onResume() { super.onResume(); worker.execute(() -> { try { Set<String> saved=store.loadFavorites(); runOnUiThread(() -> { if(!isDestroyed()) { favorites.clear(); favorites.addAll(saved); filter(false); } }); } catch(Exception ignored) {} }); if(rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
+    @Override protected void onResume() { super.onResume(); worker.execute(() -> { try { Set<String> saved=store.loadFavorites(); runOnUiThread(() -> { if(!isDestroyed() && !favorites.equals(saved)) { favorites.clear(); favorites.addAll(saved); filter(false); } }); } catch(Exception ignored) {} }); if(rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
     @Override public void onWindowFocusChanged(boolean focus) { super.onWindowFocusChanged(focus); if(focus && rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); }
     @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); super.onPause(); }
     @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }

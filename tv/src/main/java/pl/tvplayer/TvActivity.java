@@ -212,7 +212,7 @@ public final class TvActivity extends Activity {
         return super.onKeyUp(code,event);
     }
     @Override public void onBackPressed() { if(busy) { status.setText("Trwa pobieranie biblioteki…"); return; } if(!home && !seriesTitle.isEmpty()) { seriesTitle=""; open("series"); } else if(!home && (!query.isEmpty() || onlyFavorites)) { query=""; onlyFavorites=false; filter(); } else if(!home) showHome(); else new AlertDialog.Builder(this).setTitle("Zamknąć TV Player?").setPositiveButton("Wyjście",(d,w) -> finish()).setNegativeButton("Zostań",null).show(); }
-    @Override protected void onResume() { super.onResume(); worker.execute(() -> { try { Set<String> saved=new LibraryStore(this).loadFavorites(); runOnUiThread(() -> { if(!isDestroyed()) { favorites.clear(); favorites.addAll(saved); if(!home) filter(); } }); } catch(Exception ignored) {} }); if(!home && rows!=null) rows.notifyDataSetChanged(); }
+    @Override protected void onResume() { super.onResume(); worker.execute(() -> { try { Set<String> saved=new LibraryStore(this).loadFavorites(); runOnUiThread(() -> { if(!isDestroyed() && !favorites.equals(saved)) { favorites.clear(); favorites.addAll(saved); if(!home) filter(); } }); } catch(Exception ignored) {} }); if(!home && rows!=null) rows.notifyDataSetChanged(); }
     @Override protected void onDestroy() { generation++; worker.shutdown(); super.onDestroy(); }
     @Override protected void onSaveInstanceState(Bundle state) { state.putString("section",section); state.putString("group",group); state.putBoolean("home",home); super.onSaveInstanceState(state); }
 }

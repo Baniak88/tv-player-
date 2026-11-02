@@ -70,8 +70,10 @@ public class SeriesActivityTest {
     }
     @Test public void televisionRemoteReachesSeasonPickerAndEpisodePlayback() throws Exception {
         start(true); waitText("Odcinki"); waitText("1. Rywale"); long until=System.currentTimeMillis()+5000; while(activity.getCurrentFocus()==null && System.currentTimeMillis()<until) Thread.sleep(80); assertTrue(root().getWidth()>root().getHeight()); screenshot("series-television.png");
-        Spinner spinner=type(root(),Spinner.class); instrument().runOnMainSync(() -> assertTrue("Season picker cannot receive remote focus",spinner.requestFocus())); assertTrue(spinner.hasFocus()); key(KeyEvent.KEYCODE_DPAD_CENTER); key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_CENTER); waitText("1. Nowy początek");
-        ListView rows=type(root(),ListView.class); instrument().runOnMainSync(() -> { rows.setSelection(1); rows.requestFocus(); }); instrument().waitForIdleSync();
+        key(KeyEvent.KEYCODE_DPAD_RIGHT); // Enter remote navigation mode before opening a focused control.
+        Spinner spinner=type(root(),Spinner.class); instrument().runOnMainSync(() -> assertTrue("Season picker cannot receive remote focus",spinner.requestFocus())); assertTrue(spinner.hasFocus()); key(KeyEvent.KEYCODE_DPAD_CENTER); key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_CENTER);
+        long selected=System.currentTimeMillis()+4000; while(spinner.getSelectedItemPosition()!=1 && System.currentTimeMillis()<selected) { Thread.sleep(80); instrument().waitForIdleSync(); }
+        assertEquals("Remote did not choose season 2",1,spinner.getSelectedItemPosition()); key(KeyEvent.KEYCODE_DPAD_DOWN); waitText("1. Nowy początek");
         Instrumentation.ActivityMonitor monitor=instrument().addMonitor(PlayerActivity.class.getName(),null,false); key(KeyEvent.KEYCODE_DPAD_CENTER); Activity player=monitor.waitForActivityWithTimeout(7000); assertNotNull("Remote did not start selected episode",player); assertTrue(player.getIntent().getBooleanExtra("television",false)); assertTrue(player.getIntent().getStringExtra("url").endsWith("/201.mp4")); instrument().runOnMainSync(player::finish); instrument().removeMonitor(monitor);
     }
 }
