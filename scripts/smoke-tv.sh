@@ -3,7 +3,7 @@ set -euo pipefail
 mkdir -p tv-smoke-output
 trap 'adb logcat -d -v brief -s AndroidRuntime TestRunner > tv-smoke-output/runtime.txt' EXIT
 adb shell settings put system accelerometer_rotation 0
-adb shell wm size 1280x720
+adb shell wm size 720x1280
 adb shell wm density 160
 adb install apk/debug/tv-debug.apk
 adb shell am start -W -n pl.tvplayer.television/pl.tvplayer.TvActivity

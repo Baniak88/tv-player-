@@ -24,9 +24,9 @@ public class TvNavigationTest {
         new android.util.AtomicFile(new java.io.File(context().getFilesDir(),"tv-account.enc")).delete();
         new LibraryStore(context()).save(Arrays.asList(new Channel("Sport 1","https://example.com/sport.ts","Sport","","tv").withOrder(0),new Channel("Dzieci 1","https://example.com/kids.ts","Dzieci","","tv").withOrder(1),new Channel("Test Film","https://example.com/film.mp4","Kino","","movie")),Collections.emptySet());
         TvActivity activity=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        waitText(activity.getWindow().getDecorView(),"Co oglądamy?"); long focused=System.currentTimeMillis()+5000; while(!activity.hasWindowFocus() && System.currentTimeMillis()<focused) Thread.sleep(100); instrument().waitForIdleSync(); return activity;
+        waitText(activity.getWindow().getDecorView(),"Co oglądamy?"); long focused=System.currentTimeMillis()+5000; while(!activity.hasWindowFocus() && System.currentTimeMillis()<focused) Thread.sleep(100); instrument().waitForIdleSync(); assertTrue("TV activity has no input focus",activity.hasWindowFocus()); return activity;
     }
-    private void key(int code) throws Exception { long now=android.os.SystemClock.uptimeMillis(); instrument().getUiAutomation().injectInputEvent(new KeyEvent(now,now,KeyEvent.ACTION_DOWN,code,0),true); instrument().getUiAutomation().injectInputEvent(new KeyEvent(now,android.os.SystemClock.uptimeMillis(),KeyEvent.ACTION_UP,code,0),true); instrument().waitForIdleSync(); Thread.sleep(150); }
+    private void key(int code) throws Exception { try(android.os.ParcelFileDescriptor.AutoCloseInputStream input=new android.os.ParcelFileDescriptor.AutoCloseInputStream(instrument().getUiAutomation().executeShellCommand("input keyevent "+code))) { byte[] buffer=new byte[256]; while(input.read(buffer)!=-1) {} } instrument().waitForIdleSync(); Thread.sleep(200); }
     private void screenshot(TvActivity activity,String name) throws Exception { java.util.concurrent.atomic.AtomicReference<android.graphics.Bitmap> image=new java.util.concurrent.atomic.AtomicReference<>(); instrument().runOnMainSync(() -> { View root=activity.getWindow().getDecorView(); android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(root.getWidth(),root.getHeight(),android.graphics.Bitmap.Config.ARGB_8888); root.draw(new android.graphics.Canvas(bitmap)); image.set(bitmap); }); android.graphics.Bitmap bitmap=image.get(); try(java.io.FileOutputStream out=context().openFileOutput(name,Context.MODE_PRIVATE)) { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out); } bitmap.recycle(); }
     @Test public void homeAndMoviesWorkWithRemoteOnly() throws Exception {
         TvActivity activity=start();
@@ -35,7 +35,7 @@ public class TvNavigationTest {
             key(KeyEvent.KEYCODE_DPAD_RIGHT); assertTrue(activity.getCurrentFocus() instanceof Button); assertEquals("▶  Filmy",((Button)activity.getCurrentFocus()).getText().toString());
             key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(activity.getWindow().getDecorView(),"Test Film"); assertNull(find(activity.getWindow().getDecorView(),"Sport 1")); screenshot(activity,"tv-movies.png");
             key(KeyEvent.KEYCODE_BACK); waitText(activity.getWindow().getDecorView(),"Co oglądamy?");
-        } finally { instrument().runOnMainSync(activity::finish); }
+        } finally { instrument().runOnMainSync(activity::finish); instrument().waitForIdleSync(); Thread.sleep(300); }
     }
     @Test public void bouquetsAndItemOptionsWorkWithRemote() throws Exception {
         TvActivity activity=start();
@@ -51,7 +51,7 @@ public class TvNavigationTest {
             Set<String> saved=new HashSet<>(); long until=System.currentTimeMillis()+5000;
             while(!saved.contains("https://example.com/sport.ts") && System.currentTimeMillis()<until) { Thread.sleep(100); new LibraryStore(context()).loadSection("tv",saved); }
             assertTrue("Favorite was not saved after remote selection",saved.contains("https://example.com/sport.ts"));
-        } finally { instrument().runOnMainSync(activity::finish); }
+        } finally { instrument().runOnMainSync(activity::finish); instrument().waitForIdleSync(); Thread.sleep(300); }
     }
     @Test public void credentialsAreEncryptedAndReadableAfterRestart() throws Exception {
         TvAccountStore store=new TvAccountStore(context()); TvAccountStore.Account expected=new TvAccountStore.Account("xtream","https://example.com/","test-user","sensitive-password-for-TV-test"); store.save(expected); assertEquals(expected,new TvAccountStore(context()).load());
@@ -64,6 +64,6 @@ public class TvNavigationTest {
             instrument().waitForIdleSync(); assertEquals(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE,player.getRequestedOrientation());
             key(KeyEvent.KEYCODE_MENU); assertFalse(instrument().getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText("Ścieżka audio").isEmpty()); key(KeyEvent.KEYCODE_BACK);
             key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); key(KeyEvent.KEYCODE_MEDIA_STOP);
-        } finally { instrument().runOnMainSync(player::finish); }
+        } finally { instrument().runOnMainSync(player::finish); instrument().waitForIdleSync(); Thread.sleep(300); }
     }
 }
