@@ -18,6 +18,7 @@ public class SeriesActivityTest {
     private Context context() { return instrument().getTargetContext(); }
     private MockWebServer server;
     private SeriesActivity activity;
+    private Activity launcher;
     private int attempts;
     private boolean failFirst,empty;
     @Before public void setup() throws Exception {
@@ -45,14 +46,24 @@ public class SeriesActivityTest {
         return "{\"id\":"+id+",\"season\":"+season+",\"episode_num\":"+number+",\"title\":\"PL - KRÓLOWA KLEOPATRA - S0"+season+"E0"+number+" - "+title+"\",\"container_extension\":\"mp4\",\"info\":{\"duration_secs\":2820,\"plot\":\""+plot+"\",\"movie_image\":\""+image+"\"}}";
     }
     private Channel source() { return new Channel("PL - KRÓLOWA KLEOPATRA",server.url("/player_api.php?username=test&password=test&action=get_series_info&series_id=9").toString(),"Dokumenty","","series"); }
-    private void start(boolean tv) { activity=(SeriesActivity)instrument().startActivitySync(SeriesActivity.intent(context(),source(),tv).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK)); }
+    private void waitFocus(Activity target) throws Exception { long until=System.currentTimeMillis()+7000; while(!target.hasWindowFocus() && System.currentTimeMillis()<until) { Thread.sleep(80); instrument().waitForIdleSync(); } assertTrue("Activity has no OS window focus: "+target.getClass().getSimpleName(),target.hasWindowFocus()); }
+    private void start(boolean tv) throws Exception {
+        if(tv) {
+            instrument().getUiAutomation();
+            launcher=instrument().startActivitySync(context().getPackageManager().getLaunchIntentForPackage(context().getPackageName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK)); waitFocus(launcher);
+        }
+        activity=(SeriesActivity)instrument().startActivitySync(SeriesActivity.intent(context(),source(),tv).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|(tv?0:Intent.FLAG_ACTIVITY_CLEAR_TASK)));
+        if(tv) waitFocus(activity);
+    }
     private View root() { return activity.getWindow().getDecorView(); }
     private View find(View view,String value) { if(view instanceof TextView && value.equals(((TextView)view).getText().toString())) return view; if(view instanceof ViewGroup) for(int i=0;i<((ViewGroup)view).getChildCount();i++) { View found=find(((ViewGroup)view).getChildAt(i),value); if(found!=null) return found; } return null; }
     private <T extends View> T type(View view,Class<T> clazz) { if(clazz.isInstance(view)) return clazz.cast(view); if(view instanceof ViewGroup) for(int i=0;i<((ViewGroup)view).getChildCount();i++) { T found=type(((ViewGroup)view).getChildAt(i),clazz); if(found!=null) return found; } return null; }
     private void waitText(String text) throws Exception { long until=System.currentTimeMillis()+10000; while(find(root(),text)==null && System.currentTimeMillis()<until) { Thread.sleep(80); instrument().waitForIdleSync(); } assertNotNull(text,find(root(),text)); }
     private void screenshot(String name) throws Exception { Thread.sleep(1000); instrument().waitForIdleSync(); final Bitmap[] image={null}; instrument().runOnMainSync(() -> { View root=root(); image[0]=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(image[0])); }); try(java.io.FileOutputStream out=context().openFileOutput(name,Context.MODE_PRIVATE)) { image[0].compress(Bitmap.CompressFormat.PNG,100,out); } image[0].recycle(); }
-    private void key(int code) throws Exception { try(android.os.ParcelFileDescriptor.AutoCloseInputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(instrument().getUiAutomation().executeShellCommand("input keyevent "+code))) { byte[] bytes=new byte[256]; while(in.read(bytes)!=-1) {} } instrument().waitForIdleSync(); Thread.sleep(180); }
-    @After public void close() throws Exception { if(activity!=null) { instrument().runOnMainSync(activity::finish); instrument().waitForIdleSync(); } server.shutdown(); }
+    private void key(int code) throws Exception { android.util.Log.i("SeriesRemote","key="+code+" mainFocus="+activity.hasWindowFocus()+" current="+activity.getCurrentFocus()); try(android.os.ParcelFileDescriptor.AutoCloseInputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(instrument().getUiAutomation().executeShellCommand("input keyevent "+code))) { byte[] bytes=new byte[256]; while(in.read(bytes)!=-1) {} } instrument().waitForIdleSync(); Thread.sleep(250); android.view.accessibility.AccessibilityNodeInfo node=instrument().getUiAutomation().getRootInActiveWindow(); dump(node,0); }
+    private void dump(android.view.accessibility.AccessibilityNodeInfo node,int depth) { if(node==null || depth>7) return; if(node.getText()!=null || node.isFocused()) android.util.Log.i("SeriesRemote","node="+node.getText()+" focused="+node.isFocused()+" selected="+node.isSelected()+" class="+node.getClassName()); for(int i=0;i<node.getChildCount();i++) dump(node.getChild(i),depth+1); }
+    private void waitAccessible(String text) throws Exception { long until=System.currentTimeMillis()+5000; while(System.currentTimeMillis()<until) { android.view.accessibility.AccessibilityNodeInfo node=instrument().getUiAutomation().getRootInActiveWindow(); if(node!=null && !node.findAccessibilityNodeInfosByText(text).isEmpty()) return; Thread.sleep(100); } fail("Remote dialog did not appear: "+text); }
+    @After public void close() throws Exception { if(activity!=null) { instrument().runOnMainSync(activity::finish); instrument().waitForIdleSync(); } if(launcher!=null) { instrument().runOnMainSync(launcher::finish); instrument().waitForIdleSync(); } server.shutdown(); }
     @Test public void detailScreenShowsMetadataAndSwitchesSeasons() throws Exception {
         start(false); waitText("KRÓLOWA KLEOPATRA"); waitText("Odcinki"); waitText("1. Rywale"); assertNull(find(root(),"PL - KRÓLOWA KLEOPATRA - S01E01 - Rywale")); assertNotNull(find(root(),"47 min")); screenshot("series-details.png");
         Spinner spinner=type(root(),Spinner.class); assertNotNull(spinner); instrument().runOnMainSync(() -> spinner.setSelection(1)); waitText("1. Nowy początek"); assertNull(find(root(),"1. Rywale")); screenshot("series-season2.png");
@@ -71,7 +82,7 @@ public class SeriesActivityTest {
     @Test public void televisionRemoteReachesSeasonPickerAndEpisodePlayback() throws Exception {
         start(true); waitText("Odcinki"); waitText("1. Rywale"); long until=System.currentTimeMillis()+5000; while(activity.getCurrentFocus()==null && System.currentTimeMillis()<until) Thread.sleep(80); assertTrue(root().getWidth()>root().getHeight()); screenshot("series-television.png");
         key(KeyEvent.KEYCODE_DPAD_RIGHT); // Enter remote navigation mode before opening a focused control.
-        Spinner spinner=type(root(),Spinner.class); instrument().runOnMainSync(() -> assertTrue("Season picker cannot receive remote focus",spinner.requestFocus())); assertTrue(spinner.hasFocus()); key(KeyEvent.KEYCODE_DPAD_CENTER); key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_CENTER);
+        Spinner spinner=type(root(),Spinner.class); instrument().runOnMainSync(() -> assertTrue("Season picker cannot receive remote focus",spinner.requestFocus())); assertTrue(spinner.hasFocus()); key(KeyEvent.KEYCODE_DPAD_CENTER); waitAccessible("Sezon 2"); key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_CENTER);
         long selected=System.currentTimeMillis()+4000; while(spinner.getSelectedItemPosition()!=1 && System.currentTimeMillis()<selected) { Thread.sleep(80); instrument().waitForIdleSync(); }
         assertEquals("Remote did not choose season 2",1,spinner.getSelectedItemPosition()); key(KeyEvent.KEYCODE_DPAD_DOWN); waitText("1. Nowy początek");
         Instrumentation.ActivityMonitor monitor=instrument().addMonitor(PlayerActivity.class.getName(),null,false); key(KeyEvent.KEYCODE_DPAD_CENTER); Activity player=monitor.waitForActivityWithTimeout(7000); assertNotNull("Remote did not start selected episode",player); assertTrue(player.getIntent().getBooleanExtra("television",false)); assertTrue(player.getIntent().getStringExtra("url").endsWith("/201.mp4")); instrument().runOnMainSync(player::finish); instrument().removeMonitor(monitor);
