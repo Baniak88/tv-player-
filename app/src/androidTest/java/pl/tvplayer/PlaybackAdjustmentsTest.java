@@ -30,7 +30,7 @@ public class PlaybackAdjustmentsTest {
         long until=SystemClock.elapsedRealtime()+3000;
         while(SystemClock.elapsedRealtime()<until) {
             final View[] found={null}; instrument().runOnMainSync(() -> { for(View root:android.view.inspector.WindowInspector.getGlobalWindowViews()) if(root.isShown()) { View candidate=find(root,text); if(candidate!=null) { found[0]=candidate; break; } } });
-            if(found[0]!=null) return found[0]; Thread.sleep(80);
+            if(found[0]!=null && found[0].getWidth()>0 && found[0].getHeight()>0) return found[0]; Thread.sleep(80);
         } throw new AssertionError("Missing dialog view: "+text);
     }
     private void swipe(PlayerActivity activity,View video,float fraction,float from,float to) {
@@ -43,6 +43,13 @@ public class PlaybackAdjustmentsTest {
                 try { activity.dispatchTouchEvent(event); } finally { event.recycle(); }
             }
         }); instrument().waitForIdleSync();
+    }
+    private void clickItem(View target) {
+        View row=target;
+        while(row.getParent() instanceof View && !(row.getParent() instanceof AdapterView)) row=(View)row.getParent();
+        final View selected=row;
+        if(selected.getParent() instanceof AdapterView) instrument().runOnMainSync(() -> { AdapterView<?> list=(AdapterView<?>)selected.getParent(); list.performItemClick(selected,list.getPositionForView(selected),0); });
+        else instrument().runOnMainSync(target::performClick);
     }
     private void dragSlider(SeekBar bar,float percent) {
         instrument().runOnMainSync(() -> {
@@ -74,7 +81,7 @@ public class PlaybackAdjustmentsTest {
             swipe(activity,video,0.75f,0.4f,0.6f); assertTrue("Right downward swipe did not lower media volume",audio.getStreamVolume(AudioManager.STREAM_MUSIC)<=initial+1);
             assertSame("Adjustments recreated playback",engine,field(activity,"player")); assertFalse(activity.isFinishing());
             instrument().runOnMainSync(video::showController); instrument().waitForIdleSync(); View options=find(toolbar,"Opcje"); assertNotNull(options); instrument().runOnMainSync(options::performClick);
-            View choice=dialogView("Głośność i jasność"); instrument().runOnMainSync(choice::performClick);
+            View choice=dialogView("Głośność i jasność"); clickItem(choice);
             SeekBar brightness=(SeekBar)dialogView("Jasność"),volume=(SeekBar)dialogView("Głośność");
             dragSlider(brightness,0.8f); assertTrue(activity.getWindow().getAttributes().screenBrightness>0.7f);
             dragSlider(volume,0.3f); assertTrue(audio.getStreamVolume(AudioManager.STREAM_MUSIC)<audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)/2);
