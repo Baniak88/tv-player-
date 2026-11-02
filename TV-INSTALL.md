@@ -1,49 +1,56 @@
-# TV Player TV 0.9.0
+# TV Player TV 0.9.0 — instalacja
 
-## Fire TV Stick 4K / Android TV
+## Fire TV Stick 4K
 
-Install `TV-Player-FireTV-0.9.0.apk` from the release assets. This is a complete APK, not a source archive. It supports Fire OS 6+ (Android 7.1+) including the original 4K Stick and later Fire OS 4K models. It does not run on Vega OS / Fire TV Stick 4K Select.
+Pobierz **TV-Player-FireTV-0.9.0.apk** z wydania. To gotowy APK, bez ZIP. Obsługiwane są Fire OS 6+ i Android TV 7.1+, w tym pierwsza generacja Sticka 4K. APK nie działa na Vega OS / 4K Select.
 
-Enable developer options and installation from your chosen installer on the Fire TV. Open the direct APK URL in an installer such as Downloader, then install and launch TV Player from Apps. Alternatively, with Android platform-tools installed:
+1. Pobierz APK w przeglądarce zalogowanej do GitHuba. Repozytorium jest prywatne — otwarcie linku w niezalogowanym Downloaderze może pokazać 404.
+2. Prześlij plik na Fire TV. Włącz instalowanie aplikacji z używanego instalatora, następnie otwórz APK i zainstaluj TV Player.
+3. Uruchom TV Player z listy aplikacji. Dodaj serwer, login i hasło Xtream albo adres listy M3U.
+
+Z komputera z Android platform-tools można użyć:
 
 ```sh
-adb connect FIRE_TV_IP:5555
+adb connect ADRES_IP_FIRE_TV:5555
 adb install -r TV-Player-FireTV-0.9.0.apk
 ```
 
-Use arrows and OK to select. Menu or holding OK opens EPG/favorite actions for the selected channel. Back returns to the previous screen. The player stays in landscape and accepts media keys. TV is fetched first; movies and series load when selected. The TV app has its own package and encrypted library, separate from the phone app.
+Pilot: strzałki i OK wybierają pozycję. Menu lub przytrzymanie OK otwiera EPG i ulubione. Wstecz wraca. Odtwarzacz pozostaje poziomy i reaguje na przyciski multimedialne. TV pobiera się jako pierwsze; duże katalogi filmów i seriali dopiero po wybraniu sekcji. Wersja TV ma osobną, szyfrowaną bibliotekę, niezależną od aplikacji telefonu.
 
-## Samsung Tizen (including 2024 models)
+## Samsung Tizen — w tym telewizory z 2024 r.
 
-Samsung Tizen cannot install the Fire TV APK. The separate app is in `samsung/`; it uses Samsung AVPlay for TS/HLS/VOD and the TV remote, and supports Xtream/M3U, provider bouquets, sorting, search, favorites, seasons and API EPG. Samsung 2024 is the requested target; widget minimum is Tizen 4.0. Physical TV media/codec compatibility still needs device verification.
+Samsung Tizen nie instaluje APK. Osobna aplikacja jest w katalogu `samsung/`. Korzysta z Samsung AVPlay i pilota. Obsługuje Xtream/M3U, TV, filmy, seriale i odcinki, bukiety dostawcy, sortowanie, wyszukiwanie, ulubione oraz EPG z API konta. Docelowy rocznik to 2024; minimalna wersja pakietu to Tizen 4.0.
 
-`TV-Player-Samsung-0.9.0-unsigned.wgt` is an **unsigned development widget, not ready for installation**. No Samsung signing credentials or TV DUID were available when building it. A Samsung author/distributor certificate profile that permits the target TV is required. Do not rename an APK or source ZIP to WGT.
+**TV-Player-Samsung-0.9.0-unsigned.wgt jest niepodpisanym pakietem deweloperskim. Nie jest jeszcze gotowy do instalacji na TV.** Potrzebny jest profil certyfikatu Samsung z certyfikatem autora i dystrybutora dopuszczającym konkretny telewizor. W czasie przygotowania nie były dostępne certyfikaty ani DUID użytkownika. Nie należy zmieniać nazwy APK lub źródłowego ZIP na WGT.
 
-1. Install Tizen Studio with Samsung TV Extension and Samsung Certificate Extension on a computer.
-2. Enable Developer Mode on the TV (Apps panel, enter 12345), set the computer IP and restart the TV as requested by Samsung.
-3. Connect the TV in Device Manager. Create a **Samsung TV certificate profile** using your Samsung developer account and add this TV's DUID. Permit the device to install applications.
-4. Connect with `sdb connect TV_IP:26101`, then run `sdb devices` to find the device/target name.
-5. From this repository, run:
+### Podpisanie i instalacja z komputera
+
+1. Zainstaluj Tizen Studio, Samsung TV Extension i Samsung Certificate Extension.
+2. Na TV otwórz Apps, wpisz **12345**, włącz Developer Mode, wpisz adres IP komputera i uruchom TV ponownie zgodnie z komunikatem Samsunga.
+3. Połącz TV w Device Manager. W Certificate Manager utwórz profil **Samsung TV**, zaloguj się na własne konto Samsung i dodaj DUID telewizora. W Device Manager zezwól urządzeniu na instalowanie aplikacji.
+4. Pobierz kod tego wydania na komputer. Połącz TV poleceniem `sdb connect ADRES_IP_TV:26101`; `sdb devices` pokaże urządzenie.
+5. W katalogu repozytorium uruchom:
 
 ```sh
-bash scripts/install-samsung.sh YOUR_SAMSUNG_PROFILE TV_TARGET_NAME
+bash scripts/install-samsung.sh NAZWA_PROFILU_SAMSUNG NAZWA_URZADZENIA
 ```
 
-The script packages and signs the supplied source with the local profile, verifies the author/distributor signatures and installs it using Tizen CLI. The signed copy is saved as `dist/TV-Player-Samsung-0.9.0-signed.wgt`. Private certificates and their passwords stay on your computer. These steps do not publish the app to Samsung's store.
+Skrypt buduje projekt, podpisuje go lokalnym profilem, sprawdza obecność obu podpisów i uruchamia instalację przez Tizen CLI. Kopia podpisanego pakietu trafia do `dist/TV-Player-Samsung-0.9.0-signed.wgt`. Certyfikaty i ich hasła pozostają na komputerze użytkownika. Skrypt nie publikuje aplikacji w sklepie Samsunga.
 
-If using Tizen Studio UI instead, import the `samsung` directory, select the Samsung certificate profile and run it as a Tizen Web Application on the connected TV.
+Alternatywnie zaimportuj katalog `samsung` w Tizen Studio, wybierz profil certyfikatu Samsung i uruchom projekt jako Tizen Web Application na podłączonym TV.
 
-### Samsung behavior and validation limits
+Dokumentacja Samsunga: [połączenie z TV](https://developer.samsung.com/smarttv/develop/getting-started/using-sdk/tv-device.html), [certyfikaty i DUID](https://developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/creating-certificates.html), [Tizen CLI](https://developer.samsung.com/smarttv/develop/getting-started/using-sdk/command-line-interface.html).
 
-- Native playback uses Samsung AVPlay; browser tests use an AVPlay API stub to check lifecycle, remote actions and source URLs. They do not validate actual video decoding on a Samsung TV.
-- EPG is requested from the provider API. The Samsung web app cannot observe the MPEG-TS bytes being consumed inside AVPlay; the Android/Fire TV EIT observer is not claimed as available on Samsung.
-- Source parsing and large-library JSON work run in workers, with a small paginated DOM. Tests cover a streamed M3U over 30 MiB / 60,000 entries.
-- Remembered credentials, library and favorites are AES-GCM encrypted in IndexedDB using a non-extractable WebCrypto key. If the TV cannot provide that storage, the source works for the current session and the app reports that it could not persist it.
-- No playlists or channels are included. Playback, EPG and available codecs depend on the supplied source and TV capabilities.
+### Co sprawdzono i co wymaga fizycznego TV
 
-Samsung references: [TV connection](https://developer.samsung.com/smarttv/develop/getting-started/using-sdk/tv-device.html), [certificates](https://developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/creating-certificates.html), [Tizen CLI](https://developer.samsung.com/smarttv/develop/getting-started/using-sdk/command-line-interface.html), [AVPlay](https://developer.samsung.com/smarttv/develop/guides/multimedia/media-playback/using-avplay.html).
+- Testy przeglądarkowe sprawdzają pilot, biblioteki, dopasowanie EPG i wywołania AVPlay przez atrapę API. Nie potwierdzają dekodowania obrazu na Samsungu.
+- Import dużej listy i przetwarzanie JSON działają w workerach; interfejs wyświetla małą liczbę pozycji na stronie. Test obejmuje M3U ponad 30 MiB i 60 000 pozycji.
+- Zapamiętane konto, katalogi i ulubione są szyfrowane AES-GCM w IndexedDB, z nieeksportowalnym kluczem WebCrypto. Jeśli model nie udostępnia tej pamięci, źródło działa w bieżącej sesji, a aplikacja informuje o problemie zapisu.
+- Samsung pobiera EPG z API dostawcy. Nie deklarujemy odczytu DVB EIT z bajtów wewnątrz AVPlay. Obserwator EIT z Android/Fire TV nie jest dostępny w tej wersji Tizen.
+- Podpisanie, instalacja i rzeczywiste kodeki wymagają sprawdzenia na TV z właściwym certyfikatem. Nie zostały jeszcze potwierdzone na urządzeniu użytkownika.
+- Aplikacja nie zawiera kanałów ani list. Odtwarzanie i EPG zależą od własnego źródła oraz urządzenia.
 
-## Developer verification
+## Sprawdzanie projektu
 
 ```sh
 gradle :app:testDebugUnitTest :tv:lintDebug :tv:assembleDebug :tv:assembleDebugAndroidTest
@@ -52,4 +59,4 @@ node samsung/tests/browser.cjs
 python3 scripts/package-samsung.py
 ```
 
-The browser test requires Playwright and Chromium. The TV workflow verifies the APK signature and runs installation/remote tests on Android API 25; physical Fire TV and Samsung tests require the devices.
+Test przeglądarkowy wymaga Playwright i Chromium. Workflow TV sprawdza podpis APK, instalację i pilot na emulatorze Android API 25. Testy fizycznego Fire TV i Samsunga wymagają dostępu do urządzeń.

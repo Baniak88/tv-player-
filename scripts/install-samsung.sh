@@ -17,8 +17,11 @@ import sys,zipfile,pathlib
 root=pathlib.Path(sys.argv[1]);(root/'widget').mkdir()
 with zipfile.ZipFile(root/'source.wgt') as widget: widget.extractall(root/'widget')
 PY
-tizen package -t wgt -s "$tv_profile" -- "$task_stage/widget"
-tv_widget="$(find "$task_stage/widget" -maxdepth 1 -name '*.wgt' -print -quit)"
+tizen build-web -- "$task_stage/widget"
+tv_build="$task_stage/widget/.buildResult"
+test -d "$tv_build" || { echo "Tizen build-web did not create .buildResult."; exit 1; }
+tizen package -t wgt -s "$tv_profile" -- "$tv_build"
+tv_widget="$(find "$tv_build" -maxdepth 1 -name '*.wgt' -print -quit)"
 test -n "$tv_widget" || { echo 'The Tizen CLI did not create a signed WGT.'; exit 1; }
 python3 - "$tv_widget" <<'PY'
 import sys,zipfile
