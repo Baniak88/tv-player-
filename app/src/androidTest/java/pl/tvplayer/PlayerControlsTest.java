@@ -25,7 +25,16 @@ public class PlayerControlsTest {
     private View description(View root,String value) { if(value.contentEquals(root.getContentDescription()==null?"":root.getContentDescription())) return root; if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { View found=description(((ViewGroup)root).getChildAt(i),value); if(found!=null) return found; } return null; }
     private View text(View root,String value) { if(root instanceof TextView && value.equals(((TextView)root).getText().toString())) return root; if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { View found=text(((ViewGroup)root).getChildAt(i),value); if(found!=null) return found; } return null; }
     private int[] center(View target) { int[] point=new int[2]; instrument().runOnMainSync(() -> { target.getLocationOnScreen(point); point[0]+=target.getWidth()/2; point[1]+=target.getHeight()/2; }); return point; }
-    private void tap(int[] point) { long now=SystemClock.uptimeMillis(); MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,point[0],point[1],0),up=MotionEvent.obtain(now,now+30,MotionEvent.ACTION_UP,point[0],point[1],0); try { instrument().sendPointerSync(down); instrument().sendPointerSync(up); } finally { down.recycle(); up.recycle(); } instrument().waitForIdleSync(); }
+    private void tap(PlayerActivity activity,int[] point) {
+        int[] origin=new int[2]; instrument().runOnMainSync(() -> activity.getWindow().getDecorView().getLocationOnScreen(origin));
+        long now=SystemClock.uptimeMillis();
+        MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,point[0]-origin[0],point[1]-origin[1],0),up=MotionEvent.obtain(now,now+30,MotionEvent.ACTION_UP,point[0]-origin[0],point[1]-origin[1],0);
+        down.setSource(InputDevice.SOURCE_TOUCHSCREEN); up.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        // Exercise Activity dispatch and real view hit-testing, independent of OS input-injection policy.
+        try { instrument().runOnMainSync(() -> { activity.dispatchTouchEvent(down); activity.dispatchTouchEvent(up); }); }
+        finally { down.recycle(); up.recycle(); }
+        instrument().waitForIdleSync();
+    }
     @Test public void liveToolbarHidesAndTapRevealsWithoutActivatingHiddenBack() throws Exception {
         MockWebServer server=new MockWebServer();
         byte[] packets=new byte[188*10000]; java.util.Arrays.fill(packets,(byte)0xFF); for(int offset=0;offset<packets.length;offset+=188) { packets[offset]=0x47; packets[offset+1]=0x1F; packets[offset+2]=(byte)0xFF; packets[offset+3]=0x10; }
@@ -35,13 +44,15 @@ public class PlayerControlsTest {
             instrument().getUiAutomation();
             home=instrument().startActivitySync(context().getPackageManager().getLaunchIntentForPackage(context().getPackageName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK)); waitFocus(home);
             activity=(PlayerActivity)instrument().startActivitySync(new Intent(context(),PlayerActivity.class).putExtra("url",server.url("/live.ts").toString()).putExtra("name","Test TV").putExtra("kind","tv").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); waitFocus(activity);
-            View back=description(activity.getWindow().getDecorView(),"Wróć do biblioteki"); assertNotNull(back); int[] hiddenBack=center(back);
+            View back=description(activity.getWindow().getDecorView(),"Wróć do biblioteki"); assertNotNull(back); waitToolbar(activity,View.VISIBLE);
+            long laidOut=SystemClock.elapsedRealtime()+3000; while(back.getWidth()==0 && SystemClock.elapsedRealtime()<laidOut) { Thread.sleep(50); instrument().waitForIdleSync(); }
+            assertTrue("Toolbar button has not been laid out",back.getWidth()>0 && back.getHeight()>0); int[] hiddenBack=center(back);
             waitToolbar(activity,View.GONE); assertFalse(video(activity).isControllerFullyVisible());
-            tap(hiddenBack); waitToolbar(activity,View.VISIBLE); assertFalse("First reveal tap activated hidden Back",activity.isFinishing()); long visibleUntil=SystemClock.elapsedRealtime()+2000; while(!video(activity).isControllerFullyVisible() && SystemClock.elapsedRealtime()<visibleUntil) { Thread.sleep(50); instrument().waitForIdleSync(); } assertTrue(video(activity).isControllerFullyVisible());
+            tap(activity,hiddenBack); waitToolbar(activity,View.VISIBLE); assertFalse("First reveal tap activated hidden Back",activity.isFinishing()); long visibleUntil=SystemClock.elapsedRealtime()+2000; while(!video(activity).isControllerFullyVisible() && SystemClock.elapsedRealtime()<visibleUntil) { Thread.sleep(50); instrument().waitForIdleSync(); } assertTrue(video(activity).isControllerFullyVisible());
             // A second tap while controls are visible renews the timeout instead of hiding them.
-            int[] screen=center(video(activity)); screen[1]/=2; tap(screen); waitToolbar(activity,View.VISIBLE); Thread.sleep(700); assertEquals(View.VISIBLE,toolbar(activity).getVisibility());
-            waitToolbar(activity,View.GONE); tap(screen); waitToolbar(activity,View.VISIBLE);
-            View options=text(toolbar(activity),"Opcje"); assertNotNull(options); tap(center(options));
+            int[] screen=center(video(activity)); screen[1]/=2; tap(activity,screen); waitToolbar(activity,View.VISIBLE); Thread.sleep(700); assertEquals(View.VISIBLE,toolbar(activity).getVisibility());
+            waitToolbar(activity,View.GONE); tap(activity,screen); waitToolbar(activity,View.VISIBLE);
+            View options=text(toolbar(activity),"Opcje"); assertNotNull(options); tap(activity,center(options));
             long until=SystemClock.elapsedRealtime()+4000; boolean opened=false;
             while(SystemClock.elapsedRealtime()<until) { android.view.accessibility.AccessibilityNodeInfo root=instrument().getUiAutomation().getRootInActiveWindow(); if(root!=null && !root.findAccessibilityNodeInfosByText("Ścieżka audio").isEmpty()) { opened=true; break; } Thread.sleep(80); }
             assertTrue("Visible Options button stopped working",opened); instrument().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);

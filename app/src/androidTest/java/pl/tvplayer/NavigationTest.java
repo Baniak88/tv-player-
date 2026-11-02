@@ -215,7 +215,7 @@ public class NavigationTest {
         try {
             shell("settings put system accelerometer_rotation 0");
             player=(PlayerActivity)getInstrumentation().startActivitySync(new Intent(context,PlayerActivity.class).putExtra("url","https://example.com/test.mp4").putExtra("name","Rotation lock test").putExtra("kind","tv").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            getInstrumentation().waitForIdleSync(); waitLiveToolbar(player,View.GONE); ready.createNewFile();
+            getInstrumentation().waitForIdleSync(); waitLiveToolbar(player,View.VISIBLE); waitLiveToolbar(player,View.GONE); ready.createNewFile();
             long deadline=System.currentTimeMillis()+20000;
             while(player.getResources().getConfiguration().orientation!=android.content.res.Configuration.ORIENTATION_LANDSCAPE && System.currentTimeMillis()<deadline) Thread.sleep(100);
             assertEquals("Physical rotation did not reach landscape",android.content.res.Configuration.ORIENTATION_LANDSCAPE,player.getResources().getConfiguration().orientation);
