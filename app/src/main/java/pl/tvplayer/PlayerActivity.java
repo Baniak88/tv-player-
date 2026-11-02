@@ -19,6 +19,7 @@ public class PlayerActivity extends Activity {
     private LinearLayout error;
     private TextView message,title;
     private LiveChannelQueue channelQueue;
+    private PlaybackAdjustments adjustments;
     private Button full;
     private String url, bookmark;
     private long position;
@@ -90,6 +91,7 @@ public class PlayerActivity extends Activity {
                 if(requested!=sensorOrientation) { sensorOrientation=requested; setRequestedOrientation(requested); revealLiveControls(); }
             }
         };
+        if(!television) adjustments=new PlaybackAdjustments(this,root,state);
         setContentView(root); updateFullscreen();
         if(!television && !onDemand) loadChannelQueue();
         // The system may drop the fullscreen flags (focus change, dialogs, rotation); restore them.
@@ -157,6 +159,11 @@ public class PlayerActivity extends Activity {
         view.showController();
     }
     @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        if(adjustments!=null) {
+            int result=adjustments.touch(event,view,toolbar,resumed && fullscreen && !enteringPip && !isInPictureInPictureMode() && !error.isShown());
+            if(result==PlaybackAdjustments.START) { MotionEvent cancel=MotionEvent.obtain(event); cancel.setAction(MotionEvent.ACTION_CANCEL); super.dispatchTouchEvent(cancel); cancel.recycle(); }
+            if(result!=PlaybackAdjustments.PASS) return true;
+        }
         // Let the tapped view finish its click before controls can change focus or visibility.
         boolean handled=super.dispatchTouchEvent(event);
         if(event.getActionMasked()==MotionEvent.ACTION_UP && view!=null && !television && !onDemand) view.post(this::revealLiveControls);
@@ -167,7 +174,9 @@ public class PlayerActivity extends Activity {
         List<String> labels=new ArrayList<>(Arrays.asList("Ścieżka audio","Napisy","Odtwórz od początku","Obraz w obrazie (PiP)"));
         if(!onDemand) { labels.add("Program TV i archiwum"); labels.add(RecordingService.active?"Zatrzymaj nagrywanie":"Nagraj kanał do pliku"); }
         labels.add("Cofnij o 30 sekund");
+        if(adjustments!=null) labels.add("Głośność i jasność");
         new AlertDialog.Builder(this).setTitle("Odtwarzanie").setItems(labels.toArray(new String[0]),(d,i) -> {
+            if(labels.get(i).equals("Głośność i jasność")) { adjustments.showDialog(); return; }
             if(labels.get(i).equals("Cofnij o 30 sekund")) {
                 if(player!=null && player.isCurrentMediaItemSeekable()) player.seekTo(Math.max(0,player.getCurrentPosition()-30000));
                 else Toast.makeText(this,"Źródło nie udostępnia przewijania. Dla TV sprawdź archiwum w EPG.",Toast.LENGTH_LONG).show();
@@ -196,7 +205,7 @@ public class PlayerActivity extends Activity {
         if(android.os.Build.VERSION.SDK_INT<26 || !getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
             Toast.makeText(this,"Ten telefon nie udostępnia PiP.",Toast.LENGTH_LONG).show(); return;
         }
-        enteringPip=true; if(rotation!=null) rotation.disable();
+        enteringPip=true; if(adjustments!=null) adjustments.dismissFeedback(); if(rotation!=null) rotation.disable();
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
         try {
             boolean entered=enterPictureInPictureMode(new PictureInPictureParams.Builder().setAspectRatio(new android.util.Rational(16,9)).build());
@@ -233,12 +242,14 @@ public class PlayerActivity extends Activity {
         }
     }
     @Override protected void onResume() { super.onResume(); resumed=true; if(!isInPictureInPictureMode()) { updateFullscreen(); revealLiveControls(); } }
-    @Override protected void onPause() { resumed=false; saveWatchProgress(); if(rotation!=null) rotation.disable(); super.onPause(); }
+    @Override protected void onPause() { resumed=false; if(adjustments!=null) adjustments.dismissFeedback(); saveWatchProgress(); if(rotation!=null) rotation.disable(); super.onPause(); }
     @Override protected void onStart() { super.onStart(); startPlayback(); }
     private void startPlayback() {
         if(url==null) return;
         if(player!=null) return;
-        ExoPlayer.Builder builder=new ExoPlayer.Builder(this).setLoadControl(new DefaultLoadControl.Builder().setBackBuffer(30000,true).build());
+        DefaultLoadControl.Builder buffering=new DefaultLoadControl.Builder().setBackBuffer(30000,true);
+        if(!television && !onDemand) buffering.setBufferDurationsMs(5000,15000,1000,2000).setPrioritizeTimeOverSizeThresholds(true).setBackBuffer(10000,true);
+        ExoPlayer.Builder builder=new ExoPlayer.Builder(this).setLoadControl(buffering.build());
         if(!onDemand) {
             Channel channel=liveChannel(); GuideRepository repository=GuideRepository.get(this);
             androidx.media3.datasource.DefaultDataSource.Factory upstream=new androidx.media3.datasource.DefaultDataSource.Factory(this);
@@ -305,15 +316,18 @@ public class PlayerActivity extends Activity {
         super.onStop();
     }
     @Override protected void onDestroy() {
+        if(adjustments!=null) adjustments.dismissFeedback();
         if(player!=null) { saveWatchProgress(); view.setPlayer(null); player.release(); player=null; }
         stopStreamObservation();
         if(rotation!=null) rotation.disable(); guideWorker.shutdown(); super.onDestroy();
     }
     private void stopStreamObservation() { if(streamObserved) { GuideRepository.get(this).streamStopped(liveChannel()); streamObserved=false; } }
     @Override protected void onSaveInstanceState(Bundle out) {
+        if(adjustments!=null) adjustments.save(out);
         if(!television && !onDemand && getIntent().getExtras()!=null) out.putBundle("live_channel",new Bundle(getIntent().getExtras()));
         out.putLong("position",player==null?position:player.getCurrentPosition()); out.putBoolean("fullscreen",fullscreen); super.onSaveInstanceState(out);
     }
 }
+
 
 

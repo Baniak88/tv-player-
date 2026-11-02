@@ -15,17 +15,23 @@ public final class GuideRepository {
     private final XmltvStore xml;
     private final StreamGuideStore streamStore;
     private final ExecutorService streamWorker=Executors.newSingleThreadExecutor();
+    private final ExecutorService streamReaders=Executors.newFixedThreadPool(2);
     private final Map<String,Entry> streams=new LinkedHashMap<>();
     private final Map<String,Integer> observing=new HashMap<>();
     private final ExecutorService network=Executors.newFixedThreadPool(3);
+    private final ExecutorService interactive=Executors.newFixedThreadPool(2);
+    private final MetadataCache disk;
+    private record Schedule(List<Guide.Program> programs,String source,long saved) {}
     private final Handler ui=new Handler(Looper.getMainLooper());
     private final Map<String,Entry> cache=new LinkedHashMap<>();
     private final Map<String,List<Consumer<Data>>> pending=new HashMap<>();
-    private GuideRepository(Context context) { xml=new XmltvStore(context); streamStore=new StreamGuideStore(context); }
+    private GuideRepository(Context context) { xml=new XmltvStore(context); streamStore=new StreamGuideStore(context); disk=new MetadataCache(context,"epg-v1",200); }
     private String key(Channel channel,boolean full) { return channel.url()+"|"+channel.epgId()+"|"+channel.guideUrl()+"|"+full; }
     synchronized Data peek(Channel channel,boolean full) {
         Data stream=streamData(channel); if(stream!=null) return stream;
-        Entry entry=cache.get(key(channel,full)); return entry!=null && entry.until()>System.currentTimeMillis()?entry.data():null;
+        Entry entry=cache.get(key(channel,full));
+        if(!full && (entry==null || entry.until()<=System.currentTimeMillis())) entry=cache.get(key(channel,true));
+        return entry!=null && entry.until()>System.currentTimeMillis() && (entry.data().programs().isEmpty() || usable(entry.data().programs()))?entry.data():null;
     }
     private synchronized Data streamData(Channel channel) {
         Entry entry=streams.get(channel.url()); long now=System.currentTimeMillis()/1000;
@@ -49,14 +55,18 @@ public final class GuideRepository {
         streamWorker.execute(() -> { try { streamStore.save(channel,valid); } catch(RuntimeException ignored) { /* Playback must continue if disk storage is unavailable. */ } });
     }
     StreamGuideProbe requestStream(Channel channel,Consumer<Data> callback) {
+        return requestStream(channel,callback,true);
+    }
+    StreamGuideProbe requestObservedStream(Channel channel,Consumer<Data> callback) { return requestStream(channel,callback,false); }
+    private StreamGuideProbe requestStream(Channel channel,Consumer<Data> callback,boolean allowConnection) {
         StreamGuideProbe probe=new StreamGuideProbe();
-        streamWorker.execute(() -> {
+        streamReaders.execute(() -> {
             Data result=streamData(channel);
             try {
                 if(result==null) { List<Guide.Program> saved=streamStore.load(channel); if(!saved.isEmpty()) { acceptStream(channel,saved); result=streamData(channel); } }
-                if(result==null && isObserving(channel)) {
+                if(result==null && (!allowConnection || isObserving(channel))) {
                     long deadline=System.currentTimeMillis()+20000;
-                    while(!probe.cancelled() && System.currentTimeMillis()<deadline && (result=streamData(channel))==null) Thread.sleep(200);
+                    while(!probe.cancelled() && isObserving(channel) && System.currentTimeMillis()<deadline && (result=streamData(channel))==null) Thread.sleep(200);
                 } else if(result==null && !probe.cancelled()) {
                     List<Guide.Program> read=probe.read(channel); acceptStream(channel,read); result=streamData(channel);
                 }
@@ -76,7 +86,7 @@ public final class GuideRepository {
             List<Consumer<Data>> waiting=pending.get(key); if(waiting!=null) { waiting.add(callback); return; }
             waiting=new ArrayList<>(); waiting.add(callback); pending.put(key,waiting);
         }
-        network.execute(() -> {
+        (full?interactive:network).execute(() -> {
             Data loaded;
             try { loaded=load(channel,full); } catch(Exception e) { loaded=new Data(Collections.emptyList(),"","Nie można odczytać programu EPG. Sprawdź źródło i połączenie."); }
             final Data result=loaded;
@@ -95,27 +105,45 @@ public final class GuideRepository {
     private Data load(Channel channel,boolean full) {
         Data stream=streamData(channel); if(stream!=null) return stream;
         try { List<Guide.Program> saved=streamStore.load(channel); if(!saved.isEmpty()) { acceptStream(channel,saved); return streamData(channel); } } catch(RuntimeException ignored) {}
+        String diskKey="epg:"+key(channel,full); Schedule saved=null;
+        try { MetadataCache.Hit<Schedule> hit=disk.read(diskKey,Schedule.class); if(hit!=null && usable(hit.value().programs())) saved=hit.value(); }
+        catch(RuntimeException ignored) {}
+        if(saved!=null && System.currentTimeMillis()-saved.saved()<300000) return new Data(saved.programs(),saved.source(),"");
         List<Guide.Program> programs=Collections.emptyList(); String failure="";
         if(!channel.guideUrl().startsWith("xmltv:")) {
-            try { programs=source.guide(channel,full); } catch(java.io.IOException e) { failure="API programu jest niedostępne."; }
-            if(!programs.isEmpty() && programs.stream().anyMatch(p -> p.end()>System.currentTimeMillis()/1000)) return new Data(programs,"Xtream","");
+            try { programs=source.guide(channel,full); } catch(java.io.IOException e) { failure="API Xtream: "+safeFailure(e); }
+            if(usable(programs)) return persist(diskKey,programs,"Xtream");
         }
-        try {
-            okhttp3.HttpUrl url=Guide.xmltv(channel);
-            if(url!=null) {
+        LinkedHashSet<okhttp3.HttpUrl> feeds=new LinkedHashSet<>();
+        if(!channel.guideUrl().startsWith("xmltv:")) {
+            try { feeds.addAll(source.discoverGuides(channel)); } catch(java.io.IOException | IllegalArgumentException ignored) {}
+        }
+        try { okhttp3.HttpUrl url=Guide.xmltv(channel); if(url!=null) feeds.add(url); } catch(java.io.IOException | IllegalArgumentException ignored) {}
+        for(okhttp3.HttpUrl url:feeds) {
+            try {
                 List<Guide.Program> alternate=xml.load(channel,url);
-                if(!alternate.isEmpty()) {
+                if(usable(alternate)) {
                     if(full && !programs.isEmpty()) {
                         Map<Long,Guide.Program> combined=new TreeMap<>(); for(Guide.Program p:alternate) combined.put(p.start(),p); for(Guide.Program p:programs) combined.put(p.start(),p);
-                        return new Data(new ArrayList<>(combined.values()),"Xtream / XMLTV","");
+                        return persist(diskKey,new ArrayList<>(combined.values()),"Xtream / XMLTV");
                     }
-                    return new Data(alternate,"XMLTV","");
+                    return persist(diskKey,alternate,"XMLTV");
                 }
-                if(!programs.isEmpty()) return new Data(programs,"Xtream","");
-                return new Data(alternate,"XMLTV","Brak programu dopasowanego do tego kanału w XMLTV.");
-            }
-        } catch(java.io.IOException e) { failure="Nie udało się pobrać programu przez API ani XMLTV. Sprawdź połączenie lub adres EPG od dostawcy."; }
-        return new Data(programs,"",failure.isEmpty()?"Brak adresu EPG. Dodaj listę z tvg-id i x-tvg-url lub konto Xtream.":failure);
+                failure+=(failure.isEmpty()?"":"\n")+"XMLTV: brak aktualnego programu dopasowanego do kanału.";
+            } catch(java.io.IOException e) { failure+=(failure.isEmpty()?"":"\n")+"XMLTV: "+safeFailure(e); }
+        }
+        if(saved!=null) return new Data(saved.programs(),saved.source()+" · pamięć","");
+        return new Data(programs,"",failure.isEmpty()?"Nie znaleziono aktualnego programu w API ani w EPG dostawcy.":failure);
+    }
+    private static boolean usable(List<Guide.Program> programs) { return programs!=null && programs.stream().anyMatch(p -> p.end()>System.currentTimeMillis()/1000); }
+    private Data persist(String key,List<Guide.Program> programs,String sourceName) {
+        try { disk.write(key,new Schedule(programs,sourceName,System.currentTimeMillis())); } catch(RuntimeException ignored) {}
+        return new Data(programs,sourceName,"");
+    }
+    private static String safeFailure(java.io.IOException error) {
+        // Do not expose account URLs, query strings or credentials in dialogs.
+        String text=error.getMessage(); java.util.regex.Matcher code=java.util.regex.Pattern.compile("HTTP ([0-9]{3})").matcher(text==null?"":text);
+        return code.find()?"serwer zwrócił HTTP "+code.group(1)+".":error instanceof java.io.InterruptedIOException?"przekroczono czas odpowiedzi.":"brak poprawnej odpowiedzi serwera.";
     }
     static String summary(Data data,long now) {
         if(data==null) return "Wczytywanie EPG…";
@@ -130,4 +158,5 @@ public final class GuideRepository {
         return text.isEmpty()?"Brak aktualnego EPG · szczegóły pod EPG":text;
     }
 }
+
 

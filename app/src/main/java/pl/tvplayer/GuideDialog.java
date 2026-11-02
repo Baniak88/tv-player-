@@ -10,10 +10,25 @@ public final class GuideDialog {
         ProgressDialog waiting=new ProgressDialog(activity); waiting.setMessage("Pobieranie programu TV…"); waiting.setCancelable(true);
         waiting.setButton(android.content.DialogInterface.BUTTON_NEUTRAL,"Ze strumienia",(d,w) -> { waiting.dismiss(); openStream(activity,channel,play); });
         waiting.show();
-        repository.request(channel,true,data -> {
-            if(activity.isDestroyed() || !waiting.isShowing()) return; waiting.dismiss();
-            show(activity,channel,data,play);
-        });
+        final GuideRepository.Data[] results=new GuideRepository.Data[2];
+        final boolean[] done={false,!repository.isObserving(channel)};
+        final StreamGuideProbe[] probe={null};
+        waiting.setOnDismissListener(d -> { if(probe[0]!=null) probe[0].cancel(); });
+        java.util.function.BiConsumer<Integer,GuideRepository.Data> accept=(index,data) -> {
+            if(activity.isDestroyed() || activity.isFinishing() || !waiting.isShowing()) return;
+            results[index]=data; done[index]=true;
+            if(data.programs().stream().anyMatch(p -> p.end()>System.currentTimeMillis()/1000)) { waiting.dismiss(); show(activity,channel,data,play); return; }
+            if(done[0] && done[1]) {
+                waiting.dismiss(); GuideRepository.Data network=results[0];
+                if(network==null) network=data;
+                String error=network.error();
+                if(results[1]!=null && !results[1].error().isEmpty()) error+=(error.isEmpty()?"":"\n\n")+results[1].error();
+                show(activity,channel,new GuideRepository.Data(network.programs(),network.source(),error),play);
+            } else if(index==0) waiting.setMessage("Sprawdzanie EPG w oglądanym kanale…");
+        };
+        // Observe the existing playback connection in parallel; never open another stream here.
+        if(!done[1]) probe[0]=repository.requestObservedStream(channel,data -> accept.accept(1,data));
+        repository.request(channel,true,data -> accept.accept(0,data));
     }
     static void openStream(Activity activity,Channel channel,Consumer<Channel> play) {
         boolean playing=GuideRepository.get(activity).isObserving(channel);
@@ -59,4 +74,5 @@ public final class GuideDialog {
     }
     private static void info(Activity activity,String text) { new AlertDialog.Builder(activity).setTitle("Program TV").setMessage(text).setPositiveButton("Zamknij",null).show(); }
 }
+
 

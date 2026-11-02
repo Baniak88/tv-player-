@@ -20,7 +20,9 @@ final class MetadataCache {
     private static final int MAX_BYTES=4*1024*1024;
     record Hit<T>(T value,boolean fresh) {}
     private final File directory;
-    MetadataCache(Context context) { directory=new File(context.getCacheDir(),"details-v1"); }
+    private final int maxEntries;
+    MetadataCache(Context context) { this(context,"details-v1",40); }
+    MetadataCache(Context context,String folder,int maxEntries) { directory=new File(context.getCacheDir(),folder); this.maxEntries=maxEntries; }
     private File file(String source) throws Exception { byte[] hash=MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8)); StringBuilder name=new StringBuilder(64); for(byte b:hash) name.append(Character.forDigit((b&255)>>>4,16)).append(Character.forDigit(b&15,16)); return new File(directory,name+".enc"); }
     private javax.crypto.SecretKey key() throws Exception {
         KeyStore store=KeyStore.getInstance("AndroidKeyStore"); store.load(null);
@@ -42,7 +44,8 @@ final class MetadataCache {
             ByteArrayOutputStream zipped=new ByteArrayOutputStream(); try(OutputStream gzip=new GZIPOutputStream(zipped)) { gzip.write(plain); }
             Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE,key()); ByteArrayOutputStream encrypted=new ByteArrayOutputStream(); encrypted.write(cipher.getIV()); encrypted.write(cipher.doFinal(zipped.toByteArray()));
             if(!directory.isDirectory() && !directory.mkdirs()) return; AtomicFile target=new AtomicFile(file(source)); FileOutputStream output=target.startWrite(); try { output.write(encrypted.toByteArray()); target.finishWrite(output); } catch(Exception e) { target.failWrite(output); return; }
-            File[] files=directory.listFiles((dir,name) -> name.endsWith(".enc")); if(files==null) return; Arrays.sort(files,Comparator.comparingLong(File::lastModified).reversed()); long bytes=0; for(int i=0;i<files.length;i++) { bytes+=files[i].length(); if(i>=40 || bytes>16L*1024*1024) new AtomicFile(files[i]).delete(); }
+            File[] files=directory.listFiles((dir,name) -> name.endsWith(".enc")); if(files==null) return; Arrays.sort(files,Comparator.comparingLong(File::lastModified).reversed()); long bytes=0; for(int i=0;i<files.length;i++) { bytes+=files[i].length(); if(i>=maxEntries || bytes>16L*1024*1024) new AtomicFile(files[i]).delete(); }
         } catch(Exception ignored) { /* Metadata is optional; cache failures never block playback. */ } }
     }
 }
+

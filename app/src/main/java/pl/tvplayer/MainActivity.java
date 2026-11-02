@@ -318,10 +318,14 @@ public class MainActivity extends Activity {
             bindSchedule(detail,next,repository.peek(c,false)); row.setTag(c.url());
             java.lang.ref.WeakReference<TextView> target=new java.lang.ref.WeakReference<>(detail),following=new java.lang.ref.WeakReference<>(next);
             java.lang.ref.WeakReference<LinearLayout> holder=new java.lang.ref.WeakReference<>(row);
-            repository.request(c,false,data -> {
-                TextView view=target.get(),after=following.get(); LinearLayout owner=holder.get();
-                if(view!=null && after!=null && owner!=null && c.url().equals(owner.getTag())) bindSchedule(view,after,data);
-            });
+            row.postDelayed(() -> {
+                LinearLayout visible=holder.get(); android.graphics.Rect bounds=new android.graphics.Rect();
+                if(isDestroyed() || visible==null || !visible.isShown() || !c.url().equals(visible.getTag()) || !visible.getGlobalVisibleRect(bounds)) return;
+                repository.request(c,false,data -> {
+                    TextView view=target.get(),after=following.get(); LinearLayout owner=holder.get();
+                    if(view!=null && after!=null && owner!=null && c.url().equals(owner.getTag())) bindSchedule(view,after,data);
+                });
+            },180);
         } else { detail.setText(c.group()); next.setVisibility(View.GONE); }
         Button guide=(Button)header.getChildAt(2); guide.setVisibility(c.kind().equals("tv")?View.VISIBLE:View.GONE);
         guide.setContentDescription("Program TV i archiwum: "+c.name());
@@ -655,6 +659,7 @@ public class MainActivity extends Activity {
     @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); super.onPause(); }
     @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }
 }
+
 
 
 

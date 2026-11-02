@@ -23,7 +23,7 @@ public final class SourceClient {
     private interface ReaderTask<T> { T read(Reader reader) throws IOException; }
     private <T> T get(HttpUrl url, ReaderTask<T> task) throws IOException { return request(client,url,task); }
     private <T> T request(OkHttpClient http,HttpUrl url,ReaderTask<T> task) throws IOException {
-        try (Response response = http.newCall(new Request.Builder().url(url).header("User-Agent", "TVPlayer/0.3.0").build()).execute()) {
+        try (Response response = http.newCall(new Request.Builder().url(url).header("User-Agent", "TVPlayer/0.8.8").build()).execute()) {
             if (!response.isSuccessful() || response.body() == null)
                 throw new IOException("Serwer zwrócił błąd HTTP " + response.code() + ".");
             // Parse directly from the response: no size-based rejection or full-body copy.
@@ -194,15 +194,21 @@ public final class SourceClient {
     public List<Guide.Program> guide(Channel channel) throws IOException { return guide(channel,true); }
     List<Guide.Program> guide(Channel channel,boolean full) throws IOException {
         HttpUrl base=Guide.endpoint(channel); IOException failure=null; boolean responded=false;
+        Map<Long,Guide.Program> combined=new TreeMap<>(); long now=System.currentTimeMillis()/1000;
         for(String action:full?new String[]{"get_simple_data_table","get_short_epg"}:new String[]{"get_short_epg","get_simple_data_table"}) {
-            HttpUrl url=base.newBuilder().setQueryParameter("action",action).setQueryParameter("limit",full?"100":"4").build();
+            HttpUrl.Builder request=base.newBuilder().setQueryParameter("action",action).removeAllQueryParameters("limit");
+            if(action.equals("get_short_epg")) request.setQueryParameter("limit",full?"100":"4");
             try {
-                List<Guide.Program> items=request(guideClient,url,reader -> Guide.parse(reader,channel.timezone()));
-                responded=true; if(!items.isEmpty()) return items;
+                List<Guide.Program> items=request(guideClient,request.build(),reader -> Guide.parse(reader,channel.timezone()));
+                responded=true; for(Guide.Program item:items) combined.put(item.start(),item);
+                // Historical rows are not evidence that this endpoint provides current EPG.
+                if(items.stream().anyMatch(p -> p.end()>now)) return new ArrayList<>(combined.values());
             } catch(IOException e) { failure=e; }
         }
-        if(!responded && failure!=null) throw failure; return new ArrayList<>();
+        if(!responded && failure!=null) throw failure; return new ArrayList<>(combined.values());
     }
+    private final EpgDiscovery discovery=new EpgDiscovery();
+    List<HttpUrl> discoverGuides(Channel channel) throws IOException { return discovery.discover(channel); }
     private final OkHttpClient seriesClient=new OkHttpClient.Builder().connectionPool(TRANSPORT_POOL).connectTimeout(10,TimeUnit.SECONDS).readTimeout(20,TimeUnit.SECONDS).callTimeout(30,TimeUnit.SECONDS).build();
     public SeriesDetails seriesDetails(Channel series) throws IOException {
         return request(seriesClient,validate(series.url()),reader -> SeriesDetails.parse(reader,series));
@@ -246,4 +252,5 @@ public final class SourceClient {
         JsonElement e=o.get(name); return e!=null && e.isJsonPrimitive()?e.getAsString():fallback;
     }
 }
+
 

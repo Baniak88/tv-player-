@@ -15,6 +15,8 @@ import java.util.zip.GZIPInputStream;
 final class XmltvStore extends SQLiteOpenHelper {
     private final OkHttpClient client=new OkHttpClient.Builder().connectTimeout(12,TimeUnit.SECONDS).readTimeout(30,TimeUnit.SECONDS).callTimeout(3,TimeUnit.MINUTES).build();
     private final Map<String,Object> locks=new HashMap<>();
+    private final java.util.concurrent.ExecutorService refreshWorker=java.util.concurrent.Executors.newSingleThreadExecutor();
+    private final Set<String> refreshing=java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<String,Long> failures=new java.util.concurrent.ConcurrentHashMap<>();
     XmltvStore(Context context) { super(context,"epg-cache.db",null,1); setWriteAheadLoggingEnabled(true); }
     @Override public void onCreate(SQLiteDatabase db) {
@@ -38,11 +40,26 @@ final class XmltvStore extends SQLiteOpenHelper {
     List<Guide.Program> load(Channel channel,HttpUrl url) throws IOException {
         String source=key(url); Object lock;
         synchronized(locks) { lock=locks.computeIfAbsent(source,k -> new Object()); }
+        List<Guide.Program> saved=read(channel,source);
+        if(saved.stream().anyMatch(p -> p.end()>System.currentTimeMillis()/1000)) {
+            if(!fresh(source) && System.currentTimeMillis()>=failures.getOrDefault(source,0L) && refreshing.add(source)) refreshWorker.execute(() -> {
+                try { synchronized(lock) { refresh(source,url,channel.timezone()); failures.remove(source); } }
+                catch(IOException ignored) { failures.put(source,System.currentTimeMillis()+60000); }
+                finally { refreshing.remove(source); }
+            });
+            return saved;
+        }
         synchronized(lock) {
             if(System.currentTimeMillis()<failures.getOrDefault(source,0L)) throw new IOException("Źródło XMLTV jest chwilowo niedostępne.");
             try { refresh(source,url,channel.timezone()); failures.remove(source); }
             catch(IOException e) { failures.put(source,System.currentTimeMillis()+60000); throw e; }
         }
+        return read(channel,source);
+    }
+    private boolean fresh(String source) {
+        try(Cursor cursor=getReadableDatabase().rawQuery("SELECT updated FROM feeds WHERE source=?",new String[]{source})) { return cursor.moveToFirst() && System.currentTimeMillis()/1000-cursor.getLong(0)<3600; }
+    }
+    private List<Guide.Program> read(Channel channel,String source) {
         SQLiteDatabase db=getReadableDatabase(); String id=channel.epgId();
         if(id.isEmpty() || !hasPrograms(db,source,id)) {
             if(!id.isEmpty()) id=station(db,source,id);
@@ -77,6 +94,7 @@ final class XmltvStore extends SQLiteOpenHelper {
                     db.delete("programs","source=?",new String[]{source}); db.delete("stations","source=?",new String[]{source});
                     SQLiteStatement station=db.compileStatement("INSERT INTO stations(source,id,name) VALUES(?,?,?)");
                     SQLiteStatement program=db.compileStatement("INSERT INTO programs(source,channel,start,end,title,description) VALUES(?,?,?,?,?,?)");
+                    Set<String> identifiers=new HashSet<>();
                     try {
                         XmltvParser.parse(xml,timezone,new XmltvParser.Sink() {
                             public void channel(String id,String name) {
@@ -84,6 +102,7 @@ final class XmltvStore extends SQLiteOpenHelper {
                             }
                             public void program(String id,String title,String description,long start,long end) {
                                 if(start<now-86400 || start>now+3*86400) return;
+                                if(identifiers.add(id)) channel(id,id.replaceFirst("(?i)\\.[a-z]{2,3}$",""));
                                 program.clearBindings(); program.bindString(1,source); program.bindString(2,id); program.bindLong(3,start); program.bindLong(4,end);
                                 program.bindString(5,title); program.bindString(6,description); program.executeInsert();
                             }
@@ -98,3 +117,4 @@ final class XmltvStore extends SQLiteOpenHelper {
         } catch(RuntimeException e) { throw new IOException("Nie można zapisać programu XMLTV.",e); }
     }
 }
+
