@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p tv-smoke-output
-trap 'adb logcat -d -v brief -s AndroidRuntime TestRunner > tv-smoke-output/runtime.txt' EXIT
+cleanup() {
+  adb logcat -d -v brief -s AndroidRuntime TestRunner SeriesRemote > tv-smoke-output/runtime.txt
+  for name in tv-home tv-movies tv-bouquet series-television; do
+    adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png" || true
+  done
+}
+trap cleanup EXIT
 adb shell settings put system accelerometer_rotation 0
 adb shell wm size 720x1280
 adb shell wm density 160

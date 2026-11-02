@@ -13,6 +13,7 @@ final class WatchProgress {
     static Entry read(Context context,String url) { android.content.SharedPreferences p=context.getSharedPreferences("watch-progress",Context.MODE_PRIVATE); String k=key(url); return new Entry(p.getLong(k+"-position",0),p.getLong(k+"-duration",0),p.getLong(k+"-updated",0),p.getBoolean(k+"-completed",false)); }
     static void save(Context context,String url,long position,long duration,boolean completed) {
         if(position<5000 && duration<=0 && !completed) return;
+        if(duration<=0) duration=read(context,url).duration();
         String k=key(url); context.getSharedPreferences("watch-progress",Context.MODE_PRIVATE).edit().putLong(k+"-position",Math.max(0,position)).putLong(k+"-duration",Math.max(0,duration)).putLong(k+"-updated",System.currentTimeMillis()).putBoolean(k+"-completed",completed).apply();
     }
     static SeriesDetails.Episode next(Context context,List<SeriesDetails.Episode> episodes) {
