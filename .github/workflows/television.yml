@@ -58,7 +58,7 @@ jobs:
           import base64,json,pathlib
           for name in ['tv-home','tv-movies','tv-bouquet']:
               image=pathlib.Path('tv-smoke-output',name+'.png')
-              if image.exists():
+              if image.exists() and image.read_bytes().startswith(bytes([137,80,78,71,13,10,26,10])):
                   pathlib.Path('/tmp',name+'.json').write_text(json.dumps({'encoding':'base64','content':base64.b64encode(image.read_bytes()).decode()}))
           PY
           for name in tv-home tv-movies tv-bouquet; do
