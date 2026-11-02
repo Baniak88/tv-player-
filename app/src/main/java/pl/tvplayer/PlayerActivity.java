@@ -21,7 +21,7 @@ public class PlayerActivity extends Activity {
     private Button full;
     private String url, bookmark;
     private long position;
-    private boolean fullscreen=true, onDemand, resumed, enteringPip;
+    private boolean fullscreen=true, onDemand, resumed, enteringPip, television;
     private OrientationEventListener rotation;
     private int sensorOrientation=ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR;
     private LinearLayout toolbar;
@@ -44,6 +44,8 @@ public class PlayerActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }
+        television=getIntent().getBooleanExtra("television",false) || (getResources().getConfiguration().uiMode & Configuration.UI_MODE_TYPE_MASK)==Configuration.UI_MODE_TYPE_TELEVISION;
+        if(television) sensorOrientation=ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
         String kind=getIntent().getStringExtra("kind");
         onDemand=kind!=null?!kind.equals("tv"):!Channel.infer(url,"","").equals("tv");
         try {
@@ -64,6 +66,7 @@ public class PlayerActivity extends Activity {
         full=action("↙"); full.setContentDescription("Włącz lub wyłącz pełny ekran"); top.addView(full,new LinearLayout.LayoutParams(dp(46),dp(44)));
         full.setOnClickListener(v -> { fullscreen=!fullscreen; updateFullscreen(); });
         root.addView(top,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
+        if(television) { full.setVisibility(View.GONE); view.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener)(visibility -> { if(!isInPictureInPictureMode()) toolbar.setVisibility(visibility); })); }
         error=new LinearLayout(this); error.setOrientation(LinearLayout.VERTICAL); error.setGravity(Gravity.CENTER);
         error.setBackgroundColor(0xEE16171A); error.setPadding(dp(24),dp(20),dp(24),dp(20));
         message=new TextView(this); message.setTextColor(-1); message.setTextSize(17); error.addView(message);
@@ -72,7 +75,7 @@ public class PlayerActivity extends Activity {
         error.setVisibility(View.GONE); root.addView(error,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
         rotation=new OrientationEventListener(this,android.hardware.SensorManager.SENSOR_DELAY_NORMAL) {
             @Override public void onOrientationChanged(int angle) {
-                if(!resumed || !fullscreen || enteringPip || isInPictureInPictureMode()) return;
+                if(television || !resumed || !fullscreen || enteringPip || isInPictureInPictureMode()) return;
                 int requested=FullscreenRotation.requested(angle,sensorOrientation);
                 if(requested!=sensorOrientation) { sensorOrientation=requested; setRequestedOrientation(requested); }
             }
@@ -90,9 +93,10 @@ public class PlayerActivity extends Activity {
     }
     @Override public void onWindowFocusChanged(boolean hasFocus) { super.onWindowFocusChanged(hasFocus); if(hasFocus) restoreImmersive(); }
     private void updateFullscreen() {
+        if(television) { fullscreen=true; sensorOrientation=ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE; }
         if(enteringPip || isInPictureInPictureMode()) return;
         setRequestedOrientation(fullscreen?sensorOrientation:ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-        if(rotation!=null) { if(fullscreen && resumed && !enteringPip && !isInPictureInPictureMode()) rotation.enable(); else rotation.disable(); }
+        if(rotation!=null) { if(!television && fullscreen && resumed && !enteringPip && !isInPictureInPictureMode()) rotation.enable(); else rotation.disable(); }
         int flags=fullscreen?View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION:0;
         getWindow().getDecorView().setSystemUiVisibility(flags);
         FrameLayout.LayoutParams size=(FrameLayout.LayoutParams)view.getLayoutParams();
@@ -194,6 +198,13 @@ public class PlayerActivity extends Activity {
         player.setMediaItem(item.build()); player.seekTo(position); player.prepare(); player.play();
         if(onDemand && position>5000) Toast.makeText(this,"Wznawiam oglądanie. Od początku: Opcje.",Toast.LENGTH_LONG).show();
     }
+    @Override public boolean onKeyUp(int code,KeyEvent event) {
+        if(television && code==KeyEvent.KEYCODE_MENU) { showOptions(); return true; }
+        if(television && code==KeyEvent.KEYCODE_INFO && !onDemand) { openGuide(); return true; }
+        if(television && code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE && player!=null) { if(player.isPlaying()) player.pause(); else player.play(); return true; }
+        if(television && code==KeyEvent.KEYCODE_MEDIA_STOP) { finish(); return true; }
+        return super.onKeyUp(code,event);
+    }
     private void chooseTrack(int type) {
         if(player==null) return;
         List<String> labels=new ArrayList<>(); List<Runnable> actions=new ArrayList<>();
@@ -236,4 +247,3 @@ public class PlayerActivity extends Activity {
         out.putLong("position",player==null?position:player.getCurrentPosition()); out.putBoolean("fullscreen",fullscreen); super.onSaveInstanceState(out);
     }
 }
-

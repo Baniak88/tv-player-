@@ -137,6 +137,25 @@ public final class SourceClient {
         all.addAll(get(api(base,user,pass,"get_series"),reader -> readCatalog(reader,streamBase,user,pass,seriesCategories,"series")));
         return all;
     }
+    /** TV loads live TV first, and fetches the larger VOD catalogs only when selected. */
+    public List<Channel> xtreamSection(String server,String user,String pass,String section,java.util.function.Consumer<String> progress) throws Exception {
+        if(!Arrays.asList("tv","movie","series").contains(section)) throw new IllegalArgumentException("Nieprawidłowa sekcja.");
+        HttpUrl base=validate(server).newBuilder().query(null).fragment(null).build();
+        if(!base.encodedPath().endsWith("/")) base=base.newBuilder().addPathSegment("").build();
+        progress.accept("Sprawdzanie konta…");
+        JsonObject root=get(api(base,user,pass,null),reader -> JsonParser.parseReader(reader).getAsJsonObject());
+        JsonObject auth=root.has("user_info") && root.get("user_info").isJsonObject()?root.getAsJsonObject("user_info"):null;
+        if(auth==null || !"1".equals(field(auth,"auth","")) || (auth.has("status") && !"Active".equalsIgnoreCase(field(auth,"status","")))) throw new IOException("Logowanie odrzucone. Sprawdź dane i ważność konta.");
+        String prefix=section.equals("tv")?"live":section.equals("movie")?"vod":"series";
+        progress.accept("Pobieranie bukietów…");
+        Map<String,String> categories=get(api(base,user,pass,"get_"+prefix+"_categories"),SourceClient::readCategories);
+        progress.accept("Pobieranie katalogu…");
+        final HttpUrl address=base;
+        List<Channel> items=get(api(base,user,pass,section.equals("series")?"get_series":"get_"+prefix+"_streams"),reader -> readCatalog(reader,address,user,pass,categories,section));
+        String zone=root.has("server_info") && root.get("server_info").isJsonObject()?field(root.getAsJsonObject("server_info"),"timezone","UTC"):"UTC";
+        if(section.equals("tv")) for(int i=0;i<items.size();i++) items.set(i,items.get(i).withTimezone(zone));
+        return items;
+    }
     static HttpUrl accountEndpoint(Channel c) throws IOException {
         if(!c.guideUrl().isEmpty() && !c.guideUrl().startsWith("xmltv:")) return validate(c.guideUrl());
         HttpUrl url=validate(c.url());
