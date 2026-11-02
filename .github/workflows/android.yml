@@ -39,7 +39,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: TV-Player-Preview-0.8.5
+          name: TV-Player-Preview-0.8.6
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: TV-Player-Preview-0.8.5
+          name: TV-Player-Preview-0.8.6
           path: apk
       - name: Enable KVM
         run: |
@@ -78,14 +78,14 @@ jobs:
         run: |
           python3 - <<'PY'
           import base64, json, pathlib
-          for name in ['home-portrait','home-landscape','sport-bouquet','bouquets-grid','epg-channel-list','epg-program-dialog','epg-stream-list','epg-stream-dialog','series-details','series-season2','movie-details']:
+          for name in ['home-portrait','home-landscape','sport-bouquet','bouquets-grid','epg-channel-list','epg-program-dialog','epg-stream-list','epg-stream-dialog','series-details','series-season2','series-single-season','movie-details']:
               path=pathlib.Path('smoke-output',name+'.png')
               if not path.exists(): continue
               data=path.read_bytes()
               if not data.startswith(bytes([137,80,78,71,13,10,26,10])): continue
               pathlib.Path('/tmp',name+'.json').write_text(json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}))
           PY
-          for name in home-portrait home-landscape sport-bouquet bouquets-grid epg-channel-list epg-program-dialog epg-stream-list epg-stream-dialog series-details series-season2 movie-details; do
+          for name in home-portrait home-landscape sport-bouquet bouquets-grid epg-channel-list epg-program-dialog epg-stream-list epg-stream-dialog series-details series-season2 series-single-season movie-details; do
             if [ ! -f "/tmp/$name.json" ]; then continue; fi
             ref=$(gh api "repos/$GH_REPO/git/blobs" --input "/tmp/$name.json" --jq '.sha')
             echo "UI_PREVIEW $name $ref"
@@ -105,7 +105,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: TV-Player-Preview-0.8.5
+          name: TV-Player-Preview-0.8.6
           path: apk
       - name: Publish directly installable APK
         env:
@@ -113,9 +113,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/app-debug.apk TV-Player-0.8.5.apk
-          gh release view v0.8.5-preview >/dev/null 2>&1 || gh release create v0.8.5-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Preview 0.8.5" --notes "Pasek podczas oglądania TV na telefonie chowa się po 4 sekundach. Dotknięcie ekranu lub obrót telefonu pokazuje go ponownie i odnawia czas wyświetlania. Obsługa PiP i przycisków zachowana. Bezpośredni APK z podpisem aktualizacji."
-          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v0.8.5-preview" -f sha="$SOURCE_SHA" -F force=false >/dev/null
-          gh release upload v0.8.5-preview TV-Player-0.8.5.apk --clobber
+          cp apk/debug/app-debug.apk TV-Player-0.8.6.apk
+          gh release view v0.8.6-preview >/dev/null 2>&1 || gh release create v0.8.6-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Preview 0.8.6" --notes "Poprawiony wybór sezonu: pojedynczy sezon bez rozwijanego okna, spójny wybór przy kilku sezonach. Szybsze obrazy i przewijanie odcinków, szyfrowana pamięć opisów filmów i seriali oraz dopracowane paski i przyciski na telefonie. Bezpośredni APK z podpisem aktualizacji."
+          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v0.8.6-preview" -f sha="$SOURCE_SHA" -F force=false >/dev/null
+          gh release upload v0.8.6-preview TV-Player-0.8.6.apk --clobber
+
 
 

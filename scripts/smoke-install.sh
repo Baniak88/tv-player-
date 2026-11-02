@@ -43,10 +43,11 @@ done
 wait "$test_pid"
 test "$landscape_sent" = 1
 test "$portrait_sent" = 1
-for name in home-portrait home-landscape sport-bouquet bouquets-grid epg-channel-list epg-program-dialog epg-stream-list epg-stream-dialog series-details series-season2 movie-details; do
+for name in home-portrait home-landscape sport-bouquet bouquets-grid epg-channel-list epg-program-dialog epg-stream-list epg-stream-dialog series-details series-season2 series-single-season movie-details; do
   adb exec-out run-as pl.tvplayer.preview cat "files/$name.png" > "smoke-output/$name.png" || true
 done
 
-grep -q 'OK (16 tests)' smoke-output/navigation-test.txt
+grep -q 'OK (19 tests)' smoke-output/navigation-test.txt
+
 
 

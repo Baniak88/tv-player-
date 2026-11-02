@@ -13,6 +13,7 @@ import java.util.concurrent.*;
 
 public class MainActivity extends Activity {
     private static final int FILE_REQUEST = 41;
+    private static final java.util.regex.Pattern RECENT=java.util.regex.Pattern.compile(".*(ostatnio|nowo|nowości|nowosci|new|recent|latest|2026|2025).*",java.util.regex.Pattern.CASE_INSENSITIVE|java.util.regex.Pattern.UNICODE_CASE);
     private static final String ALL = "Wszystkie kategorie";
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final ExecutorService network = Executors.newFixedThreadPool(2);
@@ -83,7 +84,7 @@ public class MainActivity extends Activity {
         // Top bar: back · section switch · sort. No duplicated headings.
         LinearLayout top=new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(0,dp(wide?4:10),0,dp(10));
         Button home=Ui.button(this,"‹"); home.setTextSize(26); Ui.ghost(home,Ui.TEXT); home.setContentDescription("Wróć do ekranu głównego");
-        top.addView(home,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        top.addView(home,new LinearLayout.LayoutParams(dp(48),dp(48)));
         home.setOnClickListener(v -> { startActivity(new Intent(this,HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)); finish(); });
         LinearLayout tabs=new LinearLayout(this); tabs.setPadding(dp(3),dp(3),dp(3),dp(3)); tabs.setBackground(Ui.shape(this,Ui.SURFACE,12,Ui.BORDER));
         String[][] sections={{"tv","TV"},{"movie","Filmy"},{"series","Seriale"}};
@@ -97,20 +98,20 @@ public class MainActivity extends Activity {
                 for(java.util.Map.Entry<String,Button> item:sectionButtons.entrySet()) Ui.style(item.getValue(),item.getKey().equals(section));
                 updateSearchHint(); search.setText(""); if(loadedSections.contains(section)) refreshGroups(); else loadCachedSection(section); });
         }
-        LinearLayout.LayoutParams tabsSize=new LinearLayout.LayoutParams(0,dp(44),1); tabsSize.leftMargin=dp(4); tabsSize.rightMargin=dp(8);
+        LinearLayout.LayoutParams tabsSize=new LinearLayout.LayoutParams(0,dp(54),1); tabsSize.leftMargin=dp(4); tabsSize.rightMargin=dp(8);
         top.addView(tabs,tabsSize);
         sortButton=Ui.button(this,"⇅"); sortButton.setTextSize(20); Ui.ghost(sortButton,Ui.MUTED); sortButton.setContentDescription("Sortuj bukiety");
-        top.addView(sortButton,new LinearLayout.LayoutParams(dp(44),dp(44))); sortButton.setOnClickListener(v -> chooseSort());
+        top.addView(sortButton,new LinearLayout.LayoutParams(dp(48),dp(48))); sortButton.setOnClickListener(v -> chooseSort());
         root.addView(top);
         search=input("",false); updateSearchHint();
         LinearLayout.LayoutParams searchSize=new LinearLayout.LayoutParams(-1,dp(48));
-        if(wide) { searchSize=new LinearLayout.LayoutParams(dp(240),dp(44)); searchSize.leftMargin=dp(4); top.addView(search,top.getChildCount()-1,searchSize); }
+        if(wide) { searchSize=new LinearLayout.LayoutParams(dp(240),dp(48)); searchSize.leftMargin=dp(4); top.addView(search,top.getChildCount()-1,searchSize); }
         else root.addView(search,searchSize);
         // Breadcrumb shown only inside a bouquet or favourites; otherwise a quiet summary line.
         crumb=new LinearLayout(this); crumb.setGravity(Gravity.CENTER_VERTICAL); crumb.setPadding(0,dp(8),0,dp(4));
         Button up=Ui.button(this,"‹ Bukiety"); Ui.ghost(up,Ui.MUTED); up.setContentDescription("Wróć do listy bukietów");
         up.setOnClickListener(v -> backToBouquets());
-        crumb.addView(up,new LinearLayout.LayoutParams(-2,dp(40)));
+        crumb.addView(up,new LinearLayout.LayoutParams(-2,dp(48)));
         crumbTitle=Ui.text(this,"",17,Ui.TEXT); crumbTitle.setTypeface(null,Typeface.BOLD); crumbTitle.setMaxLines(1); crumbTitle.setEllipsize(TextUtils.TruncateAt.END);
         crumbTitle.setPadding(dp(4),0,0,0); crumb.addView(crumbTitle,new LinearLayout.LayoutParams(0,-2,1));
         root.addView(crumb);
@@ -131,12 +132,12 @@ public class MainActivity extends Activity {
         content.addView(bouquets,new FrameLayout.LayoutParams(-1,-1)); buildVodViews(content,wide); root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout dock=new LinearLayout(this); dock.setPadding(dp(3),dp(3),dp(3),dp(3)); dock.setBackground(Ui.shape(this,Ui.SURFACE,14,Ui.BORDER));
         libraryButton=Ui.button(this,"Bukiety"); favoriteButton=Ui.button(this,"☆ Ulubione");
-        dock.addView(libraryButton,new LinearLayout.LayoutParams(0,dp(42),1)); dock.addView(favoriteButton,new LinearLayout.LayoutParams(0,dp(42),1));
+        dock.addView(libraryButton,new LinearLayout.LayoutParams(0,dp(48),1)); dock.addView(favoriteButton,new LinearLayout.LayoutParams(0,dp(48),1));
         Ui.style(libraryButton,!onlyFavorites); Ui.style(favoriteButton,onlyFavorites);
         libraryButton.setOnClickListener(v -> backToBouquets());
         favoriteButton.setOnClickListener(v -> { onlyFavorites=true; showingBouquets=false; selectedGroup=ALL; Ui.style(libraryButton,false); Ui.style(favoriteButton,true); filter(true); });
         LinearLayout.LayoutParams dockSize=new LinearLayout.LayoutParams(-1,-2); dockSize.topMargin=dp(8); dockSize.bottomMargin=dp(12);
-        if(wide) { dock.removeView(favoriteButton); favoriteButton.setText("☆"); favoriteButton.setTextSize(20); favoriteButton.setContentDescription("Ulubione"); top.addView(favoriteButton,new LinearLayout.LayoutParams(dp(44),dp(44))); }
+        if(wide) { dock.removeView(favoriteButton); favoriteButton.setText("☆"); favoriteButton.setTextSize(20); favoriteButton.setContentDescription("Ulubione"); top.addView(favoriteButton,new LinearLayout.LayoutParams(dp(48),dp(48))); }
         else root.addView(dock,dockSize);
         rows=new BaseAdapter() {
             public int getCount() { return shown.size(); }
@@ -187,9 +188,10 @@ public class MainActivity extends Activity {
             try {
                 Set<String> savedFavorites=new HashSet<>();
                 List<Channel> loaded=store.loadSection(requested,savedFavorites);
+                String[] normalized=new String[loaded.size()]; for(int i=0;i<loaded.size();i++) normalized[i]=loaded.get(i).name().toLowerCase(Locale.ROOT);
                 runOnUiThread(() -> {
                     if(isDestroyed()) return;
-                    channels.removeIf(c -> c.section().equals(requested)); channels.addAll(loaded); putSection(requested,loaded);
+                    channels.removeIf(c -> c.section().equals(requested)); channels.addAll(loaded); sectionIndex.put(requested,loaded); searchKeys.put(requested,normalized);
                     if(loadedSections.isEmpty()) { favorites.clear(); favorites.addAll(savedFavorites); }
                     loadedSections.add(requested); busy=false; refreshGroups();
                     if(loaded.stream().anyMatch(c -> c.bouquetOrder()==Integer.MAX_VALUE)) syncOrder(requested,false);
@@ -296,8 +298,8 @@ public class MainActivity extends Activity {
             header.addView(badge,new LinearLayout.LayoutParams(dp(46),dp(40)));
             TextView name=Ui.text(this,"",15,Ui.TEXT); name.setMaxLines(2); name.setEllipsize(TextUtils.TruncateAt.END); name.setPadding(dp(10),0,dp(4),0);
             header.addView(name,new LinearLayout.LayoutParams(0,-2,1));
-            Button guide=Ui.button(this,"EPG"); guide.setFocusable(false); guide.setTextSize(12); Ui.ghost(guide,Ui.MUTED); guide.setPadding(0,0,0,0); guide.setSingleLine(true); header.addView(guide,new LinearLayout.LayoutParams(dp(44),dp(44)));
-            Button star=Ui.button(this,"☆"); star.setFocusable(false); star.setTextSize(20); Ui.ghost(star,Ui.FAINT); header.addView(star,new LinearLayout.LayoutParams(dp(40),dp(44)));
+            Button guide=Ui.button(this,"EPG"); guide.setFocusable(false); guide.setTextSize(12); Ui.ghost(guide,Ui.MUTED); guide.setPadding(0,0,0,0); guide.setSingleLine(true); header.addView(guide,new LinearLayout.LayoutParams(dp(48),dp(48)));
+            Button star=Ui.button(this,"☆"); star.setFocusable(false); star.setTextSize(20); Ui.ghost(star,Ui.FAINT); header.addView(star,new LinearLayout.LayoutParams(dp(40),dp(48)));
             row.addView(header,new LinearLayout.LayoutParams(-1,-2));
             LinearLayout schedule=column(); schedule.setPadding(0,dp(6),dp(4),0);
             TextView now=Ui.text(this,"",13,Ui.MUTED); now.setMaxLines(2); now.setEllipsize(TextUtils.TruncateAt.END); schedule.addView(now);
@@ -372,6 +374,7 @@ public class MainActivity extends Activity {
         boolean vod=vod();
         status.setVisibility(busy || total==0 || (grid && vod)?View.GONE:View.VISIBLE);
         sortButton.setVisibility(grid?View.VISIBLE:View.INVISIBLE);
+        if(heroItem!=null) heroSave.setText(favorites.contains(heroItem.url())?"✓  Moja lista":"＋  Moja lista");
         bouquets.setVisibility(grid && !busy && total>0 && !vod?View.VISIBLE:View.GONE);
         shelves.setVisibility(grid && !busy && total>0 && vod?View.VISIBLE:View.GONE);
         show(list,rows,!grid && !busy && !shown.isEmpty() && !vod);
@@ -406,10 +409,10 @@ public class MainActivity extends Activity {
         heroPlay=Ui.button(this,"▶  Odtwórz"); Ui.primary(heroPlay); heroPlay.setTextSize(15);
         hero.setOnClickListener(v -> { if(heroItem!=null) open(heroItem); });
         heroPlay.setOnClickListener(v -> { if(heroItem!=null) { if(heroItem.kind().equals("series")) openSeries(heroItem); else play(heroItem); } });
-        heroButtons.addView(heroPlay,new LinearLayout.LayoutParams(0,dp(44),1));
+        heroButtons.addView(heroPlay,new LinearLayout.LayoutParams(0,dp(48),1));
         heroSave=Ui.button(this,"＋  Moja lista"); heroSave.setTextColor(Ui.TEXT); heroSave.setBackground(Ui.touch(this,0x33FFFFFF,12,0));
         heroSave.setOnClickListener(v -> { if(heroItem!=null) { toggleFavorite(heroItem); bindHero(); } });
-        LinearLayout.LayoutParams saveSize=new LinearLayout.LayoutParams(0,dp(44),1); saveSize.leftMargin=dp(10); heroButtons.addView(heroSave,saveSize);
+        LinearLayout.LayoutParams saveSize=new LinearLayout.LayoutParams(0,dp(48),1); saveSize.leftMargin=dp(10); heroButtons.addView(heroSave,saveSize);
         heroText.addView(heroButtons);
         hero.addView(heroText,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
         header.addView(hero,new LinearLayout.LayoutParams(-1,dp(wide?220:300)));
@@ -455,13 +458,13 @@ public class MainActivity extends Activity {
     private void open(Channel c) { if(c.kind().equals("series")) openSeries(c); else if(c.kind().equals("movie")) openMovie(c); else play(c); }
     private void prepareShelves(List<Channel> items) {
         shelfItems.clear();
-        for(Channel c:items) { List<Channel> row=shelfItems.computeIfAbsent(c.group(),key -> new ArrayList<>()); if(row.size()<24) row.add(c); }
+        for(Channel c:items) { List<Channel> row=shelfItems.computeIfAbsent(c.group(),key -> new ArrayList<>()); if(row.size()<12) row.add(c); }
         shelfNames=new ArrayList<>(bouquetCounts.keySet());
         heroItem=null;
         if(hasCovers(items)) {
             // Prefer a "recently added" style bouquet, otherwise the first one with artwork.
             List<String> order=new ArrayList<>(shelfNames);
-            order.sort(Comparator.comparingInt(name -> name.toLowerCase(Locale.ROOT).matches(".*(ostatnio|nowo|nowości|nowosci|new|recent|latest|2026|2025).*")?0:1));
+            order.sort(Comparator.comparingInt(name -> RECENT.matcher(name).matches()?0:1));
             for(String name:order) { for(Channel c:shelfItems.get(name)) if(!c.logo().isEmpty()) { heroItem=c; break; } if(heroItem!=null) break; }
         }
         bindHero();
@@ -481,7 +484,7 @@ public class MainActivity extends Activity {
         if(reused instanceof LinearLayout) row=(LinearLayout)reused;
         else {
             row=column(); row.setPadding(0,dp(10),0,dp(6));
-            LinearLayout head=new LinearLayout(this); head.setGravity(Gravity.CENTER_VERTICAL); head.setPadding(dp(2),0,dp(2),dp(8));
+            LinearLayout head=new LinearLayout(this); head.setMinimumHeight(dp(48)); head.setBackground(Ui.touch(this,Ui.BG,10,0)); head.setGravity(Gravity.CENTER_VERTICAL); head.setPadding(dp(2),0,dp(2),dp(8));
             TextView title=Ui.text(this,"",16,Ui.TEXT); title.setTypeface(null,Typeface.BOLD); title.setMaxLines(1); title.setEllipsize(TextUtils.TruncateAt.END);
             head.addView(title,new LinearLayout.LayoutParams(0,-2,1));
             TextView more=Ui.text(this,"",12,Ui.MUTED); head.addView(more);
@@ -650,4 +653,5 @@ public class MainActivity extends Activity {
     @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); super.onPause(); }
     @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }
 }
+
 

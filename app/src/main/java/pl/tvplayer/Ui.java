@@ -2,6 +2,9 @@ package pl.tvplayer;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.content.res.ColorStateList;
+import android.view.Gravity;
+import android.widget.LinearLayout;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
@@ -43,29 +46,36 @@ final class Ui {
 
     static Button button(Context c, String label) {
         Button b = new Button(c); b.setText(label); b.setTextSize(14); b.setAllCaps(false); b.setStateListAnimator(null);
-        b.setMinWidth(0); b.setMinimumWidth(0); b.setMinHeight(dp(c, 40)); b.setMinimumHeight(dp(c, 40));
+        b.setMinWidth(0); b.setMinimumWidth(0); b.setMinHeight(dp(c, 48)); b.setMinimumHeight(dp(c, 48));
         b.setPadding(dp(c, 12), 0, dp(c, 12), 0); style(b, false); return b;
     }
 
     /** Selected = light pill with dark text; otherwise quiet text on the surface. */
     static void style(Button b, boolean selected) {
         Context c = b.getContext();
-        b.setTextColor(selected ? ON_ACCENT : MUTED);
+        b.setTextColor(buttonColors(selected ? ON_ACCENT : MUTED));
         b.setTypeface(null, selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
         b.setBackground(touch(c, selected ? ACCENT : 0x00000000, 10, 0));
     }
 
     static void primary(Button b) {
-        b.setTextColor(ON_ACCENT); b.setTypeface(null, android.graphics.Typeface.BOLD);
+        b.setTextColor(buttonColors(ON_ACCENT)); b.setTypeface(null, android.graphics.Typeface.BOLD);
         b.setBackground(touch(b.getContext(), ACCENT, 12, 0));
     }
 
     static void ghost(Button b, int textColor) {
-        b.setTextColor(textColor); b.setTypeface(null, android.graphics.Typeface.NORMAL);
+        b.setTextColor(buttonColors(textColor)); b.setTypeface(null, android.graphics.Typeface.NORMAL);
         b.setBackground(touch(b.getContext(), 0x00000000, 10, 0));
     }
 
+    private static ColorStateList buttonColors(int enabled) { return new ColorStateList(new int[][]{new int[]{-android.R.attr.state_enabled},new int[]{}},new int[]{FAINT,enabled}); }
+    static LinearLayout detailBar(Context context,String section,Runnable back) {
+        LinearLayout bar=new LinearLayout(context); bar.setGravity(Gravity.CENTER_VERTICAL); bar.setPadding(dp(context,8),dp(context,2),dp(context,16),dp(context,2)); bar.setBackgroundColor(BG); bar.setClickable(true);
+        Button arrow=button(context,"‹"); arrow.setTextSize(30); ghost(arrow,TEXT); arrow.setContentDescription(section.equals("Seriale")?"Wróć do seriali":"Wróć do filmów"); arrow.setOnClickListener(v -> back.run()); bar.addView(arrow,new LinearLayout.LayoutParams(dp(context,48),dp(context,48)));
+        TextView title=text(context,section,16,TEXT); bar.addView(title,new LinearLayout.LayoutParams(0,-2,1)); TextView brand=text(context,"TV PLAYER",11,MUTED); brand.setLetterSpacing(.06f); bar.addView(brand); return bar;
+    }
     static String count(int n) {
         return String.format(new java.util.Locale("pl", "PL"), "%,d", n).replace(',', ' ').replace('.', ' ');
     }
 }
+

@@ -15,6 +15,7 @@ public final class HomeActivity extends Activity {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private List<Channel> tv=new ArrayList<>();
     private boolean loadingAccount;
+    private static final java.util.concurrent.atomic.AtomicBoolean PRELOADING=new java.util.concurrent.atomic.AtomicBoolean();
     private int dp(int n) { return (int)(n*getResources().getDisplayMetrics().density); }
     private int scaled(int n) { return dp(Math.round(n*Math.max(1f,getResources().getConfiguration().fontScale))); }
     private LinearLayout column() { LinearLayout l=new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
@@ -44,11 +45,12 @@ public final class HomeActivity extends Activity {
     @Override public void onCreate(Bundle state) { super.onCreate(state); build(); preload(); }
     /** Decrypts the library in the background so TV, films and series open instantly. */
     private void preload() {
+        if(!PRELOADING.compareAndSet(false,true)) return;
         Context app=getApplicationContext();
         new Thread(() -> {
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
             LibraryStore store=new LibraryStore(app);
-            for(String section:new String[]{"tv","movie","series"}) store.warm(section);
+            try { for(String section:new String[]{"tv","movie","series"}) store.warm(section); } finally { PRELOADING.set(false); }
         },"library-preload").start();
     }
     private void open(String section,String group,boolean source) {
@@ -174,3 +176,4 @@ public final class HomeActivity extends Activity {
         private void play(Canvas canvas,float x,float y,float size) { Path p=new Path(); p.moveTo(x,y); p.lineTo(x+size,y+size/2); p.lineTo(x,y+size); p.close(); canvas.drawPath(p,paint); }
     }
 }
+

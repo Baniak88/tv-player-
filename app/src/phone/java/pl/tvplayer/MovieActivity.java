@@ -16,7 +16,7 @@ import java.util.concurrent.*;
 public final class MovieActivity extends Activity {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final ExecutorService network=Executors.newSingleThreadExecutor();
-    private final MovieRepository repository=new MovieRepository();
+    private MovieRepository repository;
     private final Set<String> favorites=new HashSet<>();
     private Channel source;
     private MovieDetails details;
@@ -31,12 +31,13 @@ public final class MovieActivity extends Activity {
     private LinearLayout column() { LinearLayout v=new LinearLayout(this); v.setOrientation(LinearLayout.VERTICAL); return v; }
     private TextView text(String s,int size,int color) { return Ui.text(this,s,size,color); }
     @Override public void onCreate(Bundle state) {
-        super.onCreate(state); String url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }
+        super.onCreate(state); repository=new MovieRepository(this); String url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }
         source=new Channel(getIntent().getStringExtra("name"),url,getIntent().getStringExtra("group"),"","movie").withLogo(getIntent().getStringExtra("logo")); details=MovieDetails.fallback(source); loading=MovieDetails.endpoint(source)!=null;
         if(state!=null) restoredScroll=state.getInt("scroll");
         scroll=new ScrollView(this); scroll.setBackgroundColor(Ui.BG); scroll.setFillViewport(true); scroll.setClipToPadding(false);
-        scroll.setOnApplyWindowInsetsListener((v,insets) -> { v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()+dp(20)); return insets.consumeSystemWindowInsets(); });
-        content=column(); scroll.addView(content,new ScrollView.LayoutParams(-1,-2)); setContentView(scroll); render(); load();
+        
+        content=column(); scroll.addView(content,new ScrollView.LayoutParams(-1,-2));
+        FrameLayout page=new FrameLayout(this); page.setBackgroundColor(Ui.BG); page.setOnApplyWindowInsetsListener((v,insets) -> { v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets(); }); scroll.setPadding(0,0,0,dp(20)); page.addView(scroll,new FrameLayout.LayoutParams(-1,-1)); page.addView(Ui.detailBar(this,"Filmy",this::finish),new FrameLayout.LayoutParams(-1,dp(52),Gravity.TOP)); setContentView(page); render(); load();
     }
     private void load() {
         worker.execute(() -> {
@@ -49,13 +50,13 @@ public final class MovieActivity extends Activity {
         });
     }
     private void render() {
-        int y=Math.max(restoredScroll,scroll.getScrollY()); restoredScroll=0; content.removeAllViews();
+        int y=Math.max(restoredScroll,scroll.getScrollY()); restoredScroll=0; content.removeAllViews(); if(details.cover().isEmpty() && details.backdrop().isEmpty()) content.addView(new View(this),new LinearLayout.LayoutParams(-1,dp(52)));
         int width=getResources().getDisplayMetrics().widthPixels,heroHeight=Math.min(dp(300),Math.max(dp(180),width*9/16));
         FrameLayout hero=new FrameLayout(this); hero.setBackgroundColor(Ui.SURFACE);
         ImageView artwork=new ImageView(this); artwork.setScaleType(details.backdrop().isEmpty()?ImageView.ScaleType.FIT_CENTER:ImageView.ScaleType.CENTER_CROP); hero.addView(artwork,new FrameLayout.LayoutParams(-1,-1)); ImageLoader.get(this).load(details.backdrop().isEmpty()?details.cover():details.backdrop(),artwork,width,heroHeight);
         View shade=new View(this); shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x440E0F11,0x110E0F11,Ui.BG})); hero.addView(shade,new FrameLayout.LayoutParams(-1,-1));
-        Button back=Ui.button(this,"‹"); back.setTextSize(30); back.setTextColor(Ui.TEXT); back.setContentDescription("Wróć do filmów"); back.setOnClickListener(v -> finish()); FrameLayout.LayoutParams backSize=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT); backSize.leftMargin=dp(12); backSize.topMargin=dp(10); hero.addView(back,backSize);
-        TextView brand=text("TV PLAYER",12,Ui.MUTED); brand.setTypeface(null,Typeface.BOLD); FrameLayout.LayoutParams brandSize=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT); brandSize.topMargin=dp(26); brandSize.rightMargin=dp(20); hero.addView(brand,brandSize); content.addView(hero,new LinearLayout.LayoutParams(-1,heroHeight));
+        Button back=Ui.button(this,"‹"); back.setVisibility(View.GONE); back.setTextSize(30); back.setTextColor(Ui.TEXT); back.setContentDescription("Wróć do filmów"); back.setOnClickListener(v -> finish()); FrameLayout.LayoutParams backSize=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT); backSize.leftMargin=dp(12); backSize.topMargin=dp(10); hero.addView(back,backSize);
+        TextView brand=text("TV PLAYER",12,Ui.MUTED); brand.setVisibility(View.GONE); brand.setTypeface(null,Typeface.BOLD); FrameLayout.LayoutParams brandSize=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT); brandSize.topMargin=dp(26); brandSize.rightMargin=dp(20); hero.addView(brand,brandSize); if(!details.cover().isEmpty() || !details.backdrop().isEmpty()) content.addView(hero,new LinearLayout.LayoutParams(-1,heroHeight));
         LinearLayout copy=column(); copy.setPadding(dp(20),dp(4),dp(20),dp(24)); content.addView(copy,new LinearLayout.LayoutParams(-1,-2));
         TextView title=text(details.title(),28,Ui.TEXT); title.setTypeface(null,Typeface.BOLD); copy.addView(title);
         List<String> meta=new ArrayList<>(); if(!details.year().isEmpty()) meta.add(details.year()); if(details.durationSeconds()>0) meta.add(duration(details.durationSeconds())); if(!details.rating().isEmpty() && !details.rating().equals("0")) meta.add("★ "+details.rating());
@@ -66,7 +67,7 @@ public final class MovieActivity extends Activity {
         LinearLayout actions=new LinearLayout(this); actions.setPadding(0,dp(8),0,0); star=Ui.button(this,"+  Moja lista"); star.setTextColor(Ui.TEXT); star.setOnClickListener(v -> favorite()); actions.addView(star,new LinearLayout.LayoutParams(0,dp(48),1)); restart=Ui.button(this,"Od początku"); restart.setTextColor(Ui.TEXT); restart.setOnClickListener(v -> playback(true)); actions.addView(restart,new LinearLayout.LayoutParams(0,dp(48),1)); copy.addView(actions);
         if(loading) { LinearLayout status=new LinearLayout(this); status.setGravity(Gravity.CENTER_VERTICAL); status.setPadding(0,dp(18),0,0); ProgressBar spinner=new ProgressBar(this); status.addView(spinner,new LinearLayout.LayoutParams(dp(22),dp(22))); TextView label=text("Pobieranie opisu…",14,Ui.MUTED); label.setPadding(dp(10),0,0,0); status.addView(label); copy.addView(status); }
         TextView synopsis=text(details.overview().isEmpty()?(loading?"":failed?"Nie udało się pobrać opisu. Film możesz odtworzyć bez tych danych.":"Opis nie został udostępniony przez dostawcę."):details.overview(),16,Ui.TEXT); synopsis.setLineSpacing(dp(4),1); synopsis.setPadding(0,dp(20),0,0); copy.addView(synopsis);
-        if(failed) { Button retry=Ui.button(this,"Ponów pobieranie opisu"); retry.setTextColor(Ui.TEXT); retry.setOnClickListener(v -> { loading=true; failed=false; render(); load(); }); LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-2,dp(44)); size.topMargin=dp(10); copy.addView(retry,size); }
+        if(failed) { Button retry=Ui.button(this,"Ponów pobieranie opisu"); retry.setTextColor(Ui.TEXT); retry.setOnClickListener(v -> { loading=true; failed=false; render(); load(); }); LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-2,dp(48)); size.topMargin=dp(10); copy.addView(retry,size); }
         detail(copy,"Gatunek",details.genre()); detail(copy,"Reżyseria",details.director()); detail(copy,"Obsada",details.cast());
         updateProgress(); scroll.post(() -> scroll.scrollTo(0,y));
     }
@@ -80,7 +81,7 @@ public final class MovieActivity extends Activity {
     private void updateProgress() {
         if(play==null) return; WatchProgress.Entry entry=position(); boolean continuing=entry.position()>=5000 && !entry.completed(); long duration=entry.duration()>0?entry.duration():details.durationSeconds()*1000;
         play.setText(entry.completed()?"▶  Odtwórz ponownie":continuing?"▶  Kontynuuj":"▶  Odtwórz"); restart.setVisibility(continuing?View.VISIBLE:View.GONE);
-        star.setText(favorites.contains(source.url())?"✓  Moja lista":"+  Moja lista"); star.setEnabled(favoritesReady);
+        star.setText(favorites.contains(source.url())?"✓  Moja lista":"+  Moja lista"); star.setEnabled(favoritesReady); star.setAlpha(favoritesReady?1f:.45f);
         boolean show=duration>0 && (continuing || entry.completed()); progress.setVisibility(show?View.VISIBLE:View.GONE); if(show) progress.setProgress(entry.completed()?1000:(int)Math.min(1000,entry.position()*1000/duration));
         progressText.setVisibility(continuing || entry.completed()?View.VISIBLE:View.GONE); progressText.setText(entry.completed()?"Obejrzano":duration>entry.position()?"Pozostało "+duration((duration-entry.position())/1000):"Oglądanie w trakcie");
     }
@@ -90,3 +91,4 @@ public final class MovieActivity extends Activity {
     @Override protected void onSaveInstanceState(Bundle state) { state.putInt("scroll",scroll.getScrollY()); super.onSaveInstanceState(state); }
     @Override protected void onDestroy() { repository.cancel(); network.shutdownNow(); worker.shutdown(); super.onDestroy(); }
 }
+

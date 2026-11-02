@@ -9,10 +9,11 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public final class SourceClient {
-    private final OkHttpClient client = new OkHttpClient.Builder()
+    static final ConnectionPool TRANSPORT_POOL=new ConnectionPool(8,5,TimeUnit.MINUTES);
+    private final OkHttpClient client = new OkHttpClient.Builder().connectionPool(TRANSPORT_POOL)
             .connectTimeout(20, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS)
             .callTimeout(5, TimeUnit.MINUTES).build();
-    private final OkHttpClient guideClient=new OkHttpClient.Builder().connectTimeout(10,TimeUnit.SECONDS).readTimeout(15,TimeUnit.SECONDS).callTimeout(12,TimeUnit.SECONDS).build();
+    private final OkHttpClient guideClient=new OkHttpClient.Builder().connectionPool(TRANSPORT_POOL).connectTimeout(10,TimeUnit.SECONDS).readTimeout(15,TimeUnit.SECONDS).callTimeout(12,TimeUnit.SECONDS).build();
     public static HttpUrl validate(String value) {
         HttpUrl url = HttpUrl.parse(value.trim());
         if (url == null || !url.username().isEmpty() || !url.password().isEmpty())
@@ -202,7 +203,7 @@ public final class SourceClient {
         }
         if(!responded && failure!=null) throw failure; return new ArrayList<>();
     }
-    private final OkHttpClient seriesClient=new OkHttpClient.Builder().connectTimeout(10,TimeUnit.SECONDS).readTimeout(20,TimeUnit.SECONDS).callTimeout(30,TimeUnit.SECONDS).build();
+    private final OkHttpClient seriesClient=new OkHttpClient.Builder().connectionPool(TRANSPORT_POOL).connectTimeout(10,TimeUnit.SECONDS).readTimeout(20,TimeUnit.SECONDS).callTimeout(30,TimeUnit.SECONDS).build();
     public SeriesDetails seriesDetails(Channel series) throws IOException {
         return request(seriesClient,validate(series.url()),reader -> SeriesDetails.parse(reader,series));
     }
@@ -245,3 +246,4 @@ public final class SourceClient {
         JsonElement e=o.get(name); return e!=null && e.isJsonPrimitive()?e.getAsString():fallback;
     }
 }
+
