@@ -6,8 +6,7 @@ adb install apk/debug/app-debug.apk
 adb shell am start -W -n pl.tvplayer.preview/pl.tvplayer.HomeActivity
 sleep 5
 for attempt in {1..10}; do
-  adb shell uiautomator dump /sdcard/window.xml
-  adb pull /sdcard/window.xml smoke-output/library.xml
+  if ! adb shell uiautomator dump /sdcard/window.xml || ! adb pull /sdcard/window.xml smoke-output/library.xml; then sleep 2; continue; fi
   if grep -q 'Telewizja na żywo' smoke-output/library.xml; then break; fi
   sleep 2
 done
@@ -44,8 +43,9 @@ done
 wait "$test_pid"
 test "$landscape_sent" = 1
 test "$portrait_sent" = 1
-for name in home-portrait home-landscape sport-bouquet bouquets-grid epg-channel-list epg-program-dialog epg-stream-list epg-stream-dialog series-details series-season2; do
+for name in home-portrait home-landscape sport-bouquet bouquets-grid epg-channel-list epg-program-dialog epg-stream-list epg-stream-dialog series-details series-season2 movie-details; do
   adb exec-out run-as pl.tvplayer.preview cat "files/$name.png" > "smoke-output/$name.png" || true
 done
 
-grep -q 'OK (11 tests)' smoke-output/navigation-test.txt
+grep -q 'OK (15 tests)' smoke-output/navigation-test.txt
+

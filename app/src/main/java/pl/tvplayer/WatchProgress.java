@@ -16,6 +16,11 @@ final class WatchProgress {
         if(duration<=0) duration=read(context,url).duration();
         String k=key(url); context.getSharedPreferences("watch-progress",Context.MODE_PRIVATE).edit().putLong(k+"-position",Math.max(0,position)).putLong(k+"-duration",Math.max(0,duration)).putLong(k+"-updated",System.currentTimeMillis()).putBoolean(k+"-completed",completed).apply();
     }
+    /** Explicit replay keeps a zero bookmark even when the stream duration is still unknown. */
+    static void restart(Context context,String url) {
+        Entry entry=read(context,url); String k=key(url);
+        context.getSharedPreferences("watch-progress",Context.MODE_PRIVATE).edit().putLong(k+"-position",0).putLong(k+"-duration",entry.duration()).putLong(k+"-updated",System.currentTimeMillis()).putBoolean(k+"-completed",false).apply();
+    }
     static SeriesDetails.Episode next(Context context,List<SeriesDetails.Episode> episodes) {
         if(episodes.isEmpty()) return null; int last=-1; long updated=0;
         for(int i=0;i<episodes.size();i++) { Entry e=read(context,episodes.get(i).channel().url()); if(e.updated()>updated && (e.position()>=5000 || e.completed())) { last=i; updated=e.updated(); } }
@@ -23,3 +28,4 @@ final class WatchProgress {
         return previous.completed() && last+1<episodes.size()?episodes.get(last+1):episodes.get(last);
     }
 }
+

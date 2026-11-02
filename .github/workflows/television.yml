@@ -97,6 +97,7 @@ jobs:
         if: always()
         with: {name: samsung-preview-report, path: tv-smoke-output/}
   publish-tv:
+    if: github.head_ref != 'feature/phone-movie-details'
     needs: [fire-test, samsung-test]
     runs-on: ubuntu-latest
     permissions: {contents: write}
@@ -115,3 +116,4 @@ jobs:
           gh release view v0.9.1-tv-preview >/dev/null 2>&1 || gh release create v0.9.1-tv-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Fire TV 0.9.1" --notes "Nowy ekran szczegółów serialu, wybór sezonu, miniatury odcinków, Moja lista i zapis postępu. APK na Fire OS 6+ i Android TV 7.1+, obsługa pilotem. Nie jest zgodny z Vega OS. Pakiet Samsung pozostaje dostępny osobno w wydaniu v0.9.0-tv-preview."
           gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v0.9.1-tv-preview" -f sha="$SOURCE_SHA" -F force=false >/dev/null
           gh release upload v0.9.1-tv-preview TV-Player-FireTV-0.9.1.apk --clobber
+

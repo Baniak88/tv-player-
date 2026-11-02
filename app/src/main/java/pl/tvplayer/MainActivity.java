@@ -153,7 +153,7 @@ public class MainActivity extends Activity {
         });
         list.setOnItemClickListener((p, v, pos, id) -> {
             Channel c = shown.get(pos);
-            if(c.kind().equals("series")) openSeries(c); else play(c);
+            if(c.kind().equals("series")) openSeries(c); else if(c.kind().equals("movie")) openMovie(c); else play(c);
         });
         list.setOnItemLongClickListener((p, v, pos, id) -> { toggleFavorite(shown.get(pos)); return true; });
         if(state!=null) search.setText(state.getString("query",""));
@@ -404,7 +404,8 @@ public class MainActivity extends Activity {
         heroTitle.setPadding(0,dp(2),0,dp(12)); heroText.addView(heroTitle);
         LinearLayout heroButtons=new LinearLayout(this);
         heroPlay=Ui.button(this,"▶  Odtwórz"); Ui.primary(heroPlay); heroPlay.setTextSize(15);
-        heroPlay.setOnClickListener(v -> { if(heroItem!=null) open(heroItem); });
+        hero.setOnClickListener(v -> { if(heroItem!=null) open(heroItem); });
+        heroPlay.setOnClickListener(v -> { if(heroItem!=null) { if(heroItem.kind().equals("series")) openSeries(heroItem); else play(heroItem); } });
         heroButtons.addView(heroPlay,new LinearLayout.LayoutParams(0,dp(44),1));
         heroSave=Ui.button(this,"＋  Moja lista"); heroSave.setTextColor(Ui.TEXT); heroSave.setBackground(Ui.touch(this,0x33FFFFFF,12,0));
         heroSave.setOnClickListener(v -> { if(heroItem!=null) { toggleFavorite(heroItem); bindHero(); } });
@@ -451,7 +452,7 @@ public class MainActivity extends Activity {
         posters.setOnItemLongClickListener((parent,v,index,id) -> { toggleFavorite(shown.get(index)); return true; });
         content.addView(posters,new FrameLayout.LayoutParams(-1,-1));
     }
-    private void open(Channel c) { if(c.kind().equals("series")) openSeries(c); else play(c); }
+    private void open(Channel c) { if(c.kind().equals("series")) openSeries(c); else if(c.kind().equals("movie")) openMovie(c); else play(c); }
     private void prepareShelves(List<Channel> items) {
         shelfItems.clear();
         for(Channel c:items) { List<Channel> row=shelfItems.computeIfAbsent(c.group(),key -> new ArrayList<>()); if(row.size()<24) row.add(c); }
@@ -552,6 +553,8 @@ public class MainActivity extends Activity {
     private void play(Channel c) {
         startActivity(new Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()).putExtra("guide",c.guideUrl()).putExtra("epgId",c.epgId()).putExtra("days",c.archiveDays()).putExtra("timezone",c.timezone()));
     }
+    // MainActivity is a phone screen; keep the phone activity out of the shared TV source set.
+    private void openMovie(Channel movie) { startActivity(new Intent().setClassName(this,"pl.tvplayer.MovieActivity").putExtra("url",movie.url()).putExtra("name",movie.name()).putExtra("group",movie.group()).putExtra("logo",movie.logo())); }
     private void openSeries(Channel series) { startActivity(SeriesActivity.intent(this,series,false)); }
     private void sourceMenu() {
         if (busy) return;
@@ -647,3 +650,4 @@ public class MainActivity extends Activity {
     @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); super.onPause(); }
     @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }
 }
+
