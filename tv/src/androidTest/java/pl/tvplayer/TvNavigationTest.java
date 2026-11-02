@@ -23,7 +23,7 @@ public class TvNavigationTest {
     private TvActivity start() throws Exception {
         new android.util.AtomicFile(new java.io.File(context().getFilesDir(),"tv-account.enc")).delete();
         new LibraryStore(context()).save(Arrays.asList(new Channel("Sport 1","https://example.com/sport.ts","Sport","","tv").withOrder(0),new Channel("Dzieci 1","https://example.com/kids.ts","Dzieci","","tv").withOrder(1),new Channel("Test Film","https://example.com/film.mp4","Kino","","movie")),Collections.emptySet());
-        TvActivity activity=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        TvActivity activity=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
         waitText(activity.getWindow().getDecorView(),"Co oglądamy?"); long focused=System.currentTimeMillis()+5000; while(!activity.hasWindowFocus() && System.currentTimeMillis()<focused) Thread.sleep(100); instrument().waitForIdleSync(); assertTrue("TV activity has no input focus",activity.hasWindowFocus()); return activity;
     }
     private void key(int code) throws Exception { try(android.os.ParcelFileDescriptor.AutoCloseInputStream input=new android.os.ParcelFileDescriptor.AutoCloseInputStream(instrument().getUiAutomation().executeShellCommand("input keyevent "+code))) { byte[] buffer=new byte[256]; while(input.read(buffer)!=-1) {} } instrument().waitForIdleSync(); Thread.sleep(200); }
