@@ -82,8 +82,13 @@ public class LivePreviewTest {
         waitView(main.getWindow().getDecorView(),inside?"Kanał A":"Sport");
     }
     private void screenshot(String name) throws Exception {
-        // Only generated test video is shown. Production keeps the preview surface secure.
-        instrument().runOnMainSync(() -> { PlayerView view=(PlayerView)field(preview(),"video"); if(view.getVideoSurfaceView() instanceof SurfaceView) ((SurfaceView)view.getVideoSurfaceView()).setSecure(false); });
+        // Recreate only this generated test-video surface without protection, and verify a rendered frame.
+        CountDownLatch rendered=new CountDownLatch(1); androidx.media3.common.Player.Listener listener=new androidx.media3.common.Player.Listener() { @Override public void onRenderedFirstFrame() { rendered.countDown(); } };
+        final SurfaceView[] surface={null}; final ExoPlayer engine=previewPlayer();
+        instrument().runOnMainSync(() -> { engine.addListener(listener); PlayerView view=(PlayerView)field(preview(),"video"); surface[0]=(SurfaceView)view.getVideoSurfaceView(); surface[0].setVisibility(View.INVISIBLE); });
+        instrument().waitForIdleSync(); Thread.sleep(100);
+        instrument().runOnMainSync(() -> { surface[0].setSecure(false); surface[0].setVisibility(View.VISIBLE); });
+        assertTrue("Preview video did not render after surface recreation",rendered.await(8,TimeUnit.SECONDS)); instrument().runOnMainSync(() -> engine.removeListener(listener));
         Thread.sleep(650); instrument().waitForIdleSync(); Bitmap bitmap=instrument().getUiAutomation().takeScreenshot(); assertNotNull(bitmap);
         try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(context().getFilesDir(),name+".png"))) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } bitmap.recycle();
     }
@@ -96,10 +101,13 @@ public class LivePreviewTest {
             screenshot("tv-preview-portrait"); ExoPlayer original=previewPlayer();
             View button=waitView(root,"Otwórz podgląd na pełnym ekranie"); instrument().runOnMainSync(button::performClick); full=(PlayerActivity)monitor.waitForActivityWithTimeout(7000); assertNotNull(full); waitPlaying(() -> (ExoPlayer)field(full,"player"));
             assertSame("Full screen discarded the preview buffer",original,field(full,"player")); assertEquals(1,streams.get());
-            instrument().runOnMainSync(full::finish); waitPlaying(this::previewPlayer); assertSame(original,previewPlayer()); assertEquals(1,streams.get()); full=null;
-            clickItem(waitView(root,"Kanał B")); waitPlaying(this::previewPlayer); assertEquals(b.url(),preview().selectedUrl()); assertEquals(2,streams.get());
-            instrument().runOnMainSync(() -> find(root,"Wróć do listy bukietów").performClick()); instrument().waitForIdleSync(); assertNull(previewPlayer()); assertFalse(GuideRepository.get(context()).isObserving(b));
-            clickItem(waitView(root,"Sport")); waitPlaying(this::previewPlayer); assertEquals("Last selected channel in this bouquet was lost",b.url(),preview().selectedUrl());
+            PlayerView fullVideo=(PlayerView)field(full,"view"); instrument().runOnMainSync(() -> { fullVideo.showController(); fullVideo.findViewById(androidx.media3.ui.R.id.exo_next).performClick(); }); waitPlaying(() -> (ExoPlayer)field(full,"player"));
+            assertEquals(b.url(),full.getIntent().getStringExtra("url")); ExoPlayer selectedInFull=(ExoPlayer)field(full,"player");
+            instrument().runOnMainSync(full::finish); waitPlaying(this::previewPlayer); assertSame(selectedInFull,previewPlayer()); assertEquals(b.url(),preview().selectedUrl()); assertEquals(2,streams.get()); full=null;
+            instrument().runOnMainSync(main::finish); instrument().waitForIdleSync(); start(false); View reopened=main.getWindow().getDecorView(); clickItem(waitView(reopened,"Sport")); waitPlaying(this::previewPlayer); assertEquals("Full-screen selection was not saved for the bouquet",b.url(),preview().selectedUrl());
+            clickItem(waitView(reopened,"Kanał A")); waitPlaying(this::previewPlayer); assertEquals(a.url(),preview().selectedUrl());
+            instrument().runOnMainSync(() -> find(reopened,"Wróć do listy bukietów").performClick()); instrument().waitForIdleSync(); assertNull(previewPlayer()); assertFalse(GuideRepository.get(context()).isObserving(a));
+            clickItem(waitView(reopened,"Sport")); waitPlaying(this::previewPlayer); assertEquals("Last selected channel in this bouquet was lost",a.url(),preview().selectedUrl());
         } finally { instrument().removeMonitor(monitor); }
     }
     @Test public void landscapeRecreationKeepsSelectionAndPlacesListBesidePreview() throws Exception {

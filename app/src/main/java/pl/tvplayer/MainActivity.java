@@ -15,7 +15,8 @@ import java.util.concurrent.*;
 public class MainActivity extends Activity {
     private static final int FILE_REQUEST = 41, LIVE_FULLSCREEN=42;
     private LivePreview preview;
-    private LinearLayout liveArea,dockBar;
+    private LinearLayout liveArea,dockBar,liveListColumn;
+    private LinearLayout screenRoot;
     private boolean wideLayout;
     private String fullscreenToken;
     private static final java.util.regex.Pattern RECENT=java.util.regex.Pattern.compile(".*(ostatnio|nowo|nowości|nowosci|new|recent|latest|2026|2025).*",java.util.regex.Pattern.CASE_INSENSITIVE|java.util.regex.Pattern.UNICODE_CASE);
@@ -82,7 +83,7 @@ public class MainActivity extends Activity {
             showingBouquets=state.getBoolean("showingBouquets",showingBouquets); onlyFavorites=state.getBoolean("onlyFavorites",false);
         }
         boolean wide=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE; wideLayout=wide;
-        LinearLayout root=column(); root.setFocusableInTouchMode(true); root.setBackgroundColor(Ui.BG);
+        LinearLayout root=column(); screenRoot=root; root.setFocusableInTouchMode(true); root.setBackgroundColor(Ui.BG);
         root.setOnApplyWindowInsetsListener((v,insets) -> {
             v.setPadding(dp(16)+insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),dp(16)+insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets();
         });
@@ -127,7 +128,8 @@ public class MainActivity extends Activity {
         liveArea=new LinearLayout(this); liveArea.setOrientation(wide?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);
         preview=new LivePreview(this,wide,state,this::play,() -> { if(rows!=null) rows.notifyDataSetChanged(); });
         if(wide) {
-            liveArea.addView(list,new LinearLayout.LayoutParams(0,-1,0.43f));
+            liveListColumn=column(); liveListColumn.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+            liveArea.addView(liveListColumn,new LinearLayout.LayoutParams(0,-1,0.43f));
             LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(0,-1,0.57f); size.leftMargin=dp(12); liveArea.addView(preview.panel,size);
         } else { liveArea.addView(preview.panel,new LinearLayout.LayoutParams(-1,-2)); LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,0,1); size.topMargin=dp(10); liveArea.addView(list,size); }
         liveArea.setVisibility(View.GONE); content.addView(liveArea,new FrameLayout.LayoutParams(-1,-1));
@@ -379,6 +381,11 @@ public class MainActivity extends Activity {
         }
         shown=next;
         boolean live=!grid && !busy && !shown.isEmpty() && !vod(); liveArea.setVisibility(live?View.VISIBLE:View.GONE);
+        if(wideLayout) {
+            ViewGroup parent=(ViewGroup)crumb.getParent();
+            if(live && parent!=liveListColumn) { parent.removeView(crumb); liveListColumn.addView(crumb,0,new LinearLayout.LayoutParams(-1,-2)); }
+            else if(!live && parent!=screenRoot) { parent.removeView(crumb); screenRoot.addView(crumb,1,new LinearLayout.LayoutParams(-1,-2)); }
+        }
         if(!wideLayout) {
             ViewGroup parent=(ViewGroup)favoriteButton.getParent();
             if(live && parent!=crumb) {
@@ -403,7 +410,7 @@ public class MainActivity extends Activity {
         crumb.setVisibility(inside?View.VISIBLE:View.GONE);
         crumbTitle.setText(!inside?"":onlyFavorites?"Ulubione":!query.isEmpty() && showingBouquets?"Wyniki wyszukiwania":selectedGroup.equals(ALL)?"Cała oferta":selectedGroup);
         boolean vod=vod();
-        status.setVisibility(busy || total==0 || (grid && vod)?View.GONE:View.VISIBLE);
+        status.setVisibility(busy || live || total==0 || (grid && vod)?View.GONE:View.VISIBLE);
         sortButton.setVisibility(grid?View.VISIBLE:View.INVISIBLE);
         if(heroItem!=null) heroSave.setText(favorites.contains(heroItem.url())?"✓  Moja lista":"＋  Moja lista");
         bouquets.setVisibility(grid && !busy && total>0 && !vod?View.VISIBLE:View.GONE);
