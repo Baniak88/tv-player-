@@ -74,21 +74,20 @@ public class LivePreviewTest {
     }
     private void waitPlaying(java.util.function.Supplier<ExoPlayer> supplier) throws Exception {
         long until=SystemClock.elapsedRealtime()+30000; boolean playing=false;
-        while(SystemClock.elapsedRealtime()<until) { final boolean[] value={false}; instrument().runOnMainSync(() -> { ExoPlayer player=supplier.get(); value[0]=player!=null && player.isPlaying() && player.getVideoSize().width>0; }); if(value[0]) { playing=true; break; } Thread.sleep(80); }
+        while(SystemClock.elapsedRealtime()<until) { final boolean[] value={false}; instrument().runOnMainSync(() -> { ExoPlayer player=supplier.get(); value[0]=player!=null && player.isPlaying() && player.getVideoSize().width>0 && pictureVisible(player); }); if(value[0]) { playing=true; break; } Thread.sleep(80); }
         assertTrue("Fixture video did not play",playing);
+    }
+    private boolean pictureVisible(ExoPlayer player) {
+        PlayerView view=null;
+        if(main!=null && previewPlayer()==player) view=(PlayerView)field(preview(),"video");
+        else if(full!=null && field(full,"player")==player) view=(PlayerView)field(full,"view");
+        if(view==null) return false; View shutter=view.findViewById(androidx.media3.ui.R.id.exo_shutter); return shutter!=null && shutter.getVisibility()!=View.VISIBLE;
     }
     private void start(boolean inside) throws Exception {
         Intent intent=new Intent(context(),MainActivity.class).putExtra("section","tv").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK); if(inside) intent.putExtra("bouquet","Sport"); main=(MainActivity)instrument().startActivitySync(intent);
         waitView(main.getWindow().getDecorView(),inside?"Kanał A":"Sport");
     }
     private void screenshot(String name) throws Exception {
-        // Recreate only this generated test-video surface without protection, and verify a rendered frame.
-        CountDownLatch rendered=new CountDownLatch(1); androidx.media3.common.Player.Listener listener=new androidx.media3.common.Player.Listener() { @Override public void onRenderedFirstFrame() { rendered.countDown(); } };
-        final SurfaceView[] surface={null}; final ExoPlayer engine=previewPlayer();
-        instrument().runOnMainSync(() -> { engine.addListener(listener); PlayerView view=(PlayerView)field(preview(),"video"); surface[0]=(SurfaceView)view.getVideoSurfaceView(); surface[0].setVisibility(View.INVISIBLE); });
-        instrument().waitForIdleSync(); Thread.sleep(100);
-        instrument().runOnMainSync(() -> { surface[0].setSecure(false); surface[0].setVisibility(View.VISIBLE); });
-        assertTrue("Preview video did not render after surface recreation",rendered.await(8,TimeUnit.SECONDS)); instrument().runOnMainSync(() -> engine.removeListener(listener));
         Thread.sleep(650); instrument().waitForIdleSync(); Bitmap bitmap=instrument().getUiAutomation().takeScreenshot(); assertNotNull(bitmap);
         try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(context().getFilesDir(),name+".png"))) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } bitmap.recycle();
     }

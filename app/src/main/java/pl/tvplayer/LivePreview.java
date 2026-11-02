@@ -48,7 +48,6 @@ final class LivePreview {
         panel=new LinearLayout(activity); panel.setOrientation(LinearLayout.VERTICAL); panel.setBackground(Ui.shape(activity,Ui.SURFACE,14,Ui.BORDER)); panel.setClipToOutline(true);
         FrameLayout picture=new FrameLayout(activity); picture.setBackgroundColor(0xFF000000);
         video=new PlayerView(activity); video.setUseController(false); video.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING); video.setKeepContentOnPlayerReset(false);
-        if(video.getVideoSurfaceView() instanceof SurfaceView) ((SurfaceView)video.getVideoSurfaceView()).setSecure(true);
         picture.addView(video,new FrameLayout.LayoutParams(-1,-1));
         notice=Ui.text(activity,"",13,Ui.TEXT); notice.setGravity(Gravity.CENTER); notice.setPadding(dp(16),dp(10),dp(16),dp(10)); notice.setBackgroundColor(0xB3000000); notice.setVisibility(View.GONE);
         picture.addView(notice,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
