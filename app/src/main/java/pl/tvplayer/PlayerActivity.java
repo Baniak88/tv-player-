@@ -134,7 +134,7 @@ public class PlayerActivity extends Activity {
     }
     private void enterPip() {
         if(player==null) return;
-        if(!getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
+        if(android.os.Build.VERSION.SDK_INT<26 || !getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
             Toast.makeText(this,"Ten telefon nie udostępnia PiP.",Toast.LENGTH_LONG).show(); return;
         }
         enteringPip=true; if(rotation!=null) rotation.disable();
@@ -169,7 +169,7 @@ public class PlayerActivity extends Activity {
             try {
                 android.content.Intent service=new android.content.Intent(this,RecordingService.class).setData(data.getData())
                     .putExtra("url",url).putExtra("name",getIntent().getStringExtra("name")).putExtra("minutes",recordingMinutes);
-                startForegroundService(service); Toast.makeText(this,"Rozpoczynam nagrywanie. Zatrzymasz je w Opcjach lub powiadomieniu.",Toast.LENGTH_LONG).show();
+                if(android.os.Build.VERSION.SDK_INT>=26) startForegroundService(service); else startService(service); Toast.makeText(this,"Rozpoczynam nagrywanie. Zatrzymasz je w Opcjach lub powiadomieniu.",Toast.LENGTH_LONG).show();
             } catch(RuntimeException e) { Toast.makeText(this,"Nie można uruchomić nagrywania. Sprawdź uprawnienia i plik.",Toast.LENGTH_LONG).show(); }
         }
     }

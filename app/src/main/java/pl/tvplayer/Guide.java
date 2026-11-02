@@ -21,7 +21,9 @@ public final class Guide {
     }
     static String decode(String text) {
         try {
-            byte[] bytes=Base64.getDecoder().decode(text);
+            okio.ByteString decodedBytes=okio.ByteString.decodeBase64(text);
+            if(decodedBytes==null) return text;
+            byte[] bytes=decodedBytes.toByteArray();
             String decoded=StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
             for(char c:decoded.toCharArray()) if(Character.isISOControl(c) && c!='\n' && c!='\r' && c!='\t') return text;
             return decoded;
@@ -104,4 +106,3 @@ public final class Guide {
             .addPathSegment(stamp).addPathSegment(api.queryParameter("stream_id")+".m3u8").build().toString();
     }
 }
-
