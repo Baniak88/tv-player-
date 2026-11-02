@@ -39,7 +39,7 @@ public final class TvActivity extends Activity {
         states.addState(new int[]{},Ui.shape(this,normal,12,Ui.BORDER)); return states;
     }
     private Button button(String value,Runnable action) {
-        Button b=Ui.button(this,value); b.setTextSize(17); b.setTextColor(Ui.TEXT); b.setFocusable(true); b.setBackground(focus(Ui.SURFACE)); b.setOnClickListener(v -> action.run()); return b;
+        Button b=Ui.button(this,value); b.setTextSize(17); b.setTextColor(Ui.TEXT); b.setFocusable(true); b.setFocusableInTouchMode(true); b.setBackground(focus(Ui.SURFACE)); b.setOnClickListener(v -> action.run()); return b;
     }
     private String title(String kind) { return kind.equals("tv")?"Telewizja na żywo":kind.equals("movie")?"Filmy":"Seriale"; }
     @Override public void onCreate(Bundle state) {
@@ -80,7 +80,7 @@ public final class TvActivity extends Activity {
             LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,0,1); size.bottomMargin=dp(10); actions.addView(action,size);
         }
         tiles.addView(actions,new LinearLayout.LayoutParams(0,height,1.1f)); body.addView(tiles);
-        status.setText(account==null?"Dodaj konto Xtream lub adres listy M3U, aby rozpocząć.":"OK — wybierz · Strzałki — nawigacja · Wstecz — powrót"); live.requestFocus();
+        status.setText(account==null?"Dodaj konto Xtream lub adres listy M3U, aby rozpocząć.":"OK — wybierz · Strzałki — nawigacja · Wstecz — powrót"); live.requestFocus(); live.post(() -> { if(home && !isFinishing()) live.requestFocus(); });
     }
     private void open(String kind) { if(busy) return; section=kind; group=""; query=""; seriesTitle=""; onlyFavorites=false; items=new ArrayList<>(); home=false; showCatalog(); load(kind); }
     private void load(String kind) {
