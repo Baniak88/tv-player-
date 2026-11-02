@@ -86,7 +86,10 @@ public class PlaybackAdjustmentsTest {
             dragSlider(brightness,0.8f); assertTrue(activity.getWindow().getAttributes().screenBrightness>0.7f);
             dragSlider(volume,0.3f); assertTrue(audio.getStreamVolume(AudioManager.STREAM_MUSIC)<audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)/2);
             assertEquals("Player changed global brightness",systemBrightness,android.provider.Settings.System.getInt(context().getContentResolver(),android.provider.Settings.System.SCREEN_BRIGHTNESS,128));
-            View automatic=dialogView("Jasność telefonu"); instrument().runOnMainSync(automatic::performClick); assertEquals(-1f,activity.getWindow().getAttributes().screenBrightness,0.001f);
+            View automatic=dialogView("Jasność telefonu"); instrument().runOnMainSync(automatic::performClick);
+            // AlertDialog delivers button clicks through a posted message, so wait for it instead of reading immediately.
+            until=SystemClock.elapsedRealtime()+3000; while(activity.getWindow().getAttributes().screenBrightness!=-1f && SystemClock.elapsedRealtime()<until) { instrument().waitForIdleSync(); Thread.sleep(50); }
+            assertEquals(-1f,activity.getWindow().getAttributes().screenBrightness,0.001f);
             instrument().runOnMainSync(() -> { assertSame(engine,uncheckedPlayer(opened)); assertTrue("Video stopped during adjustments",engine.isPlaying()); assertTrue("Playback clock did not advance",engine.getCurrentPosition()>1000); });
         } finally {
             audio.setStreamVolume(AudioManager.STREAM_MUSIC,previous,0);
