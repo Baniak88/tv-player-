@@ -48,7 +48,6 @@ final class LivePreview {
         panel=new LinearLayout(activity); panel.setOrientation(LinearLayout.VERTICAL); panel.setBackground(Ui.shape(activity,Ui.SURFACE,14,Ui.BORDER)); panel.setClipToOutline(true);
         FrameLayout picture=new FrameLayout(activity); picture.setBackgroundColor(0xFF000000);
         video=new PlayerView(activity); video.setUseController(false); video.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING); video.setKeepContentOnPlayerReset(false);
-        if(video.getVideoSurfaceView() instanceof SurfaceView) ((SurfaceView)video.getVideoSurfaceView()).setSecure(true);
         picture.addView(video,new FrameLayout.LayoutParams(-1,-1));
         notice=Ui.text(activity,"",13,Ui.TEXT); notice.setGravity(Gravity.CENTER); notice.setPadding(dp(16),dp(10),dp(16),dp(10)); notice.setBackgroundColor(0xB3000000); notice.setVisibility(View.GONE);
         picture.addView(notice,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
@@ -93,8 +92,7 @@ final class LivePreview {
         if(!same) { release(); guide=null; }
         channel=selected; remembered=selected.url(); title.setText("Na żywo · "+selected.name()); full.setEnabled(true); pause.setEnabled(true);
         if(active && visible) { if(user && player!=null && player.getPlayerError()!=null && same) { player.prepare(); player.play(); } else start(); }
-        android.content.SharedPreferences prefs=activity.getSharedPreferences("live-preview",Context.MODE_PRIVATE); String key=hash(scope),identity=hash(selected.url());
-        if(!identity.equals(prefs.getString(key,""))) prefs.edit().putString(key,identity).putInt(key+".index",visibleChannels.indexOf(selected)).apply();
+        rememberSelection();
         updateGuide(); if(active && visible) { ui.removeCallbacks(guideTick); ui.postDelayed(guideTick,1000); } if(user) selectionChanged.run();
     }
     void guideChanged(String url) { if(channel!=null && channel.url().equals(url)) updateGuide(); }
@@ -131,13 +129,18 @@ final class LivePreview {
         PlaybackHandoff.Transfer transfer=PlaybackHandoff.take(token,returned.url());
         if(transfer==null) { select(returned); return; }
         release(); activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); channel=returned; remembered=returned.url(); guide=null; player=transfer.player(); observing=true; weak=PlaybackSettings.weakInternet(activity);
-        title.setText("Na żywo · "+returned.name()); attach(); updateGuide(); selectionChanged.run();
+        title.setText("Na żywo · "+returned.name()); rememberSelection(); attach(); updateGuide(); selectionChanged.run();
     }
     private void release() {
         activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if(player!=null) { video.setPlayer(null); if(listener!=null) player.removeListener(listener); player.release(); player=null; listener=null; }
         if(observing && channel!=null) { GuideRepository.get(activity).streamStopped(channel); observing=false; }
         notice.setVisibility(View.GONE);
+    }
+    private void rememberSelection() {
+        if(channel==null) return;
+        android.content.SharedPreferences prefs=activity.getSharedPreferences("live-preview",Context.MODE_PRIVATE); String key=hash(scope),identity=hash(channel.url()); int index=visibleChannels.indexOf(channel);
+        if(!identity.equals(prefs.getString(key,"")) || index>=0 && index!=prefs.getInt(key+".index",-1)) prefs.edit().putString(key,identity).putInt(key+".index",index).apply();
     }
     private static String hash(String value) {
         try { return android.util.Base64.encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)),android.util.Base64.NO_WRAP); }
