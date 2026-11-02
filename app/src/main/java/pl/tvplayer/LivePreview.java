@@ -55,12 +55,12 @@ final class LivePreview {
         if(wide) panel.addView(picture,new LinearLayout.LayoutParams(-1,0,1));
         else { int height=Math.min(Math.round((activity.getResources().getDisplayMetrics().widthPixels-dp(32))*9f/16),Math.round(activity.getResources().getDisplayMetrics().heightPixels*0.24f)); panel.addView(picture,new LinearLayout.LayoutParams(-1,Math.max(dp(130),Math.min(dp(220),height)))); }
         LinearLayout controls=new LinearLayout(activity); controls.setGravity(Gravity.CENTER_VERTICAL); controls.setPadding(dp(4),0,dp(4),0);
-        pause=Ui.button(activity,"Ⅱ"); pause.setContentDescription("Wstrzymaj podgląd"); pause.setTextSize(18); Ui.ghost(pause,Ui.TEXT); controls.addView(pause,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        pause=Ui.button(activity,"Ⅱ"); pause.setContentDescription("Wstrzymaj podgląd"); pause.setTextSize(18); Ui.ghost(pause,Ui.TEXT); controls.addView(pause,new LinearLayout.LayoutParams(dp(48),dp(48)));
         pause.setOnClickListener(v -> { if(player==null) { start(); return; } if(player.getPlayerError()!=null) { player.prepare(); player.play(); } else if(player.getPlayWhenReady()) player.pause(); else player.play(); });
         title=Ui.text(activity,"Podgląd",14,Ui.TEXT); title.setMaxLines(1); title.setEllipsize(TextUtils.TruncateAt.END); title.setTypeface(null,android.graphics.Typeface.BOLD); controls.addView(title,new LinearLayout.LayoutParams(0,-2,1));
-        Button internet=Ui.button(activity,"◉"); internet.setContentDescription("Ustawienia słabszego internetu"); Ui.ghost(internet,Ui.MUTED); controls.addView(internet,new LinearLayout.LayoutParams(dp(44),dp(44)));
+        Button internet=Ui.button(activity,"⚙"); internet.setContentDescription("Ustawienia słabszego internetu"); Ui.ghost(internet,Ui.MUTED); controls.addView(internet,new LinearLayout.LayoutParams(dp(48),dp(48)));
         internet.setOnClickListener(v -> PlaybackSettings.choose(activity,() -> { release(); start(); selectionChanged.run(); }));
-        full=Ui.button(activity,"⤢"); full.setTextSize(23); full.setContentDescription("Otwórz podgląd na pełnym ekranie"); Ui.ghost(full,Ui.TEXT); controls.addView(full,new LinearLayout.LayoutParams(dp(48),dp(44)));
+        full=Ui.button(activity,"⤢"); full.setTextSize(23); full.setContentDescription("Otwórz podgląd na pełnym ekranie"); Ui.ghost(full,Ui.TEXT); controls.addView(full,new LinearLayout.LayoutParams(dp(48),dp(48)));
         full.setOnClickListener(v -> { if(channel!=null) fullscreen.accept(channel); });
         panel.addView(controls,new LinearLayout.LayoutParams(-1,dp(48)));
         schedule=Ui.text(activity,"",12,Ui.MUTED); schedule.setMaxLines(wide?2:1); schedule.setEllipsize(TextUtils.TruncateAt.END); schedule.setPadding(dp(12),0,dp(12),dp(8));

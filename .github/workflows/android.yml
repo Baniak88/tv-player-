@@ -114,7 +114,7 @@ jobs:
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           cp apk/debug/app-debug.apk TV-Player-0.8.9.apk
-          gh release view v0.8.9-preview >/dev/null 2>&1 || gh release create v0.8.9-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Preview 0.8.9" --notes "Telefon: podgląd TV po wejściu w bukiet, wybór kanałów obok obrazu i EPG, osobny pełny ekran z zachowaniem odtwarzacza i bufora oraz powrót do podglądu. Tryb Słabszy internet zwiększa bufor i ogranicza jakość źródeł adaptacyjnych do 720p/2,5 Mb/s. Pionowy i poziomy układ TV, zapamiętywanie ostatniego kanału. Bezpośredni APK z podpisem aktualizacji."
+          gh release view v0.8.9-preview >/dev/null 2>&1 || gh release create v0.8.9-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Preview 0.8.9" --notes "Telefon: podgląd TV po wejściu w bukiet, wybór kanałów obok obrazu i EPG, osobny pełny ekran z zachowaniem odtwarzacza i bufora oraz powrót do podglądu. Tryb Słabszy internet zwiększa bufor i preferuje dostępne adaptacyjne warianty do 720p/2,5 Mb/s. Pionowy i poziomy układ TV, zapamiętywanie ostatniego kanału. Bezpośredni APK z podpisem aktualizacji."
           gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v0.8.9-preview" -f sha="$SOURCE_SHA" -F force=false >/dev/null
           gh release upload v0.8.9-preview TV-Player-0.8.9.apk --clobber
 

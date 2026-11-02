@@ -15,6 +15,7 @@ import java.util.zip.GZIPInputStream;
 final class XmltvStore extends SQLiteOpenHelper {
     private final OkHttpClient client=new OkHttpClient.Builder().connectTimeout(12,TimeUnit.SECONDS).readTimeout(30,TimeUnit.SECONDS).callTimeout(3,TimeUnit.MINUTES).build();
     private final Map<String,Object> locks=new HashMap<>();
+    private final java.util.concurrent.atomic.AtomicInteger generation=new java.util.concurrent.atomic.AtomicInteger();
     private final java.util.concurrent.ExecutorService refreshWorker=java.util.concurrent.Executors.newSingleThreadExecutor();
     private final Set<String> refreshing=java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<String,Long> failures=new java.util.concurrent.ConcurrentHashMap<>();
@@ -37,15 +38,16 @@ final class XmltvStore extends SQLiteOpenHelper {
         try { byte[] data=MessageDigest.getInstance("SHA-256").digest(url.toString().getBytes(StandardCharsets.UTF_8)); StringBuilder result=new StringBuilder(); for(byte b:data) result.append(String.format(Locale.ROOT,"%02x",b&255)); return result.toString(); }
         catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
+    void cancelDownloads() { generation.incrementAndGet(); client.dispatcher().cancelAll(); failures.clear(); }
     List<Guide.Program> cached(Channel channel,HttpUrl url) { return read(channel,key(url)); }
     List<Guide.Program> load(Channel channel,HttpUrl url) throws IOException {
-        String source=key(url); Object lock;
+        int started=generation.get(); String source=key(url); Object lock;
         synchronized(locks) { lock=locks.computeIfAbsent(source,k -> new Object()); }
         List<Guide.Program> saved=read(channel,source);
         if(saved.stream().anyMatch(p -> p.end()>System.currentTimeMillis()/1000)) {
             if(!fresh(source) && System.currentTimeMillis()>=failures.getOrDefault(source,0L) && refreshing.add(source)) refreshWorker.execute(() -> {
                 try { synchronized(lock) { refresh(source,url,channel.timezone()); failures.remove(source); } }
-                catch(IOException | RuntimeException ignored) { failures.put(source,System.currentTimeMillis()+60000); }
+                catch(IOException | RuntimeException ignored) { if(started==generation.get()) failures.put(source,System.currentTimeMillis()+60000); }
                 finally { refreshing.remove(source); }
             });
             return saved;
@@ -53,7 +55,7 @@ final class XmltvStore extends SQLiteOpenHelper {
         synchronized(lock) {
             if(System.currentTimeMillis()<failures.getOrDefault(source,0L)) throw new IOException("Źródło XMLTV jest chwilowo niedostępne.");
             try { refresh(source,url,channel.timezone()); failures.remove(source); }
-            catch(IOException e) { failures.put(source,System.currentTimeMillis()+60000); throw e; }
+            catch(IOException e) { if(started==generation.get()) failures.put(source,System.currentTimeMillis()+60000); throw e; }
         }
         return read(channel,source);
     }

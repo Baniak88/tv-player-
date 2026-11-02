@@ -106,6 +106,7 @@ public final class GuideRepository {
             });
         });
     }
+    void pauseBulkDownloads() { xml.cancelDownloads(); invalidateFailures(); }
     synchronized void invalidateFailures() { cache.entrySet().removeIf(entry -> entry.getValue().data().programs().isEmpty()); }
     private Data load(Channel channel,boolean full) {
         Data stream=streamData(channel); if(stream!=null) return stream;
