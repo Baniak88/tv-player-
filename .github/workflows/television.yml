@@ -56,12 +56,12 @@ jobs:
         run: |
           python3 - <<'PY'
           import base64,json,pathlib
-          for name in ['tv-home','tv-movies','tv-bouquet']:
+          for name in ['tv-home','tv-movies','tv-bouquet','series-television']:
               image=pathlib.Path('tv-smoke-output',name+'.png')
               if image.exists() and image.read_bytes().startswith(bytes([137,80,78,71,13,10,26,10])):
                   pathlib.Path('/tmp',name+'.json').write_text(json.dumps({'encoding':'base64','content':base64.b64encode(image.read_bytes()).decode()}))
           PY
-          for name in tv-home tv-movies tv-bouquet; do
+          for name in tv-home tv-movies tv-bouquet series-television; do
             if [ ! -f "/tmp/$name.json" ]; then continue; fi
             ref=$(gh api "repos/$GH_REPO/git/blobs" --input "/tmp/$name.json" --jq '.sha')
             echo "UI_PREVIEW $name $ref"
@@ -108,7 +108,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/tv-debug.apk TV-Player-FireTV-0.9.0.apk
-          gh release view v0.9.0-tv-preview >/dev/null 2>&1 || gh release create v0.9.0-tv-preview --target "$SOURCE_SHA" --prerelease --title "TV Player TV 0.9.0" --notes "Wersja TV z obsługą pilota. APK: Fire OS 6+ i Android TV 7.1+. Nie jest zgodny z Vega OS. Samsung Tizen: dołączony WGT jest niepodpisany. Przed instalacją wymaga certyfikatu Samsung z DUID telewizora; instrukcja w TV-INSTALL.md."
-          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v0.9.0-tv-preview" -f sha="$SOURCE_SHA" -F force=false >/dev/null
-          gh release upload v0.9.0-tv-preview TV-Player-FireTV-0.9.0.apk widget/dist/TV-Player-Samsung-0.9.0-unsigned.wgt widget/TV-INSTALL.md --clobber
+          cp apk/debug/tv-debug.apk TV-Player-FireTV-0.9.1.apk
+          gh release view v0.9.1-tv-preview >/dev/null 2>&1 || gh release create v0.9.1-tv-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Fire TV 0.9.1" --notes "Nowy ekran szczegółów serialu, wybór sezonu, miniatury odcinków, Moja lista i zapis postępu. APK na Fire OS 6+ i Android TV 7.1+, obsługa pilotem. Nie jest zgodny z Vega OS. Pakiet Samsung pozostaje dostępny osobno w wydaniu v0.9.0-tv-preview."
+          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v0.9.1-tv-preview" -f sha="$SOURCE_SHA" -F force=false >/dev/null
+          gh release upload v0.9.1-tv-preview TV-Player-FireTV-0.9.1.apk --clobber

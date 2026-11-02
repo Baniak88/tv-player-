@@ -17,9 +17,15 @@ for case in homeAndMoviesWorkWithRemoteOnly bouquetsAndItemOptionsWorkWithRemote
   adb shell am instrument -w -r -e class "pl.tvplayer.TvNavigationTest#$case" pl.tvplayer.television.test/androidx.test.runner.AndroidJUnitRunner | tee "tv-smoke-output/$case.txt"
   grep -q 'OK (1 test)' "tv-smoke-output/$case.txt"
 done
+adb shell am force-stop pl.tvplayer.television
+adb shell input keyevent KEYCODE_WAKEUP
+adb shell wm dismiss-keyguard
+adb shell am instrument -w -r -e class "pl.tvplayer.SeriesActivityTest#televisionRemoteReachesSeasonPickerAndEpisodePlayback" pl.tvplayer.television.test/androidx.test.runner.AndroidJUnitRunner | tee tv-smoke-output/series-remote.txt
+grep -q 'OK (1 test)' tv-smoke-output/series-remote.txt
 cat tv-smoke-output/*Remote*.txt tv-smoke-output/credentials*.txt > tv-smoke-output/navigation.txt
-echo 'TV_REMOTE_CHECKS_PASSED=4' | tee -a tv-smoke-output/navigation.txt
-for name in tv-home tv-movies tv-bouquet; do
+echo 'TV_REMOTE_CHECKS_PASSED=5' | tee -a tv-smoke-output/navigation.txt
+for name in tv-home tv-movies tv-bouquet series-television; do
   adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png"
 done
-grep -q 'TV_REMOTE_CHECKS_PASSED=4' tv-smoke-output/navigation.txt
+grep -q 'TV_REMOTE_CHECKS_PASSED=5' tv-smoke-output/navigation.txt
+

@@ -1,13 +1,15 @@
 plugins { id 'com.android.application' }
 android {
     namespace 'pl.tvplayer'
+    sourceSets { androidTest { java.srcDirs += [rootProject.file("app/src/androidTestSeries/java")] } }
     compileSdk 35
+    buildFeatures { buildConfig true }
     defaultConfig {
         applicationId 'pl.tvplayer.preview'
         minSdk 26
         targetSdk 35
-        versionCode 14
-        versionName '0.8.2'
+        versionCode 15
+        versionName '0.8.3'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     signingConfigs {
@@ -36,4 +38,3 @@ dependencies {
     testImplementation 'net.sf.kxml:kxml2:2.3.0'
     testImplementation 'org.json:json:20240303'
 }
-

@@ -172,6 +172,7 @@ final class LibraryStore {
             encryptedWrite("favorites.enc",plain.toByteArray());
         }
     }
+    Set<String> loadFavorites() throws Exception { synchronized(LOCK) { Set<String> result=new HashSet<>(); readFavorites(result); return result; } }
     private void readFavorites(Set<String> favorites) throws Exception {
         byte[] bytes;
         try { bytes=decryptedRead("favorites.enc"); } catch(FileNotFoundException missing) { return; }
@@ -260,3 +261,4 @@ final class LibraryStore {
         return result;
     }
 }
+

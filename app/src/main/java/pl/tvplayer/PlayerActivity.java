@@ -231,7 +231,9 @@ public class PlayerActivity extends Activity {
         if(player!=null && !isInPictureInPictureMode()) {
             position=onDemand?player.getCurrentPosition():0;
             long duration=player.getDuration();
-            if(player.getPlaybackState()==Player.STATE_ENDED || (duration>0 && position>=duration-2000)) position=0;
+            boolean completed=player.getPlaybackState()==Player.STATE_ENDED || (duration>0 && position>=duration-2000);
+            if(onDemand) WatchProgress.save(this,url,position,duration,completed);
+            if(completed) position=0;
             if(onDemand) getPreferences(MODE_PRIVATE).edit().putLong(bookmark,position).apply();
             view.setPlayer(null); player.release(); player=null; stopStreamObservation();
         }

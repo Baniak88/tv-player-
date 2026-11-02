@@ -171,14 +171,12 @@ public final class TvActivity extends Activity {
         worker.execute(() -> { try { new LibraryStore(this).saveFavorites(saved); } catch(Exception ignored) {} }); filter();
     }
     private void select(Channel channel) {
-        if(!channel.kind().equals("series")) { play(channel); return; }
-        if(busy) return; busy=true; status.setText("Pobieranie odcinków…");
-        worker.execute(() -> { try { List<Channel> episodes=source.episodes(channel); runOnUiThread(() -> { if(!isDestroyed()) { busy=false; seriesTitle=channel.name(); items=episodes; group=""; query=""; rebuildGroups(); list.requestFocus(); } }); } catch(Exception e) { runOnUiThread(() -> { busy=false; error("Nie udało się pobrać odcinków."); }); } });
+        if(channel.kind().equals("series")) startActivity(SeriesActivity.intent(this,channel,true)); else play(channel);
     }
     private void play(Channel channel) { startActivity(new Intent(this,PlayerActivity.class).putExtra("television",true).putExtra("url",channel.url()).putExtra("name",channel.name()).putExtra("kind",channel.kind()).putExtra("guide",channel.guideUrl()).putExtra("epgId",channel.epgId()).putExtra("days",channel.archiveDays()).putExtra("timezone",channel.timezone())); }
     private void search() { EditText field=new EditText(this); field.setSingleLine(true); field.setText(query); new AlertDialog.Builder(this).setTitle("Szukaj w sekcji").setView(field).setPositiveButton("Szukaj",(d,w) -> { query=field.getText().toString().trim(); group=""; filter(); }).setNegativeButton("Anuluj",null).show(); }
     private void sort() { new AlertDialog.Builder(this).setTitle("Kolejność bukietów").setItems(BouquetOrder.LABELS,(d,index) -> { getPreferences(MODE_PRIVATE).edit().putString("sort-"+section,BouquetOrder.MODES[index]).apply(); rebuildGroups(); }).show(); }
-    private void info() { new AlertDialog.Builder(this).setTitle("TV Player TV 0.9.0").setMessage("Wersja na Fire OS 6+ i Android TV 7.1+.\n\nTV, filmy, seriale, bukiety dostawcy, ulubione i EPG.\n\nOK: odtwórz\nMenu / przytrzymanie OK: opcje pozycji\nPlay/Pause: sterowanie odtwarzaniem\n\nAplikacja odtwarza własne źródła użytkownika.").setPositiveButton("Zamknij",null).show(); }
+    private void info() { new AlertDialog.Builder(this).setTitle("TV Player TV "+BuildConfig.VERSION_NAME).setMessage("Wersja na Fire OS 6+ i Android TV 7.1+.\n\nTV, filmy, seriale, bukiety dostawcy, ulubione i EPG.\n\nOK: odtwórz\nMenu / przytrzymanie OK: opcje pozycji\nPlay/Pause: sterowanie odtwarzaniem\n\nAplikacja odtwarza własne źródła użytkownika.").setPositiveButton("Zamknij",null).show(); }
     private void error(String message) { if(!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK",null).show(); }
     private void sourceDialog() {
         if(busy) return;
@@ -214,7 +212,7 @@ public final class TvActivity extends Activity {
         return super.onKeyUp(code,event);
     }
     @Override public void onBackPressed() { if(busy) { status.setText("Trwa pobieranie biblioteki…"); return; } if(!home && !seriesTitle.isEmpty()) { seriesTitle=""; open("series"); } else if(!home && (!query.isEmpty() || onlyFavorites)) { query=""; onlyFavorites=false; filter(); } else if(!home) showHome(); else new AlertDialog.Builder(this).setTitle("Zamknąć TV Player?").setPositiveButton("Wyjście",(d,w) -> finish()).setNegativeButton("Zostań",null).show(); }
-    @Override protected void onResume() { super.onResume(); if(!home && rows!=null) rows.notifyDataSetChanged(); }
+    @Override protected void onResume() { super.onResume(); worker.execute(() -> { try { Set<String> saved=new LibraryStore(this).loadFavorites(); runOnUiThread(() -> { if(!isDestroyed()) { favorites.clear(); favorites.addAll(saved); if(!home) filter(); } }); } catch(Exception ignored) {} }); if(!home && rows!=null) rows.notifyDataSetChanged(); }
     @Override protected void onDestroy() { generation++; worker.shutdown(); super.onDestroy(); }
     @Override protected void onSaveInstanceState(Bundle state) { state.putString("section",section); state.putString("group",group); state.putBoolean("home",home); super.onSaveInstanceState(state); }
 }

@@ -552,40 +552,7 @@ public class MainActivity extends Activity {
     private void play(Channel c) {
         startActivity(new Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()).putExtra("guide",c.guideUrl()).putExtra("epgId",c.epgId()).putExtra("days",c.archiveDays()).putExtra("timezone",c.timezone()));
     }
-    /** Episodes already fetched in this process; reopening a series is then instant. */
-    private static final Map<String,List<Channel>> EPISODES=java.util.Collections.synchronizedMap(new LinkedHashMap<String,List<Channel>>(16,.75f,true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String,List<Channel>> eldest) { return size()>40; }
-    });
-    private void openSeries(Channel series) {
-        android.app.ProgressDialog dialog=new android.app.ProgressDialog(this);
-        dialog.setMessage("Wczytywanie odcinków…"); dialog.setCancelable(true);
-        if(!EPISODES.containsKey(series.url())) dialog.show();
-        network.execute(() -> {
-            try {
-                List<Channel> cached=EPISODES.get(series.url());
-                List<Channel> episodes=cached!=null?cached:new SourceClient().episodes(series);
-                if(cached==null && !episodes.isEmpty()) EPISODES.put(series.url(),episodes);
-                runOnUiThread(() -> {
-                    if(isDestroyed() || (cached==null && !dialog.isShowing())) return;
-                    dialog.dismiss();
-                    if(episodes.isEmpty()) { error("Dostawca nie udostępnił odcinków tego serialu."); return; }
-                    java.util.TreeMap<String,List<Channel>> seasons=new java.util.TreeMap<>((left,right) -> {
-                        try { return Integer.compare(Integer.parseInt(left.replace("Sezon ","")),Integer.parseInt(right.replace("Sezon ",""))); }
-                        catch(NumberFormatException e) { return left.compareTo(right); }
-                    });
-                    for(Channel episode:episodes) seasons.computeIfAbsent(episode.group(),key -> new ArrayList<>()).add(episode);
-                    List<String> names=new ArrayList<>(seasons.keySet());
-                    new AlertDialog.Builder(this).setTitle(series.name()).setItems(names.toArray(new String[0]),(d,index) -> {
-                        List<Channel> selected=seasons.get(names.get(index)); String[] labels=new String[selected.size()];
-                        for(int i=0;i<selected.size();i++) labels[i]=selected.get(i).name();
-                        new AlertDialog.Builder(this).setTitle(names.get(index)).setItems(labels,(e,n) -> play(selected.get(n))).setNegativeButton("Zamknij",null).show();
-                    }).setNegativeButton("Zamknij",null).show();
-                });
-            } catch(Exception e) {
-                runOnUiThread(() -> { if(!isDestroyed() && dialog.isShowing()) { dialog.dismiss(); error("Nie udało się pobrać odcinków. Sprawdź połączenie i dostępność serialu."); } });
-            }
-        });
-    }
+    private void openSeries(Channel series) { startActivity(SeriesActivity.intent(this,series,false)); }
     private void sourceMenu() {
         if (busy) return;
         new SourceSheet(this, new SourceSheet.Listener() {
@@ -675,9 +642,8 @@ public class MainActivity extends Activity {
         worker.execute(() -> { try { store.save(copy, stars); } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) error("Nie udało się zapisać biblioteki na urządzeniu."); }); } });
     }
     private void error(String message) { if (!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK", null).show(); }
-    @Override protected void onResume() { super.onResume(); if(rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
+    @Override protected void onResume() { super.onResume(); worker.execute(() -> { try { Set<String> saved=store.loadFavorites(); runOnUiThread(() -> { if(!isDestroyed()) { favorites.clear(); favorites.addAll(saved); filter(false); } }); } catch(Exception ignored) {} }); if(rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
     @Override public void onWindowFocusChanged(boolean focus) { super.onWindowFocusChanged(focus); if(focus && rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); }
     @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); super.onPause(); }
     @Override protected void onDestroy() { searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }
 }
-

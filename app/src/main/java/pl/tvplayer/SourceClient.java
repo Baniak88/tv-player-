@@ -202,6 +202,11 @@ public final class SourceClient {
         }
         if(!responded && failure!=null) throw failure; return new ArrayList<>();
     }
+    private final OkHttpClient seriesClient=new OkHttpClient.Builder().connectTimeout(10,TimeUnit.SECONDS).readTimeout(20,TimeUnit.SECONDS).callTimeout(30,TimeUnit.SECONDS).build();
+    public SeriesDetails seriesDetails(Channel series) throws IOException {
+        return request(seriesClient,validate(series.url()),reader -> SeriesDetails.parse(reader,series));
+    }
+    public void cancelSeriesRequest() { seriesClient.dispatcher().cancelAll(); }
     public List<Channel> episodes(Channel series) throws IOException {
         HttpUrl address = validate(series.url());
         String user = address.queryParameter("username"), pass = address.queryParameter("password");
