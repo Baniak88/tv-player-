@@ -10,6 +10,7 @@ import android.view.*;
 import android.widget.*;
 
 /** Window brightness and media volume; no global brightness settings are modified. */
+@androidx.annotation.OptIn(markerClass=androidx.media3.common.util.UnstableApi.class)
 final class PlaybackAdjustments {
     static final int PASS=0,START=1,CONSUME=2;
     private final Activity activity;

@@ -30,7 +30,10 @@ public final class GuideRepository {
     synchronized Data peek(Channel channel,boolean full) {
         Data stream=streamData(channel); if(stream!=null) return stream;
         Entry entry=cache.get(key(channel,full));
-        if(!full && (entry==null || entry.until()<=System.currentTimeMillis())) entry=cache.get(key(channel,true));
+        if(!full) {
+            Entry complete=cache.get(key(channel,true));
+            if(complete!=null && complete.until()>System.currentTimeMillis() && usable(complete.data().programs())) entry=complete;
+        }
         return entry!=null && entry.until()>System.currentTimeMillis() && (entry.data().programs().isEmpty() || usable(entry.data().programs()))?entry.data():null;
     }
     private synchronized Data streamData(Channel channel) {

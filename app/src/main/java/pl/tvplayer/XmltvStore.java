@@ -44,7 +44,7 @@ final class XmltvStore extends SQLiteOpenHelper {
         if(saved.stream().anyMatch(p -> p.end()>System.currentTimeMillis()/1000)) {
             if(!fresh(source) && System.currentTimeMillis()>=failures.getOrDefault(source,0L) && refreshing.add(source)) refreshWorker.execute(() -> {
                 try { synchronized(lock) { refresh(source,url,channel.timezone()); failures.remove(source); } }
-                catch(IOException ignored) { failures.put(source,System.currentTimeMillis()+60000); }
+                catch(IOException | RuntimeException ignored) { failures.put(source,System.currentTimeMillis()+60000); }
                 finally { refreshing.remove(source); }
             });
             return saved;
