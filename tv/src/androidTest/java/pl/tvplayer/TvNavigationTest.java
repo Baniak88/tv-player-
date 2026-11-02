@@ -59,11 +59,12 @@ public class TvNavigationTest {
         assertFalse(bytes.contains(expected.password())); assertFalse(bytes.contains(expected.user()));
     }
     @Test public void playerKeepsLandscapeAndHandlesRemoteMenu() throws Exception {
+        TvActivity home=start();
         PlayerActivity player=(PlayerActivity)instrument().startActivitySync(new Intent(context(),PlayerActivity.class).putExtra("television",true).putExtra("url","https://example.com/film.mp4").putExtra("name","Test Film").putExtra("kind","movie").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         try {
             instrument().waitForIdleSync(); assertEquals(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE,player.getRequestedOrientation());
             key(KeyEvent.KEYCODE_MENU); assertFalse(instrument().getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText("Ścieżka audio").isEmpty()); key(KeyEvent.KEYCODE_BACK);
             key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); key(KeyEvent.KEYCODE_MEDIA_STOP);
-        } finally { instrument().runOnMainSync(player::finish); instrument().waitForIdleSync(); Thread.sleep(300); }
+        } finally { instrument().runOnMainSync(player::finish); instrument().waitForIdleSync(); long until=System.currentTimeMillis()+5000; while(!home.hasWindowFocus() && System.currentTimeMillis()<until) Thread.sleep(100); instrument().runOnMainSync(home::finish); instrument().waitForIdleSync(); Thread.sleep(500); }
     }
 }
