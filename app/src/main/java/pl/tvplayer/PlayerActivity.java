@@ -72,7 +72,9 @@ public class PlayerActivity extends Activity {
         full.setOnClickListener(v -> { fullscreen=!fullscreen; updateFullscreen(); });
         root.addView(top,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
         if(television) full.setVisibility(View.GONE);
-        if(television || !onDemand) view.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener)(visibility -> { if(!isInPictureInPictureMode()) toolbar.setVisibility(visibility); }));
+        // The top bar follows the player controls everywhere: films and series hide it together with the controls, like live TV.
+        view.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener)(visibility -> { if(!isInPictureInPictureMode()) toolbar.setVisibility(visibility); }));
+        if(onDemand && !television) view.setControllerShowTimeoutMs(4000);
         if(!television && !onDemand) {
             view.setShowPreviousButton(true); view.setShowNextButton(true); view.setShowRewindButton(false); view.setShowFastForwardButton(false);
             view.setControllerShowTimeoutMs(4000);

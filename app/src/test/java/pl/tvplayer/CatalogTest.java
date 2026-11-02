@@ -58,4 +58,16 @@ public class CatalogTest {
         assertEquals("https://img.example.com/tvp.png",m3u.get(0).logo()); assertEquals("",m3u.get(1).logo());
         assertEquals("https://img.example.com/tvp.png",m3u.get(0).withOrder(3).logo());
     }
+    @Test public void panelPlaylistPointsGuideAtThePanelNotTheStreamHost() throws Exception {
+        HttpUrl playlist=HttpUrl.get("http://panel.example.com:8080/get.php?username=u&password=p&type=m3u_plus");
+        List<Channel> parsed=M3uParser.parse("#EXTM3U\n#EXTINF:-1,TVP 1\nhttp://cdn.example.net/u/p/123.ts\n#EXTINF:-1,Film\nhttp://cdn.example.net/movie/u/p/9.mkv",playlist.toString());
+        List<Channel> fixed=SourceClient.withPanelGuide(playlist,parsed);
+        HttpUrl api=SourceClient.accountEndpoint(fixed.get(0));
+        assertEquals("panel.example.com",api.host()); assertEquals(8080,api.port()); assertEquals("/player_api.php",api.encodedPath());
+        assertEquals("u",api.queryParameter("username")); assertEquals("123",Guide.endpoint(fixed.get(0)).queryParameter("stream_id"));
+        assertEquals("panel.example.com",Guide.xmltv(fixed.get(0)).host());
+        assertEquals("",fixed.get(1).guideUrl());
+        HttpUrl plain=HttpUrl.get("https://example.com/list.m3u");
+        assertEquals(parsed,SourceClient.withPanelGuide(plain,parsed));
+    }
 }
