@@ -25,13 +25,15 @@ public class PlayerControlsTest {
     private View description(View root,String value) { if(value.contentEquals(root.getContentDescription()==null?"":root.getContentDescription())) return root; if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { View found=description(((ViewGroup)root).getChildAt(i),value); if(found!=null) return found; } return null; }
     private View text(View root,String value) { if(root instanceof TextView && value.equals(((TextView)root).getText().toString())) return root; if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { View found=text(((ViewGroup)root).getChildAt(i),value); if(found!=null) return found; } return null; }
     private int[] center(View target) { int[] point=new int[2]; instrument().runOnMainSync(() -> { target.getLocationOnScreen(point); point[0]+=target.getWidth()/2; point[1]+=target.getHeight()/2; }); return point; }
-    private void tap(PlayerActivity activity,int[] point) {
+    private void tap(PlayerActivity activity,int[] point) { tap(activity,point,null); }
+    private void tap(PlayerActivity activity,int[] point,View expected) {
+        instrument().setInTouchMode(true);
         int[] origin=new int[2]; instrument().runOnMainSync(() -> activity.getWindow().getDecorView().getLocationOnScreen(origin));
         long now=SystemClock.uptimeMillis();
         MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,point[0]-origin[0],point[1]-origin[1],0),up=MotionEvent.obtain(now,now+30,MotionEvent.ACTION_UP,point[0]-origin[0],point[1]-origin[1],0);
         down.setSource(InputDevice.SOURCE_TOUCHSCREEN); up.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         // Exercise Activity dispatch and real view hit-testing, independent of OS input-injection policy.
-        try { instrument().runOnMainSync(() -> { activity.dispatchTouchEvent(down); activity.dispatchTouchEvent(up); }); }
+        try { instrument().runOnMainSync(() -> { activity.dispatchTouchEvent(down); if(expected!=null) assertTrue("Touch did not hit the visible toolbar button",expected.isPressed()); activity.dispatchTouchEvent(up); }); }
         finally { down.recycle(); up.recycle(); }
         instrument().waitForIdleSync();
     }
@@ -52,7 +54,7 @@ public class PlayerControlsTest {
             // A second tap while controls are visible renews the timeout instead of hiding them.
             int[] screen=center(video(activity)); screen[1]/=2; tap(activity,screen); waitToolbar(activity,View.VISIBLE); Thread.sleep(700); assertEquals(View.VISIBLE,toolbar(activity).getVisibility());
             waitToolbar(activity,View.GONE); tap(activity,screen); waitToolbar(activity,View.VISIBLE);
-            View options=text(toolbar(activity),"Opcje"); assertNotNull(options); tap(activity,center(options));
+            View options=text(toolbar(activity),"Opcje"); assertNotNull(options); tap(activity,center(options),options);
             long until=SystemClock.elapsedRealtime()+4000; boolean opened=false;
             while(SystemClock.elapsedRealtime()<until) { android.view.accessibility.AccessibilityNodeInfo root=instrument().getUiAutomation().getRootInActiveWindow(); if(root!=null && !root.findAccessibilityNodeInfosByText("Ścieżka audio").isEmpty()) { opened=true; break; } Thread.sleep(80); }
             assertTrue("Visible Options button stopped working",opened); instrument().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);

@@ -115,9 +115,9 @@ public class PlayerActivity extends Activity {
         view.showController();
     }
     @Override public boolean dispatchTouchEvent(MotionEvent event) {
-        // Reveal after dispatch so the first tap cannot activate a previously hidden button.
+        // Let the tapped view finish its click before controls can change focus or visibility.
         boolean handled=super.dispatchTouchEvent(event);
-        if(event.getActionMasked()==MotionEvent.ACTION_UP) revealLiveControls();
+        if(event.getActionMasked()==MotionEvent.ACTION_UP && view!=null && !television && !onDemand) view.post(this::revealLiveControls);
         return handled;
     }
     @Override public void onConfigurationChanged(Configuration config) { super.onConfigurationChanged(config); if(!isInPictureInPictureMode()) { updateFullscreen(); revealLiveControls(); } }
