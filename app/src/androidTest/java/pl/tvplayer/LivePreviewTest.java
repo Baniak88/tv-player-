@@ -115,7 +115,11 @@ public class LivePreviewTest {
     }
     @Test public void weakInternetOptionPersistsAndChoosesLowerAdaptiveVariantOnThrottledConnection() throws Exception {
         full=(PlayerActivity)instrument().startActivitySync(new Intent(context(),PlayerActivity.class).putExtra("url",server.url("/master.m3u8").toString()).putExtra("name","Test internetu").putExtra("kind","tv").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
-        waitPlaying(() -> (ExoPlayer)field(full,"player")); assertTrue("Normal playback did not select the available 1080p variant",hd.get()>0);
+        waitPlaying(() -> (ExoPlayer)field(full,"player"));
+        // Establish a high-quality starting point independent of the emulator's bandwidth estimate.
+        instrument().runOnMainSync(() -> { ExoPlayer player=(ExoPlayer)field(full,"player"); player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon().setForceHighestSupportedBitrate(true).build()); player.seekTo(0); });
+        long highUntil=SystemClock.elapsedRealtime()+8000; while(hd.get()==0 && SystemClock.elapsedRealtime()<highUntil) Thread.sleep(60);
+        assertTrue("Normal playback could not select the available 1080p variant",hd.get()>0);
         View options=waitView(full.getWindow().getDecorView(),"Opcje"); instrument().runOnMainSync(options::performClick); clickItem(dialogView("Połączenie internetowe"));
         clickItem(dialogView("Słabszy internet · większy bufor"));
         long until=SystemClock.elapsedRealtime()+8000; while(!PlaybackSettings.weakInternet(context()) && SystemClock.elapsedRealtime()<until) Thread.sleep(60); assertTrue(PlaybackSettings.weakInternet(context()));

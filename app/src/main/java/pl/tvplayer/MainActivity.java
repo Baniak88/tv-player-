@@ -15,7 +15,8 @@ import java.util.concurrent.*;
 public class MainActivity extends Activity {
     private static final int FILE_REQUEST = 41, LIVE_FULLSCREEN=42;
     private LivePreview preview;
-    private LinearLayout liveArea;
+    private LinearLayout liveArea,dockBar;
+    private boolean wideLayout;
     private String fullscreenToken;
     private static final java.util.regex.Pattern RECENT=java.util.regex.Pattern.compile(".*(ostatnio|nowo|nowości|nowosci|new|recent|latest|2026|2025).*",java.util.regex.Pattern.CASE_INSENSITIVE|java.util.regex.Pattern.UNICODE_CASE);
     private static final String ALL = "Wszystkie kategorie";
@@ -80,8 +81,8 @@ public class MainActivity extends Activity {
             section=state.getString("section",section); selectedGroup=state.getString("bouquet",selectedGroup);
             showingBouquets=state.getBoolean("showingBouquets",showingBouquets); onlyFavorites=state.getBoolean("onlyFavorites",false);
         }
-        boolean wide=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;
-        LinearLayout root=column(); root.setBackgroundColor(Ui.BG);
+        boolean wide=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE; wideLayout=wide;
+        LinearLayout root=column(); root.setFocusableInTouchMode(true); root.setBackgroundColor(Ui.BG);
         root.setOnApplyWindowInsetsListener((v,insets) -> {
             v.setPadding(dp(16)+insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),dp(16)+insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets();
         });
@@ -140,7 +141,7 @@ public class MainActivity extends Activity {
         bouquets.setSelector(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)); bouquets.setClipToPadding(false); bouquets.setFastScrollEnabled(true);
         bouquets.setOnItemClickListener((parent,v,index,id) -> { if(busy) return; selectedGroup=bouquetNames.get(index); showingBouquets=false; filter(true); });
         content.addView(bouquets,new FrameLayout.LayoutParams(-1,-1)); buildVodViews(content,wide); root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout dock=new LinearLayout(this); dock.setPadding(dp(3),dp(3),dp(3),dp(3)); dock.setBackground(Ui.shape(this,Ui.SURFACE,14,Ui.BORDER));
+        LinearLayout dock=new LinearLayout(this); dockBar=dock; dock.setPadding(dp(3),dp(3),dp(3),dp(3)); dock.setBackground(Ui.shape(this,Ui.SURFACE,14,Ui.BORDER));
         libraryButton=Ui.button(this,"Bukiety"); favoriteButton=Ui.button(this,"☆ Ulubione");
         dock.addView(libraryButton,new LinearLayout.LayoutParams(0,dp(48),1)); dock.addView(favoriteButton,new LinearLayout.LayoutParams(0,dp(48),1));
         Ui.style(libraryButton,!onlyFavorites); Ui.style(favoriteButton,onlyFavorites);
@@ -156,7 +157,7 @@ public class MainActivity extends Activity {
             public View getView(int p,View reused,ViewGroup parent) { return row(shown.get(p),reused); }
         };
         list.setAdapter(rows);
-        setContentView(root); busy=true;
+        setContentView(root); root.requestFocus(); busy=true;
         search.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int a, int c, int f) { }
             public void onTextChanged(CharSequence s, int a, int b, int c) { searchHandler.removeCallbacks(searchTask); searchHandler.postDelayed(searchTask,150); }
@@ -267,7 +268,7 @@ public class MainActivity extends Activity {
         bouquetCounts.putAll(BouquetOrder.counts(items,sortMode()));
         bouquetNames=new ArrayList<>(); bouquetNames.add(ALL); bouquetNames.addAll(bouquetCounts.keySet());
         if(!bouquetNames.contains(selectedGroup)) selectedGroup=ALL;
-        boolean wide=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        boolean wide=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE; wideLayout=wide;
         bouquets.setAdapter(new BaseAdapter() {
             public int getCount() { return bouquetNames.size(); }
             public Object getItem(int p) { return bouquetNames.get(p); }
@@ -378,6 +379,15 @@ public class MainActivity extends Activity {
         }
         shown=next;
         boolean live=!grid && !busy && !shown.isEmpty() && !vod(); liveArea.setVisibility(live?View.VISIBLE:View.GONE);
+        if(!wideLayout) {
+            ViewGroup parent=(ViewGroup)favoriteButton.getParent();
+            if(live && parent!=crumb) {
+                parent.removeView(favoriteButton); favoriteButton.setText("☆"); favoriteButton.setTextSize(20); favoriteButton.setContentDescription("Ulubione"); crumb.addView(favoriteButton,new LinearLayout.LayoutParams(dp(48),dp(48)));
+            } else if(!live && parent!=dockBar) {
+                parent.removeView(favoriteButton); favoriteButton.setText("☆ Ulubione"); favoriteButton.setTextSize(14); dockBar.addView(favoriteButton,new LinearLayout.LayoutParams(0,dp(48),1));
+            }
+            dockBar.setVisibility(live?View.GONE:View.VISIBLE);
+        }
         preview.show(shown,live,onlyFavorites?"favorites":selectedGroup+"|"+query);
         rows.notifyDataSetChanged(); posterAdapter.notifyDataSetChanged();
         if(resetScroll) { list.setSelection(0); posters.setSelection(0); }
