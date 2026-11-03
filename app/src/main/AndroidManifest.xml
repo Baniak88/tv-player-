@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <application android:theme="@style/AppTheme" android:label="TV Player Preview" android:icon="@drawable/ic_player" android:allowBackup="false" android:usesCleartextTraffic="true" android:supportsRtl="true">
+    <application android:theme="@style/AppTheme" android:label="OKTV Player" android:icon="@drawable/ic_player" android:allowBackup="false" android:usesCleartextTraffic="true" android:supportsRtl="true">
         <activity android:name=".PlayerActivity" android:supportsPictureInPicture="true" android:resizeableActivity="true" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" />
         <service android:name=".RecordingService" android:exported="false" android:foregroundServiceType="dataSync" />
         <activity android:name=".MovieActivity" android:exported="false" />

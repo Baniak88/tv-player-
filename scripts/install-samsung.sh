@@ -32,4 +32,4 @@ PY
 mkdir -p "$task_root/dist"
 cp "$tv_widget" "$task_root/dist/TV-Player-Samsung-0.9.0-signed.wgt"
 tizen install -n "$(basename "$tv_widget")" -t "$tv_target" -- "$(dirname "$tv_widget")"
-echo 'Installed. Start TV Player from Apps on the TV.'
+echo 'Installed. Start OKTV Player from Apps on the TV.'

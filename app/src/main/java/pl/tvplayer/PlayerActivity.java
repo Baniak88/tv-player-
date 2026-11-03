@@ -38,10 +38,9 @@ public class PlayerActivity extends Activity {
     }
     private int dp(int value) { return (int)(value*getResources().getDisplayMetrics().density); }
     private Button action(String text) {
-        Button b=new Button(this); b.setText(text); b.setTextColor(-1); b.setTextSize(13); b.setAllCaps(false);
-        b.setMinWidth(0); b.setMinimumWidth(0); b.setPadding(dp(10),0,dp(10),0);
-        android.graphics.drawable.GradientDrawable shape=new android.graphics.drawable.GradientDrawable();
-        shape.setColor(0x33FFFFFF); shape.setCornerRadius(dp(12)); b.setBackground(shape);
+        Button b=new Button(this); b.setText(text); b.setTextColor(-1); b.setTextSize(14); b.setAllCaps(false); b.setStateListAnimator(null);
+        b.setTypeface(null,android.graphics.Typeface.BOLD); b.setMinWidth(0); b.setMinimumWidth(0); b.setMinHeight(dp(44)); b.setMinimumHeight(dp(44)); b.setPadding(dp(12),0,dp(12),0);
+        b.setBackground(Ui.touch(this,0x52000000,22,0x40FFFFFF));
         return b;
     }
     @Override public void onCreate(Bundle state) {
@@ -62,8 +61,15 @@ public class PlayerActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON | WindowManager.LayoutParams.FLAG_SECURE);
         FrameLayout root=new FrameLayout(this); root.setBackgroundColor(0xFF000000);
         view=new PlayerView(this); view.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING);
+        View progressBar=view.findViewById(androidx.media3.ui.R.id.exo_progress);
+        if(progressBar instanceof androidx.media3.ui.DefaultTimeBar) {
+            androidx.media3.ui.DefaultTimeBar timeBar=(androidx.media3.ui.DefaultTimeBar)progressBar;
+            timeBar.setPlayedColor(Ui.ACCENT); timeBar.setScrubberColor(Ui.ACCENT); timeBar.setBufferedColor(0x80FFFFFF); timeBar.setUnplayedColor(0x40FFFFFF); timeBar.setAdMarkerColor(Ui.HIGHLIGHT);
+        }
         root.addView(view,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout top=new LinearLayout(this); toolbar=top; top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(10),dp(24),dp(10),dp(6)); top.setBackgroundColor(0x99000000);
+        LinearLayout top=new LinearLayout(this); toolbar=top; top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(12),dp(24),dp(12),dp(18));
+        // Soft fade instead of a hard black band, so the picture stays visible behind the controls.
+        top.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xD9000000,0x80000000,0x00000000}));
         Button back=action("‹"); back.setContentDescription("Wróć do biblioteki"); top.addView(back,new LinearLayout.LayoutParams(dp(46),dp(44))); back.setOnClickListener(v -> finish());
         title=new TextView(this); title.setText(getIntent().getStringExtra("name")); title.setTextColor(-1); title.setTextSize(15); title.setMaxLines(2); title.setPadding(dp(10),0,dp(6),0); top.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         Button settings=action("Audio / CC"); top.addView(settings,new LinearLayout.LayoutParams(dp(92),dp(44)));
@@ -82,7 +88,7 @@ public class PlayerActivity extends Activity {
             view.setControllerHideOnTouch(false);
         }
         error=new LinearLayout(this); error.setOrientation(LinearLayout.VERTICAL); error.setGravity(Gravity.CENTER);
-        error.setBackgroundColor(0xEE16171A); error.setPadding(dp(24),dp(20),dp(24),dp(20));
+        error.setBackgroundColor(0xEE141A27); error.setPadding(dp(24),dp(20),dp(24),dp(20));
         message=new TextView(this); message.setTextColor(-1); message.setTextSize(17); error.addView(message);
         Button retry=action("Spróbuj ponownie"); error.addView(retry);
         retry.setOnClickListener(v -> { if(player!=null) { error.setVisibility(View.GONE); player.prepare(); player.play(); } });
@@ -179,7 +185,7 @@ public class PlayerActivity extends Activity {
         labels.add("Cofnij o 30 sekund");
         if(adjustments!=null) labels.add("Głośność i jasność");
         if(!television && !onDemand) labels.add("Połączenie internetowe");
-        new AlertDialog.Builder(this).setTitle("Odtwarzanie").setItems(labels.toArray(new String[0]),(d,i) -> {
+        new AlertDialog.Builder(this).setTitle("Opcje odtwarzania").setAdapter(optionRows(labels),(d,i) -> {
             if(labels.get(i).equals("Połączenie internetowe")) { PlaybackSettings.choose(this,() -> {
                 boolean playing=player!=null && player.getPlayWhenReady();
                 if(player!=null) { view.setPlayer(null); player.release(); player=null; } stopStreamObservation(); error.setVisibility(View.GONE); startPlayback(); if(player!=null && !playing) player.pause();
@@ -201,6 +207,48 @@ public class PlayerActivity extends Activity {
                 case 5: if(RecordingService.active) stopService(new android.content.Intent(this,RecordingService.class)); else chooseRecording(); break;
             }
         }).show();
+    }
+    /** Options as large rows with an icon and a one-line hint; labels stay exact for accessibility services. */
+    private ListAdapter optionRows(List<String> labels) {
+        return new BaseAdapter() {
+            public int getCount() { return labels.size(); }
+            public Object getItem(int p) { return labels.get(p); }
+            public long getItemId(int p) { return p; }
+            public View getView(int p,View reused,ViewGroup parent) {
+                LinearLayout row;
+                if(reused instanceof LinearLayout) row=(LinearLayout)reused;
+                else {
+                    row=new LinearLayout(PlayerActivity.this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(20),dp(10),dp(20),dp(10)); row.setMinimumHeight(dp(60));
+                    TextView icon=new TextView(PlayerActivity.this); icon.setGravity(Gravity.CENTER); icon.setTextSize(16); icon.setTextColor(Ui.ACCENT); icon.setTypeface(null,android.graphics.Typeface.BOLD);
+                    icon.setBackground(Ui.shape(PlayerActivity.this,0x26FF3D5E,20,0)); row.addView(icon,new LinearLayout.LayoutParams(dp(40),dp(40)));
+                    LinearLayout copy=new LinearLayout(PlayerActivity.this); copy.setOrientation(LinearLayout.VERTICAL); copy.setPadding(dp(16),0,0,0);
+                    TextView label=new TextView(PlayerActivity.this); label.setTextSize(16); label.setTextColor(Ui.TEXT); copy.addView(label);
+                    TextView hint=new TextView(PlayerActivity.this); hint.setTextSize(12); hint.setTextColor(Ui.MUTED); copy.addView(hint);
+                    row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+                }
+                String label=labels.get(p);
+                ((TextView)row.getChildAt(0)).setText(optionIcon(label));
+                LinearLayout copy=(LinearLayout)row.getChildAt(1); ((TextView)copy.getChildAt(0)).setText(label);
+                String hint=optionHint(label); TextView hintView=(TextView)copy.getChildAt(1); hintView.setText(hint); hintView.setVisibility(hint.isEmpty()?View.GONE:View.VISIBLE);
+                return row;
+            }
+        };
+    }
+    private static String optionIcon(String label) {
+        switch(label) {
+            case "Ścieżka audio": return "♪"; case "Napisy": return "CC"; case "Odtwórz od początku": return "⟲"; case "Obraz w obrazie (PiP)": return "▣";
+            case "Program TV i archiwum": return "☰"; case "Nagraj kanał do pliku": return "●"; case "Zatrzymaj nagrywanie": return "■";
+            case "Cofnij o 30 sekund": return "30"; case "Głośność i jasność": return "☀"; case "Połączenie internetowe": return "⇅"; default: return "•";
+        }
+    }
+    private String optionHint(String label) {
+        switch(label) {
+            case "Ścieżka audio": return "Język i lektor"; case "Napisy": return "Włącz, wyłącz lub zmień język";
+            case "Odtwórz od początku": return onDemand?"Zacznij od pierwszej minuty":"Program TV i powtórki";
+            case "Obraz w obrazie (PiP)": return "Oglądaj w małym oknie"; case "Program TV i archiwum": return "EPG i oglądanie od początku";
+            case "Głośność i jasność": return "Suwaki dla tego odtwarzania"; case "Połączenie internetowe": return PlaybackSettings.weakInternet(this)?"Teraz: słabszy internet":"Teraz: standard";
+            default: return "";
+        }
     }
     private void openGuide() {
         GuideDialog.open(this,liveChannel(),guideWorker,c -> {

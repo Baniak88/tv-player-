@@ -11,11 +11,12 @@ import android.graphics.drawable.StateListDrawable;
 import android.widget.Button;
 import android.widget.TextView;
 
-/** Minimal graphite palette shared by every screen. */
+/** OKTV palette: deep navy surfaces, one vivid coral-red accent and a cyan highlight for progress. */
 final class Ui {
-    static final int BG = 0xFF0E0F11, SURFACE = 0xFF16171A, SURFACE_HIGH = 0xFF1E2024, BORDER = 0xFF2A2C31,
-        TEXT = 0xFFEDEEF0, MUTED = 0xFF8E939C, FAINT = 0xFF5F636B, ON_ACCENT = 0xFF0E0F11, ACCENT = 0xFFF2F3F5,
-        STAR = 0xFFF2C14E, DANGER = 0xFFFF6B6B;
+    static final String APP_NAME = "OKTV Player", BRAND = "OKTV";
+    static final int BG = 0xFF0A0D14, SURFACE = 0xFF141A27, SURFACE_HIGH = 0xFF1C2335, BORDER = 0xFF2A3350,
+        TEXT = 0xFFF3F5FA, MUTED = 0xFF9DA6BC, FAINT = 0xFF646D84, ON_ACCENT = 0xFFFFFFFF, ACCENT = 0xFFFF3D5E,
+        HIGHLIGHT = 0xFF35D0FF, STAR = 0xFFFFC53D, DANGER = 0xFFFF6B6B;
     private Ui() { }
 
     static int dp(Context c, float n) { return Math.round(n * c.getResources().getDisplayMetrics().density); }
@@ -72,7 +73,7 @@ final class Ui {
     static LinearLayout detailBar(Context context,String section,Runnable back) {
         LinearLayout bar=new LinearLayout(context); bar.setGravity(Gravity.CENTER_VERTICAL); bar.setPadding(dp(context,8),dp(context,2),dp(context,16),dp(context,2)); bar.setBackgroundColor(BG); bar.setClickable(true);
         Button arrow=button(context,"‹"); arrow.setTextSize(30); ghost(arrow,TEXT); arrow.setContentDescription(section.equals("Seriale")?"Wróć do seriali":"Wróć do filmów"); arrow.setOnClickListener(v -> back.run()); bar.addView(arrow,new LinearLayout.LayoutParams(dp(context,48),dp(context,48)));
-        TextView title=text(context,section,16,TEXT); bar.addView(title,new LinearLayout.LayoutParams(0,-2,1)); TextView brand=text(context,"TV PLAYER",11,MUTED); brand.setLetterSpacing(.06f); bar.addView(brand); return bar;
+        TextView title=text(context,section,16,TEXT); bar.addView(title,new LinearLayout.LayoutParams(0,-2,1)); TextView brand=text(context,BRAND,12,ACCENT); brand.setTypeface(null,android.graphics.Typeface.BOLD); brand.setLetterSpacing(.06f); bar.addView(brand); return bar;
     }
     static String count(int n) {
         return String.format(new java.util.Locale("pl", "PL"), "%,d", n).replace(',', ' ').replace('.', ' ');

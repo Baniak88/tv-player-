@@ -117,7 +117,7 @@ public final class SeriesActivity extends Activity {
         if(television) { FrameLayout.LayoutParams infoSize=new FrameLayout.LayoutParams(Math.max(dp(420),getResources().getDisplayMetrics().widthPixels/2),-2,Gravity.LEFT); hero.addView(copy,infoSize); }
         if(television || !details.cover().isEmpty() || !details.backdrop().isEmpty()) header.addView(hero,new LinearLayout.LayoutParams(-1,heroHeight)); if(!television) header.addView(copy);
         Button back=back(); if(!television) back.setVisibility(View.GONE); FrameLayout.LayoutParams backSize=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT); backSize.leftMargin=dp(television?26:14); backSize.topMargin=dp(12); hero.addView(back,backSize);
-        TextView brand=text("TV PLAYER",12,Ui.MUTED); if(!television) brand.setVisibility(View.GONE); brand.setTypeface(null,Typeface.BOLD); FrameLayout.LayoutParams brandSize=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT); brandSize.rightMargin=dp(18); brandSize.topMargin=dp(26); hero.addView(brand,brandSize);
+        TextView brand=text(Ui.BRAND,12,Ui.ACCENT); if(!television) brand.setVisibility(View.GONE); brand.setTypeface(null,Typeface.BOLD); FrameLayout.LayoutParams brandSize=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT); brandSize.rightMargin=dp(18); brandSize.topMargin=dp(26); hero.addView(brand,brandSize);
         LinearLayout seasonBar=new LinearLayout(this); seasonBar.setPadding(dp(television?32:18),dp(16),dp(television?32:18),dp(8)); seasonBar.setGravity(Gravity.CENTER_VERTICAL);
         TextView label=text("Odcinki",television?24:20,Ui.TEXT); label.setTypeface(null,Typeface.BOLD); seasonBar.addView(label,new LinearLayout.LayoutParams(0,-2,1));
         seasonButton=null;

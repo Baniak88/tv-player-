@@ -505,7 +505,7 @@ public class MainActivity extends Activity {
         hero=new FrameLayout(this); hero.setClipToOutline(true); hero.setBackground(Ui.shape(this,Ui.SURFACE,16,0));
         heroImage=new ImageView(this); heroImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
         hero.addView(heroImage,new FrameLayout.LayoutParams(-1,-1));
-        View shade=new View(this); shade.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0x660E0F11,0xF00E0F11}));
+        View shade=new View(this); shade.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0x660A0D14,0xF20A0D14}));
         hero.addView(shade,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout heroText=column(); heroText.setPadding(dp(16),0,dp(16),dp(16));
         heroMeta=Ui.text(this,"",12,Ui.MUTED); heroMeta.setMaxLines(1); heroMeta.setEllipsize(TextUtils.TruncateAt.END); heroText.addView(heroMeta);
@@ -662,7 +662,7 @@ public class MainActivity extends Activity {
             placeholder.setMaxLines(4); placeholder.setEllipsize(TextUtils.TruncateAt.END);
             frame.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
             ImageView image=new ImageView(this); image.setScaleType(ImageView.ScaleType.CENTER_CROP); frame.addView(image,new FrameLayout.LayoutParams(-1,-1));
-            TextView badge=Ui.text(this,"★",12,Ui.STAR); badge.setGravity(Gravity.CENTER); badge.setBackground(Ui.shape(this,0xCC0E0F11,12,0));
+            TextView badge=Ui.text(this,"★",12,Ui.STAR); badge.setGravity(Gravity.CENTER); badge.setBackground(Ui.shape(this,0xCC0A0D14,12,0));
             FrameLayout.LayoutParams badgeSize=new FrameLayout.LayoutParams(dp(24),dp(24),Gravity.TOP|Gravity.END); badgeSize.topMargin=dp(6); badgeSize.rightMargin=dp(6);
             frame.addView(badge,badgeSize);
             card.addView(frame,new LinearLayout.LayoutParams(-1,width*3/2));
@@ -798,7 +798,7 @@ public class MainActivity extends Activity {
         List<Channel> copy = new ArrayList<>(channels); Set<String> stars = new HashSet<>(favorites);
         worker.execute(() -> { try { store.save(copy, stars); } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) error("Nie udało się zapisać biblioteki na urządzeniu."); }); } });
     }
-    private void error(String message) { if (!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK", null).show(); }
+    private void error(String message) { if (!isDestroyed()) new AlertDialog.Builder(this).setTitle(Ui.APP_NAME).setMessage(message).setPositiveButton("OK", null).show(); }
     @Override protected void onResume() { super.onResume(); if(preview!=null) preview.resume(); worker.execute(() -> { try { Set<String> saved=store.loadFavorites(); runOnUiThread(() -> { if(!isDestroyed() && !favorites.equals(saved)) { favorites.clear(); favorites.addAll(saved); if(vod() && sectionIndex.containsKey(section)) updateMyList(); filter(false); } }); } catch(Exception ignored) {} }); if(section.equals("movie") && sectionIndex.containsKey("movie")) refreshContinuing(sectionIndex.get("movie")); if(rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
     @Override public void onWindowFocusChanged(boolean focus) { super.onWindowFocusChanged(focus); if(focus && rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); }
     @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); if(preview!=null) preview.pause(); super.onPause(); }
