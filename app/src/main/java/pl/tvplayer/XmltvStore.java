@@ -94,7 +94,13 @@ final class XmltvStore extends SQLiteOpenHelper {
     private void refresh(String source,HttpUrl url,String timezone) throws IOException {
         SQLiteDatabase db=getWritableDatabase(); long now=System.currentTimeMillis()/1000;
         try(Cursor cursor=db.rawQuery("SELECT updated FROM feeds WHERE source=?",new String[]{source})) { if(cursor.moveToFirst() && now-cursor.getLong(0)<3600) return; }
-        try(Response response=client.newCall(new Request.Builder().url(url).header("User-Agent","TVPlayer/0.8.1").build()).execute()) {
+        Response first=client.newCall(new Request.Builder().url(url).header("User-Agent",SourceClient.agent(url)).build()).execute();
+        if(!first.isSuccessful() && SourceClient.blockedAgent(first.code()) && SourceClient.agent(url).equals(SourceClient.AGENT)) {
+            // Some panels only serve xmltv.php to known players; retry once and remember the host.
+            first.close(); first=client.newCall(new Request.Builder().url(url).header("User-Agent",SourceClient.PLAYER_AGENT).build()).execute();
+            if(first.isSuccessful()) SourceClient.preferPlayerAgent(url);
+        }
+        try(Response response=first) {
             if(!response.isSuccessful() || response.body()==null) throw new IOException("Nie udało się pobrać XMLTV (HTTP "+response.code()+").");
             try(PushbackInputStream input=new PushbackInputStream(new BufferedInputStream(response.body().byteStream(),65536),2)) {
                 int a=input.read(),b=input.read(); if(b>=0) input.unread(b); if(a>=0) input.unread(a);

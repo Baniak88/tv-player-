@@ -20,7 +20,7 @@ final class EpgDiscovery {
         String key=playlist.toString(); Entry old=cache.get(key); long now=System.currentTimeMillis();
         if(old!=null && old.until()>now) return old.urls();
         List<HttpUrl> urls=Collections.emptyList();
-        try(Response response=client.newCall(new Request.Builder().url(playlist).header("User-Agent","TVPlayer/0.8.8").build()).execute()) {
+        try(Response response=client.newCall(new Request.Builder().url(playlist).header("User-Agent",SourceClient.agent(playlist)).build()).execute()) {
             if(!response.isSuccessful() || response.body()==null) throw new IOException("Nagłówek playlisty: HTTP "+response.code()+".");
             urls=header(response.body().charStream(),response.request().url());
             return urls;

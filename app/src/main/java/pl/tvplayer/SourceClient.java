@@ -23,10 +23,28 @@ public final class SourceClient {
     private interface ReaderTask<T> { T read(Reader reader) throws IOException; }
     private <T> T get(HttpUrl url, ReaderTask<T> task) throws IOException { return request(client,url,task); }
     private <T> T request(OkHttpClient http,HttpUrl url,ReaderTask<T> task) throws IOException { return request(http,url,task,0); }
+    static final String AGENT="TVPlayer/1.0", PLAYER_AGENT="VLC/3.0.20 LibVLC/3.0.20";
+    /** Hosts whose panel only answered when the app presented itself as a common media player. */
+    private static final Set<String> PLAYER_HOSTS=java.util.concurrent.ConcurrentHashMap.newKeySet();
+    static String agent(HttpUrl url) { return PLAYER_HOSTS.contains(url.host())?PLAYER_AGENT:AGENT; }
+    /** Some IPTV panels hide endpoints (404/403) from unknown apps; retry once like a media player and remember it. */
+    static boolean blockedAgent(int code) { return code==403 || code==404 || code==406 || code==451; }
+    static void preferPlayerAgent(HttpUrl url) { PLAYER_HOSTS.add(url.host()); }
     private <T> T request(OkHttpClient http,HttpUrl url,ReaderTask<T> task,long budgetNanos) throws IOException {
-        Call call=http.newCall(new Request.Builder().url(url).header("User-Agent", "TVPlayer/1.0").build());
+        String agent=agent(url);
+        Call call=http.newCall(new Request.Builder().url(url).header("User-Agent", agent).build());
         if(budgetNanos>0) call.timeout().timeout(budgetNanos,TimeUnit.NANOSECONDS);
         try (Response response = call.execute()) {
+            if (!response.isSuccessful() && blockedAgent(response.code()) && agent.equals(AGENT)) {
+                response.close();
+                Call retry=http.newCall(new Request.Builder().url(url).header("User-Agent", PLAYER_AGENT).build());
+                if(budgetNanos>0) retry.timeout().timeout(budgetNanos,TimeUnit.NANOSECONDS);
+                try (Response second = retry.execute()) {
+                    if (!second.isSuccessful() || second.body() == null) throw new IOException("Serwer zwrócił błąd HTTP " + second.code() + ".");
+                    preferPlayerAgent(url);
+                    try (Reader reader = second.body().charStream()) { return task.read(reader); }
+                }
+            }
             if (!response.isSuccessful() || response.body() == null)
                 throw new IOException("Serwer zwrócił błąd HTTP " + response.code() + ".");
             // Parse directly from the response: no size-based rejection or full-body copy.

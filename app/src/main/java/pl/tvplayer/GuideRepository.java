@@ -156,7 +156,7 @@ public final class GuideRepository {
         }
         LinkedHashSet<okhttp3.HttpUrl> feeds=new LinkedHashSet<>();
         okhttp3.HttpUrl own=EpgSettings.custom(context); if(own!=null) feeds.add(own);
-        else failure+=(failure.isEmpty()?"":"\n")+"• Własny link EPG: nie ustawiono (przycisk „Ustaw EPG”).";
+        else failure+=(failure.isEmpty()?"":"\n")+"• Własny link EPG: nie ustawiono (przycisk „Link EPG”).";
         if(!channel.guideUrl().startsWith("xmltv:")) {
             try { feeds.addAll(source.discoverGuides(channel)); } catch(java.io.IOException | IllegalArgumentException ignored) {}
         }

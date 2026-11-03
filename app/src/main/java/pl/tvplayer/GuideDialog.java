@@ -47,8 +47,8 @@ public final class GuideDialog {
         if(programs.isEmpty()) {
             AlertDialog.Builder error=new AlertDialog.Builder(activity).setTitle("Program TV")
                 .setMessage(data.error().isEmpty()?"Dostawca nie udostępnił programu dla tego kanału.":data.error()).setNegativeButton("Zamknij",null);
-            error.setNeutralButton("Ustaw EPG",(d,w) -> EpgSettings.choose(activity,() -> open(activity,channel,java.util.concurrent.ForkJoinPool.commonPool(),play)));
-            if(!data.source().equals("Strumień DVB EIT")) error.setPositiveButton("Odczytaj strumień",(d,w) -> openStream(activity,channel,play));
+            error.setNeutralButton("Link EPG",(d,w) -> EpgSettings.choose(activity,() -> open(activity,channel,java.util.concurrent.ForkJoinPool.commonPool(),play)));
+            if(!data.source().equals("Strumień DVB EIT")) error.setPositiveButton("Ze strumienia",(d,w) -> openStream(activity,channel,play));
             else error.setPositiveButton("Włącz kanał",(d,w) -> play.accept(channel));
             error.show(); return;
         }
