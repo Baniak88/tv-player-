@@ -46,7 +46,7 @@ public final class HomeActivity extends Activity {
         Icon glyph=new Icon(this,icon); glyph.tint=Ui.ACCENT; row.addView(glyph,new LinearLayout.LayoutParams(dp(24),dp(24)));
         TextView t=text(label,15,Ui.TEXT); t.setPadding(dp(12),0,0,0); t.setMaxLines(1); t.setTypeface(null,Typeface.BOLD);
         // Shrink long labels ("Odśwież źródło") instead of wrapping them onto two lines.
-        t.setAutoSizeTextTypeUniformWithConfiguration(11,15,1,android.util.TypedValue.COMPLEX_UNIT_SP); row.addView(t,new LinearLayout.LayoutParams(0,dp(24),1));
+        if(android.os.Build.VERSION.SDK_INT>=26) t.setAutoSizeTextTypeUniformWithConfiguration(11,15,1,android.util.TypedValue.COMPLEX_UNIT_SP); else t.setEllipsize(android.text.TextUtils.TruncateAt.END); row.addView(t,new LinearLayout.LayoutParams(0,dp(24),1));
         row.setOnClickListener(v -> click.run()); return row;
     }
     private View compactAction(String label,String icon,Runnable click) {
