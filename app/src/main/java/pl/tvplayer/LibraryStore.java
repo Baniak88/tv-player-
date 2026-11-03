@@ -74,10 +74,11 @@ final class LibraryStore {
             .name("epg").value(c.epgId()).name("kind").value(c.kind()).name("guide").value(c.guideUrl())
             .name("archiveDays").value(c.archiveDays()).name("timezone").value(c.timezone()).name("bouquetOrder").value(c.bouquetOrder());
         if(!c.logo().isEmpty()) writer.name("logo").value(c.logo());
+        if(c.added()>0) writer.name("added").value(c.added());
         writer.endObject();
     }
     private Channel readChannel(JsonReader reader) throws IOException {
-        String name="",url="",group="Bez kategorii",epg="",kind="",guide="",timezone="UTC",logo=""; int days=0,order=Integer.MAX_VALUE;
+        String name="",url="",group="Bez kategorii",epg="",kind="",guide="",timezone="UTC",logo=""; long added=0; int days=0,order=Integer.MAX_VALUE;
         reader.beginObject();
         while(reader.hasNext()) {
             switch(reader.nextName()) {
@@ -89,12 +90,13 @@ final class LibraryStore {
                 case "guide": guide=SourceClient.value(reader); break;
                 case "timezone": timezone=SourceClient.value(reader); break;
                 case "logo": logo=SourceClient.value(reader); break;
+                case "added": try { added=Long.parseLong(SourceClient.value(reader)); } catch(NumberFormatException ignored) {} break;
                 case "bouquetOrder": try { order=Integer.parseInt(SourceClient.value(reader)); } catch(NumberFormatException ignored) {} break;
                 case "archiveDays": try { days=Integer.parseInt(SourceClient.value(reader)); } catch(NumberFormatException ignored) {} break;
                 default: reader.skipValue();
             }
         }
-        reader.endObject(); return new Channel(name,url,group,epg,kind,guide,days,timezone,order,logo);
+        reader.endObject(); return new Channel(name,url,group,epg,kind,guide,days,timezone,order,logo,added);
     }
     void save(List<Channel> channels,Set<String> favorites) throws Exception {
         synchronized(LOCK) {

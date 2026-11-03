@@ -24,7 +24,7 @@ public final class SourceClient {
     private <T> T get(HttpUrl url, ReaderTask<T> task) throws IOException { return request(client,url,task); }
     private <T> T request(OkHttpClient http,HttpUrl url,ReaderTask<T> task) throws IOException { return request(http,url,task,0); }
     private <T> T request(OkHttpClient http,HttpUrl url,ReaderTask<T> task,long budgetNanos) throws IOException {
-        Call call=http.newCall(new Request.Builder().url(url).header("User-Agent", "TVPlayer/0.8.10").build());
+        Call call=http.newCall(new Request.Builder().url(url).header("User-Agent", "TVPlayer/1.0").build());
         if(budgetNanos>0) call.timeout().timeout(budgetNanos,TimeUnit.NANOSECONDS);
         try (Response response = call.execute()) {
             if (!response.isSuccessful() || response.body() == null)
@@ -99,7 +99,7 @@ public final class SourceClient {
         List<Channel> result = new ArrayList<>();
         reader.beginArray();
         while (reader.hasNext()) {
-            String id = "", name = "Kanał", category = "", epg = "", extension = "mp4", icon = "";
+            String id = "", name = "Kanał", category = "", epg = "", extension = "mp4", icon = ""; long added = 0;
             int archive=0,days=0;
             reader.beginObject();
             while (reader.hasNext()) {
@@ -109,6 +109,7 @@ public final class SourceClient {
                     case "tv_archive": try { archive=Integer.parseInt(value(reader)); } catch(NumberFormatException ignored) {} break;
                     case "tv_archive_duration": try { days=Integer.parseInt(value(reader)); } catch(NumberFormatException ignored) {} break;
                     case "stream_icon": case "cover": if (icon.isEmpty()) icon = value(reader); else reader.skipValue(); break;
+                    case "added": case "last_modified": try { added = Math.max(added, Long.parseLong(value(reader).trim())); } catch (NumberFormatException ignored) {} break;
                     case "name": name = value(reader); break;
                     case "category_id": category = value(reader); break;
                     case "epg_channel_id": epg = value(reader); break;
@@ -127,7 +128,7 @@ public final class SourceClient {
                     .addPathSegment(id + (kind.equals("tv") ? ".ts" : "." + extension)).build().toString();
             }
             String guide=kind.equals("tv")?api(base,user,pass,"get_simple_data_table").newBuilder().addQueryParameter("stream_id",id).build().toString():"";
-            result.add(new Channel(name,url,categories.getOrDefault(category,"Bez kategorii"),epg,kind,guide,archive==1?Math.max(0,days):0,"UTC",ranks.getOrDefault(category,Integer.MAX_VALUE),icon));
+            result.add(new Channel(name,url,categories.getOrDefault(category,"Bez kategorii"),epg,kind,guide,archive==1?Math.max(0,days):0,"UTC",ranks.getOrDefault(category,Integer.MAX_VALUE),icon,kind.equals("tv")?0:added));
         }
         reader.endArray();
         if (reader.peek() != JsonToken.END_DOCUMENT) throw new IOException("Nieprawidłowa odpowiedź serwera.");

@@ -3,15 +3,20 @@ package pl.tvplayer;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-public record Channel(String name, String url, String group, String epgId, String kind, String guideUrl, int archiveDays, String timezone, int bouquetOrder, String logo) {
+public record Channel(String name, String url, String group, String epgId, String kind, String guideUrl, int archiveDays, String timezone, int bouquetOrder, String logo, long added) {
+    public Channel(String name,String url,String group,String epgId,String kind,String guideUrl,int archiveDays,String timezone,int bouquetOrder,String logo) {
+        this(name,url,group,epgId,kind,guideUrl,archiveDays,timezone,bouquetOrder,logo,0);
+    }
     public Channel(String name,String url,String group,String epgId,String kind,String guideUrl,int archiveDays,String timezone,int bouquetOrder) {
         this(name,url,group,epgId,kind,guideUrl,archiveDays,timezone,bouquetOrder,"");
     }
+    /** Same item with the provider's "added" time (seconds since 1970), used for "Ostatnio dodane". */
+    Channel withAdded(long seconds) { return new Channel(name,url,group,epgId,kind,guideUrl,archiveDays,timezone,bouquetOrder,logo,Math.max(0,seconds)); }
     /** Same item with another bouquet rank. */
-    Channel withOrder(int order) { return new Channel(name,url,group,epgId,kind,guideUrl,archiveDays,timezone,order,logo); }
-    Channel withTimezone(String zone) { return new Channel(name,url,group,epgId,kind,guideUrl,archiveDays,zone,bouquetOrder,logo); }
-    Channel withLogo(String image) { return new Channel(name,url,group,epgId,kind,guideUrl,archiveDays,timezone,bouquetOrder,image==null?"":image.trim()); }
-    Channel withGuideSource(String source) { return new Channel(name,url,group,epgId,kind,source,archiveDays,timezone,bouquetOrder,logo); }
+    Channel withOrder(int order) { return new Channel(name,url,group,epgId,kind,guideUrl,archiveDays,timezone,order,logo,added); }
+    Channel withTimezone(String zone) { return new Channel(name,url,group,epgId,kind,guideUrl,archiveDays,zone,bouquetOrder,logo,added); }
+    Channel withLogo(String image) { return new Channel(name,url,group,epgId,kind,guideUrl,archiveDays,timezone,bouquetOrder,image==null?"":image.trim(),added); }
+    Channel withGuideSource(String source) { return new Channel(name,url,group,epgId,kind,source,archiveDays,timezone,bouquetOrder,logo,added); }
     private static final Pattern EPISODE = Pattern.compile(".*\\bs[0-9]{1,2}\\s?e[0-9]{1,3}\\b.*");
     private static final Pattern VIDEO_FILE = Pattern.compile(".*\\.(mp4|mkv|avi|mov|webm|m4v|wmv|flv|mpg|mpeg)$");
     private static final Pattern LIVE_FILE = Pattern.compile(".*\\.(ts|m3u8?)$");
@@ -34,7 +39,7 @@ public record Channel(String name, String url, String group, String epgId, Strin
     /** Older versions classified live channels such as "Polsat Film" as movies; used once when migrating. */
     static Channel repairKind(Channel c) {
         if ((c.kind.equals("movie") || c.kind.equals("episode")) && infer(c.url, c.group, c.name).equals("tv"))
-            return new Channel(c.name, c.url, c.group, c.epgId, "tv", c.guideUrl, c.archiveDays, c.timezone, c.bouquetOrder, c.logo);
+            return new Channel(c.name, c.url, c.group, c.epgId, "tv", c.guideUrl, c.archiveDays, c.timezone, c.bouquetOrder, c.logo, c.added);
         return c;
     }
     public String section() { return kind.equals("episode") ? "series" : kind; }

@@ -70,4 +70,12 @@ public class CatalogTest {
         HttpUrl plain=HttpUrl.get("https://example.com/list.m3u");
         assertEquals(parsed,SourceClient.withPanelGuide(plain,parsed));
     }
+    @Test public void providerAddedTimeIsReadForFilmsAndSeries() throws Exception {
+        List<Channel> movies=SourceClient.readCatalog(new StringReader("[{\"stream_id\":12,\"name\":\"Film\",\"added\":\"1730000000\"}]"),
+            HttpUrl.get("https://example.com/"),"u","p",Collections.emptyMap(),"movie");
+        assertEquals(1730000000L,movies.get(0).added());
+        List<Channel> series=SourceClient.readCatalog(new StringReader("[{\"series_id\":8,\"name\":\"Serial\",\"last_modified\":\"1730000500\"}]"),
+            HttpUrl.get("https://example.com/"),"u","p",Collections.emptyMap(),"series");
+        assertEquals(1730000500L,series.get(0).added());
+    }
 }

@@ -21,6 +21,12 @@ public class MainActivity extends Activity {
     private String fullscreenToken;
     private static final java.util.regex.Pattern RECENT=java.util.regex.Pattern.compile(".*(ostatnio|nowo|nowości|nowosci|new|recent|latest|2026|2025).*",java.util.regex.Pattern.CASE_INSENSITIVE|java.util.regex.Pattern.UNICODE_CASE);
     private static final String ALL = "Wszystkie kategorie";
+    /** Netflix-style rows built from the library itself; never equal to a provider bouquet name. */
+    private static final String CONTINUE="\u0001continue", MYLIST="\u0001mylist", RECENTLY="\u0001recent";
+    private final ExecutorService indexer = Executors.newSingleThreadExecutor();
+    private LinkedHashMap<String,Long> continuing=new LinkedHashMap<>();
+    private boolean gridMode=true;
+    private Button clearSearch;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final ExecutorService network = Executors.newFixedThreadPool(2);
     private final Set<String> orderRequested=new HashSet<>();
@@ -109,10 +115,18 @@ public class MainActivity extends Activity {
         sortButton=Ui.button(this,"⇅"); sortButton.setTextSize(20); Ui.ghost(sortButton,Ui.MUTED); sortButton.setContentDescription("Sortuj bukiety");
         top.addView(sortButton,new LinearLayout.LayoutParams(dp(48),dp(48))); sortButton.setOnClickListener(v -> chooseSort());
         root.addView(top);
-        search=input("",false); updateSearchHint();
+        search=input("",false); updateSearchHint(); search.setPadding(dp(40),0,dp(44),0);
+        // Search field with a magnifier and a clear button, like streaming apps.
+        FrameLayout searchBox=new FrameLayout(this);
+        searchBox.addView(search,new FrameLayout.LayoutParams(-1,-1));
+        TextView glass=Ui.text(this,"⌕",20,Ui.FAINT); glass.setGravity(Gravity.CENTER); glass.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        searchBox.addView(glass,new FrameLayout.LayoutParams(dp(40),-1,Gravity.START|Gravity.CENTER_VERTICAL));
+        clearSearch=Ui.button(this,"✕"); Ui.ghost(clearSearch,Ui.MUTED); clearSearch.setTextSize(16); clearSearch.setContentDescription("Wyczyść wyszukiwanie"); clearSearch.setVisibility(View.GONE);
+        clearSearch.setOnClickListener(v -> { search.setText(""); search.requestFocus(); });
+        searchBox.addView(clearSearch,new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.END|Gravity.CENTER_VERTICAL));
         LinearLayout.LayoutParams searchSize=new LinearLayout.LayoutParams(-1,dp(48));
-        if(wide) { searchSize=new LinearLayout.LayoutParams(dp(240),dp(48)); searchSize.leftMargin=dp(4); top.addView(search,top.getChildCount()-1,searchSize); }
-        else root.addView(search,searchSize);
+        if(wide) { searchSize=new LinearLayout.LayoutParams(dp(260),dp(48)); searchSize.leftMargin=dp(4); top.addView(searchBox,top.getChildCount()-1,searchSize); }
+        else root.addView(searchBox,searchSize);
         // Breadcrumb shown only inside a bouquet or favourites; otherwise a quiet summary line.
         crumb=new LinearLayout(this); crumb.setGravity(Gravity.CENTER_VERTICAL); crumb.setPadding(0,dp(8),0,dp(4));
         Button up=Ui.button(this,"‹ Bukiety"); Ui.ghost(up,Ui.MUTED); up.setContentDescription("Wróć do listy bukietów");
@@ -181,18 +195,38 @@ public class MainActivity extends Activity {
         if(search.getText().length()>0) search.setText(""); filter(true);
     }
     private void toggleFavorite(Channel c) {
-        if(!favorites.remove(c.url())) favorites.add(c.url());
+        boolean added=!favorites.remove(c.url()); if(added) favorites.add(c.url());
         persistFavorites();
+        if(vod()) updateMyList();
+        String place=vod()?"„Moja lista”":"ulubionych"; Toast.makeText(this,(added?"Dodano do ":"Usunięto z ")+place,Toast.LENGTH_SHORT).show();
         // Only the favourites view changes its rows; elsewhere keep the scroll position.
         if(onlyFavorites) filter(false); else { rows.notifyDataSetChanged(); posterAdapter.notifyDataSetChanged(); }
         if(shelves.getVisibility()==View.VISIBLE) shelfAdapter.notifyDataSetChanged();
     }
-    private void putSection(String name,List<Channel> items) {
-        sectionIndex.put(name,items);
-        String[] keys=new String[items.size()];
-        for(int i=0;i<keys.length;i++) keys[i]=items.get(i).name().toLowerCase(Locale.ROOT);
-        searchKeys.put(name,keys);
+    /** Keeps the "Moja lista" row current without rebuilding (and scrolling) the whole shelf list. */
+    private void updateMyList() {
+        List<Channel> mine=new ArrayList<>(); int count=0;
+        for(Channel c:sectionIndex.getOrDefault(section,Collections.emptyList())) if(favorites.contains(c.url())) { count++; if(mine.size()<16) mine.add(c); }
+        boolean listed=shelfNames.contains(MYLIST);
+        if(mine.isEmpty()) { if(listed) { shelfNames.remove(MYLIST); shelfItems.remove(MYLIST); specialCounts.remove(MYLIST); } }
+        else { shelfItems.put(MYLIST,mine); specialCounts.put(MYLIST,count); if(!listed) shelfNames.add(shelfNames.contains(CONTINUE)?1:0,MYLIST); }
+        shelfAdapter.notifyDataSetChanged();
     }
+    private void putSection(String name,List<Channel> items) {
+        sectionIndex.put(name,items); searchKeys.remove(name);
+        // Search keys are prepared off the main thread; filter() falls back to on-the-fly keys meanwhile.
+        indexer.execute(() -> {
+            String[] keys=searchKeysFor(items);
+            runOnUiThread(() -> { if(!isDestroyed() && sectionIndex.get(name)==items) { searchKeys.put(name,keys); if(name.equals(section) && search.getText().length()>0) filter(false); } });
+        });
+    }
+    private static String[] searchKeysFor(List<Channel> items) {
+        String[] keys=new String[items.size()]; for(int i=0;i<keys.length;i++) keys[i]=TitleSearch.normalize(items.get(i).name()); return keys;
+    }
+    private static String display(String group) {
+        return group.equals(CONTINUE)?"Kontynuuj oglądanie":group.equals(MYLIST)?"Moja lista":group.equals(RECENTLY)?"Ostatnio dodane":group.equals(ALL)?"Cała oferta":group;
+    }
+    private static boolean special(String group) { return group.startsWith("\u0001"); }
     private void loadCachedSection(String requested) {
         busy=true;
         loadingMessage=requested.equals("tv")?"Wczytywanie kanałów…":requested.equals("movie")?"Wczytywanie filmów…":"Wczytywanie seriali…";
@@ -201,7 +235,7 @@ public class MainActivity extends Activity {
             try {
                 Set<String> savedFavorites=new HashSet<>();
                 List<Channel> loaded=store.loadSection(requested,savedFavorites);
-                String[] normalized=new String[loaded.size()]; for(int i=0;i<loaded.size();i++) normalized[i]=loaded.get(i).name().toLowerCase(Locale.ROOT);
+                String[] normalized=searchKeysFor(loaded);
                 runOnUiThread(() -> {
                     if(isDestroyed()) return;
                     channels.removeIf(c -> c.section().equals(requested)); channels.addAll(loaded); sectionIndex.put(requested,loaded); searchKeys.put(requested,normalized);
@@ -234,7 +268,17 @@ public class MainActivity extends Activity {
         return e;
     }
     private String sortMode() { return getSharedPreferences("catalog-ui",MODE_PRIVATE).getString("sort-"+section,"provider"); }
+    private String titleMode() { return getSharedPreferences("catalog-ui",MODE_PRIVATE).getString("titles-"+section,TitleSearch.PROVIDER); }
+    private void chooseTitleSort() {
+        String mode=titleMode(); int selected=0;
+        for(int i=0;i<TitleSearch.MODES.length;i++) if(TitleSearch.MODES[i].equals(mode)) selected=i;
+        new AlertDialog.Builder(this).setTitle("Sortuj tytuły").setSingleChoiceItems(TitleSearch.LABELS,selected,(dialog,index) -> {
+            getSharedPreferences("catalog-ui",MODE_PRIVATE).edit().putString("titles-"+section,TitleSearch.MODES[index]).apply();
+            dialog.dismiss(); filter(true);
+        }).setNegativeButton("Anuluj",null).show();
+    }
     private void chooseSort() {
+        if(vod() && !gridMode) { chooseTitleSort(); return; }
         String mode=sortMode(); int selected=0;
         for(int i=0;i<BouquetOrder.MODES.length;i++) if(BouquetOrder.MODES[i].equals(mode)) selected=i;
         new AlertDialog.Builder(this).setTitle("Sortowanie bukietów").setSingleChoiceItems(BouquetOrder.LABELS,selected,(dialog,index) -> {
@@ -364,20 +408,42 @@ public class MainActivity extends Activity {
     }
     private void filter(boolean resetScroll) {
         if (list == null) return;
-        String query = search.getText().toString().trim().toLowerCase(Locale.ROOT);
-        boolean grid=showingBouquets && query.isEmpty() && !onlyFavorites;
+        String query = search.getText().toString().trim();
+        String[] tokens=TitleSearch.tokens(query);
+        boolean querying=tokens.length>0;
+        boolean grid=showingBouquets && !querying && !onlyFavorites; gridMode=grid;
+        if(clearSearch!=null) clearSearch.setVisibility(query.isEmpty()?View.GONE:View.VISIBLE);
         List<Channel> items=sectionIndex.getOrDefault(section,Collections.emptyList());
-        String[] keys=searchKeys.get(section);
+        String[] keys=searchKeys.get(section); if(keys!=null && keys.length!=items.size()) keys=null;
         List<Channel> next = new ArrayList<>();
         if(!grid) {
-            boolean all=selectedGroup.equals(ALL) || (showingBouquets && !query.isEmpty());
+            // Searching from the shelves or bouquets covers the whole section; inside a row it stays in that row.
+            boolean searchAll=showingBouquets && querying;
+            String group=searchAll?ALL:selectedGroup;
+            boolean mine=onlyFavorites || group.equals(MYLIST);
+            int[] scores=querying?new int[items.size()]:null;
+            List<Integer> hits=new ArrayList<>();
             for (int i=0;i<items.size();i++) {
                 Channel c=items.get(i);
-                if (onlyFavorites && !favorites.contains(c.url())) continue;
-                if (!all && !selectedGroup.equals(c.group())) continue;
-                if (!query.isEmpty() && !(keys!=null && keys.length==items.size()?keys[i]:c.name().toLowerCase(Locale.ROOT)).contains(query)) continue;
-                next.add(c);
+                if (mine && !favorites.contains(c.url())) continue;
+                if (group.equals(CONTINUE) && !continuing.containsKey(c.url())) continue;
+                if (group.equals(RECENTLY) && c.added()<=0) continue;
+                if (!special(group) && !group.equals(ALL) && !group.equals(c.group())) continue;
+                if (querying) { int score=TitleSearch.score(keys!=null?keys[i]:TitleSearch.normalize(c.name()),tokens); if(score<0) continue; scores[i]=score; }
+                hits.add(i);
             }
+            if(vod()) {
+                if(group.equals(CONTINUE)) hits.sort(Comparator.comparingLong((Integer i) -> continuing.getOrDefault(items.get(i).url(),0L)).reversed());
+                else {
+                    String mode=group.equals(RECENTLY)?TitleSearch.ADDED:titleMode();
+                    String[] sortKeys=keys;
+                    if(sortKeys==null && (mode.equals(TitleSearch.AZ) || mode.equals(TitleSearch.ZA))) { sortKeys=new String[items.size()]; for(Integer i:hits) sortKeys[i]=TitleSearch.normalize(items.get(i).name()); }
+                    TitleSearch.sort(hits,items,sortKeys,mode);
+                }
+                // Best matches first; the chosen title order is kept within each match level (stable sort).
+                if(querying) { final int[] rank=scores; hits.sort(Comparator.comparingInt((Integer i) -> rank[i])); }
+            }
+            for(Integer i:hits) next.add(items.get(i));
         }
         shown=next;
         boolean live=!grid && !busy && !shown.isEmpty() && !vod(); liveArea.setVisibility(live?View.VISIBLE:View.GONE);
@@ -405,13 +471,14 @@ public class MainActivity extends Activity {
             :channels.isEmpty()?"Brak źródła\n\nPołącz konto Xtream Codes albo wczytaj listę M3U."
             :total==0?(section.equals("movie")?"Brak filmów\n\nTo źródło nie udostępnia filmów VOD.":section.equals("series")?"Brak seriali\n\nTo źródło nie udostępnia seriali.":"Brak kanałów TV w tym źródle.")
             :onlyFavorites?"Brak ulubionych\n\nDotknij ☆ przy pozycji, aby ją tu zapisać."
-            :"Brak wyników dla „"+query+"”");
+            :querying?"Brak wyników dla „"+query+"”\n\nSprawdź pisownię albo wpisz krótszy fragment tytułu.":"Brak pozycji w tym rzędzie.");
         boolean inside=!grid && !busy && total>0;
         crumb.setVisibility(inside?View.VISIBLE:View.GONE);
-        crumbTitle.setText(!inside?"":onlyFavorites?"Ulubione":!query.isEmpty() && showingBouquets?"Wyniki wyszukiwania":selectedGroup.equals(ALL)?"Cała oferta":selectedGroup);
+        crumbTitle.setText(!inside?"":onlyFavorites?"Ulubione":querying && showingBouquets?"Wyniki wyszukiwania":display(selectedGroup));
         boolean vod=vod();
         status.setVisibility(busy || live || total==0 || (grid && vod)?View.GONE:View.VISIBLE);
-        sortButton.setVisibility(grid?View.VISIBLE:View.INVISIBLE);
+        sortButton.setVisibility(grid || (vod && !shown.isEmpty())?View.VISIBLE:View.INVISIBLE);
+        sortButton.setContentDescription(grid?"Sortuj bukiety":"Sortuj tytuły");
         if(heroItem!=null) heroSave.setText(favorites.contains(heroItem.url())?"✓  Moja lista":"＋  Moja lista");
         bouquets.setVisibility(grid && !busy && total>0 && !vod?View.VISIBLE:View.GONE);
         shelves.setVisibility(grid && !busy && total>0 && vod?View.VISIBLE:View.GONE);
@@ -419,7 +486,8 @@ public class MainActivity extends Activity {
         show(posters,posterAdapter,!grid && !busy && !shown.isEmpty() && vod);
         emptyPanel.setVisibility(busy || total==0 || (!grid && shown.isEmpty())?View.VISIBLE:View.GONE);
         if(!busy) status.setText(grid?Ui.count(bouquetCounts.size())+" bukietów · "+Ui.count(total)+" pozycji"+(syncingOrder?" · aktualizuję kolejność…":"")
-            :Ui.count(shown.size())+(shown.size()==1?" pozycja":" pozycji"));
+            :querying?Ui.count(shown.size())+(shown.size()==1?" wynik":" wyników")+" dla „"+query+"”"
+            :Ui.count(shown.size())+(shown.size()==1?" pozycja":" pozycji")+(vod() && !special(selectedGroup)?" · "+TitleSearch.label(titleMode()):""));
     }
     // ---- Films and series: streaming-style shelves and poster grid ------------------------------
 
@@ -494,10 +562,28 @@ public class MainActivity extends Activity {
         content.addView(posters,new FrameLayout.LayoutParams(-1,-1));
     }
     private void open(Channel c) { if(c.kind().equals("series")) openSeries(c); else if(c.kind().equals("movie")) openMovie(c); else preview.select(c); }
+    private final Map<String,Integer> specialCounts=new HashMap<>();
     private void prepareShelves(List<Channel> items) {
-        shelfItems.clear();
-        for(Channel c:items) { List<Channel> row=shelfItems.computeIfAbsent(c.group(),key -> new ArrayList<>()); if(row.size()<12) row.add(c); }
-        shelfNames=new ArrayList<>(bouquetCounts.keySet());
+        shelfItems.clear(); specialCounts.clear();
+        List<Channel> mine=new ArrayList<>(); int mineCount=0, dated=0;
+        // Newest 16 by provider "added" time without sorting the whole catalogue.
+        PriorityQueue<Channel> newest=new PriorityQueue<>(Comparator.comparingLong(Channel::added));
+        for(Channel c:items) {
+            List<Channel> row=shelfItems.computeIfAbsent(c.group(),key -> new ArrayList<>()); if(row.size()<12) row.add(c);
+            if(favorites.contains(c.url())) { mineCount++; if(mine.size()<16) mine.add(c); }
+            if(c.added()>0) { dated++; newest.add(c); if(newest.size()>16) newest.poll(); }
+        }
+        List<Channel> recent=new ArrayList<>(newest); recent.sort(Comparator.comparingLong(Channel::added).reversed());
+        shelfNames=new ArrayList<>();
+        if(!continuing.isEmpty()) {
+            List<Channel> resume=new ArrayList<>(); Map<String,Channel> byUrl=new HashMap<>(); for(Channel c:items) if(continuing.containsKey(c.url())) byUrl.put(c.url(),c);
+            for(String url:continuing.keySet()) { Channel c=byUrl.get(url); if(c!=null && resume.size()<16) resume.add(c); }
+            if(!resume.isEmpty()) { shelfNames.add(CONTINUE); shelfItems.put(CONTINUE,resume); specialCounts.put(CONTINUE,byUrl.size()); }
+        }
+        if(!mine.isEmpty()) { shelfNames.add(MYLIST); shelfItems.put(MYLIST,mine); specialCounts.put(MYLIST,mineCount); }
+        if(!recent.isEmpty()) { shelfNames.add(RECENTLY); shelfItems.put(RECENTLY,recent); specialCounts.put(RECENTLY,dated); }
+        shelfNames.addAll(bouquetCounts.keySet());
+        if(section.equals("movie")) refreshContinuing(items);
         heroItem=null;
         if(hasCovers(items)) {
             // Prefer a "recently added" style bouquet, otherwise the first one with artwork.
@@ -509,10 +595,22 @@ public class MainActivity extends Activity {
         coverHint.setVisibility(!items.isEmpty() && heroItem==null?View.VISIBLE:View.GONE);
         shelves.setAdapter(shelfAdapter);
     }
+    /** Reads watch progress for the visible films in the background and adds the "Kontynuuj oglądanie" row. */
+    private void refreshContinuing(List<Channel> items) {
+        final String target=section;
+        indexer.execute(() -> {
+            LinkedHashMap<String,Long> found=WatchProgress.inProgress(getApplicationContext(),items);
+            runOnUiThread(() -> {
+                if(isDestroyed() || !target.equals(section) || sectionIndex.get(target)!=items || found.keySet().equals(continuing.keySet())) return;
+                continuing=found; prepareShelves(items); filter(false);
+            });
+        });
+    }
     private void bindHero() {
         hero.setVisibility(heroItem==null?View.GONE:View.VISIBLE);
         if(heroItem==null) { heroTitle.setText(""); heroMeta.setText(""); heroImage.setImageDrawable(null); return; }
-        heroTitle.setText(heroItem.name()); heroMeta.setText(heroItem.group().toUpperCase(Locale.ROOT));
+        heroTitle.setText(heroItem.name()); int year=TitleSearch.year(heroItem.name());
+        heroMeta.setText((heroItem.kind().equals("series")?"SERIAL":"FILM")+(year>0?"  ·  "+year:"")+"  ·  "+heroItem.group().toUpperCase(Locale.ROOT));
         heroPlay.setText(heroItem.kind().equals("series")?"▶  Odcinki":"▶  Odtwórz");
         boolean saved=favorites.contains(heroItem.url()); heroSave.setText(saved?"✓  Moja lista":"＋  Moja lista");
         ImageLoader.get(this).load(heroItem.logo(),heroImage,getResources().getDisplayMetrics().widthPixels,dp(300));
@@ -531,8 +629,8 @@ public class MainActivity extends Activity {
             LinearLayout strip=new LinearLayout(this); scroller.addView(strip); row.addView(scroller);
         }
         LinearLayout head=(LinearLayout)row.getChildAt(0);
-        ((TextView)head.getChildAt(0)).setText(name);
-        Integer total=bouquetCounts.get(name);
+        ((TextView)head.getChildAt(0)).setText(display(name));
+        Integer total=special(name)?specialCounts.get(name):bouquetCounts.get(name);
         ((TextView)head.getChildAt(1)).setText(Ui.count(total==null?0:total)+"  ›");
         head.setOnClickListener(v -> { if(busy) return; selectedGroup=name; showingBouquets=false; filter(true); });
         HorizontalScrollView scroller=(HorizontalScrollView)row.getChildAt(1);
@@ -701,10 +799,10 @@ public class MainActivity extends Activity {
         worker.execute(() -> { try { store.save(copy, stars); } catch (Exception e) { runOnUiThread(() -> { if (!isDestroyed()) error("Nie udało się zapisać biblioteki na urządzeniu."); }); } });
     }
     private void error(String message) { if (!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK", null).show(); }
-    @Override protected void onResume() { super.onResume(); if(preview!=null) preview.resume(); worker.execute(() -> { try { Set<String> saved=store.loadFavorites(); runOnUiThread(() -> { if(!isDestroyed() && !favorites.equals(saved)) { favorites.clear(); favorites.addAll(saved); filter(false); } }); } catch(Exception ignored) {} }); if(rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
+    @Override protected void onResume() { super.onResume(); if(preview!=null) preview.resume(); worker.execute(() -> { try { Set<String> saved=store.loadFavorites(); runOnUiThread(() -> { if(!isDestroyed() && !favorites.equals(saved)) { favorites.clear(); favorites.addAll(saved); if(vod() && sectionIndex.containsKey(section)) updateMyList(); filter(false); } }); } catch(Exception ignored) {} }); if(section.equals("movie") && sectionIndex.containsKey("movie")) refreshContinuing(sectionIndex.get("movie")); if(rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); searchHandler.removeCallbacks(epgTick); searchHandler.postDelayed(epgTick,60000); }
     @Override public void onWindowFocusChanged(boolean focus) { super.onWindowFocusChanged(focus); if(focus && rows!=null && section.equals("tv")) rows.notifyDataSetChanged(); }
     @Override protected void onPause() { searchHandler.removeCallbacks(epgTick); if(preview!=null) preview.pause(); super.onPause(); }
-    @Override protected void onDestroy() { if(preview!=null) preview.destroy(); searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); network.shutdownNow(); super.onDestroy(); }
+    @Override protected void onDestroy() { if(preview!=null) preview.destroy(); searchHandler.removeCallbacksAndMessages(null); worker.shutdown(); indexer.shutdownNow(); network.shutdownNow(); super.onDestroy(); }
 }
 
 
