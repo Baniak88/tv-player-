@@ -64,6 +64,18 @@ final class Ui {
         b.setBackground(touch(b.getContext(), ACCENT, 12, 0));
     }
 
+    /** Secondary action: outlined pill on a raised surface, clearly a button but quieter than primary. */
+    static void secondary(Button b) {
+        b.setTextColor(buttonColors(TEXT)); b.setTypeface(null, android.graphics.Typeface.BOLD);
+        b.setBackground(touch(b.getContext(), SURFACE_HIGH, 12, BORDER));
+    }
+
+    /** Small tinted tag-style button (e.g. EPG in channel rows). */
+    static void chip(Button b) {
+        b.setTextColor(buttonColors(ACCENT)); b.setTypeface(null, android.graphics.Typeface.BOLD);
+        b.setBackground(touch(b.getContext(), 0x26FF3D5E, 14, 0));
+    }
+
     static void ghost(Button b, int textColor) {
         b.setTextColor(buttonColors(textColor)); b.setTypeface(null, android.graphics.Typeface.NORMAL);
         b.setBackground(touch(b.getContext(), 0x00000000, 10, 0));

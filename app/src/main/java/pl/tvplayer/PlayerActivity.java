@@ -85,7 +85,8 @@ public class PlayerActivity extends Activity {
             view.setShowPreviousButton(true); view.setShowNextButton(true); view.setShowRewindButton(false); view.setShowFastForwardButton(false);
             view.setControllerShowTimeoutMs(4000);
             view.setControllerAutoShow(false);
-            view.setControllerHideOnTouch(false);
+            // Same as films and series: a tap shows the bars, the next tap (or 4 s) hides them.
+            view.setControllerHideOnTouch(true);
         }
         error=new LinearLayout(this); error.setOrientation(LinearLayout.VERTICAL); error.setGravity(Gravity.CENTER);
         error.setBackgroundColor(0xEE141A27); error.setPadding(dp(24),dp(20),dp(24),dp(20));
@@ -175,7 +176,7 @@ public class PlayerActivity extends Activity {
         }
         // Let the tapped view finish its click before controls can change focus or visibility.
         boolean handled=super.dispatchTouchEvent(event);
-        if(event.getActionMasked()==MotionEvent.ACTION_UP && view!=null && !television && !onDemand) view.post(this::revealLiveControls);
+        // Live TV taps are handled by the player view itself (toggle), exactly like films and series.
         return handled;
     }
     @Override public void onConfigurationChanged(Configuration config) { super.onConfigurationChanged(config); if(!isInPictureInPictureMode()) { updateFullscreen(); revealLiveControls(); } }

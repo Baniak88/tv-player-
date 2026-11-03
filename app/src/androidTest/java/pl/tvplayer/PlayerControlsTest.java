@@ -51,9 +51,9 @@ public class PlayerControlsTest {
             assertTrue("Toolbar button has not been laid out",back.getWidth()>0 && back.getHeight()>0); int[] hiddenBack=center(back);
             waitToolbar(activity,View.GONE); assertFalse(video(activity).isControllerFullyVisible());
             tap(activity,hiddenBack); waitToolbar(activity,View.VISIBLE); assertFalse("First reveal tap activated hidden Back",activity.isFinishing()); long visibleUntil=SystemClock.elapsedRealtime()+2000; while(!video(activity).isControllerFullyVisible() && SystemClock.elapsedRealtime()<visibleUntil) { Thread.sleep(50); instrument().waitForIdleSync(); } assertTrue(video(activity).isControllerFullyVisible());
-            // A second tap while controls are visible renews the timeout instead of hiding them.
-            int[] screen=center(video(activity)); screen[1]/=2; tap(activity,screen); waitToolbar(activity,View.VISIBLE); Thread.sleep(700); assertEquals(View.VISIBLE,toolbar(activity).getVisibility());
-            waitToolbar(activity,View.GONE); tap(activity,screen); waitToolbar(activity,View.VISIBLE);
+            // Like films and series: a second tap on the picture hides the bars, the next one shows them again.
+            int[] screen=center(video(activity)); screen[1]/=2; tap(activity,screen); waitToolbar(activity,View.GONE);
+            tap(activity,screen); waitToolbar(activity,View.VISIBLE);
             View options=text(toolbar(activity),"Opcje"); assertNotNull(options); tap(activity,center(options),options);
             long until=SystemClock.elapsedRealtime()+4000; boolean opened=false;
             while(SystemClock.elapsedRealtime()<until) {

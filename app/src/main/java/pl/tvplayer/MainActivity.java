@@ -355,7 +355,7 @@ public class MainActivity extends Activity {
             header.addView(badge,new LinearLayout.LayoutParams(dp(46),dp(40)));
             TextView name=Ui.text(this,"",15,Ui.TEXT); name.setMaxLines(2); name.setEllipsize(TextUtils.TruncateAt.END); name.setPadding(dp(10),0,dp(4),0);
             header.addView(name,new LinearLayout.LayoutParams(0,-2,1));
-            Button guide=Ui.button(this,"EPG"); guide.setFocusable(false); guide.setTextSize(12); Ui.ghost(guide,Ui.MUTED); guide.setPadding(0,0,0,0); guide.setSingleLine(true); header.addView(guide,new LinearLayout.LayoutParams(dp(48),dp(48)));
+            Button guide=Ui.button(this,"EPG"); guide.setFocusable(false); guide.setTextSize(11); Ui.chip(guide); guide.setPadding(0,0,0,0); guide.setSingleLine(true); guide.setMinHeight(0); guide.setMinimumHeight(0); LinearLayout.LayoutParams guideSize=new LinearLayout.LayoutParams(dp(46),dp(32)); guideSize.rightMargin=dp(2); header.addView(guide,guideSize);
             Button star=Ui.button(this,"☆"); star.setFocusable(false); star.setTextSize(20); Ui.ghost(star,Ui.FAINT); header.addView(star,new LinearLayout.LayoutParams(dp(40),dp(48)));
             row.addView(header,new LinearLayout.LayoutParams(-1,-2));
             LinearLayout schedule=column(); schedule.setPadding(0,dp(6),dp(4),0);
