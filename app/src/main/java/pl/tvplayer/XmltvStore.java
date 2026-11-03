@@ -111,7 +111,7 @@ final class XmltvStore extends SQLiteOpenHelper {
                             }
                         });
                     } finally { station.close(); program.close(); }
-                    db.execSQL("UPDATE programs SET end=(SELECT MIN(p.start) FROM programs p WHERE p.source=programs.source AND p.channel=programs.channel AND p.start>programs.start) WHERE source=? AND end<=start",new Object[]{source});
+                    db.execSQL("UPDATE programs SET end=(SELECT MIN(p.start) FROM programs p WHERE p.source=programs.source AND p.channel=programs.channel COLLATE NOCASE AND p.start>programs.start) WHERE source=? AND end<=start",new Object[]{source});
                     for(String table:new String[]{"programs","stations"}) db.execSQL("DELETE FROM "+table+" WHERE source IN (SELECT source FROM feeds WHERE updated<? AND source<>?)",new Object[]{now-86400,source});
                     db.execSQL("DELETE FROM feeds WHERE updated<? AND source<>?",new Object[]{now-86400,source});
                     db.execSQL("INSERT OR REPLACE INTO feeds(source,updated) VALUES(?,?)",new Object[]{source,now}); db.setTransactionSuccessful();

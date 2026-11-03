@@ -22,8 +22,11 @@ public final class SourceClient {
     }
     private interface ReaderTask<T> { T read(Reader reader) throws IOException; }
     private <T> T get(HttpUrl url, ReaderTask<T> task) throws IOException { return request(client,url,task); }
-    private <T> T request(OkHttpClient http,HttpUrl url,ReaderTask<T> task) throws IOException {
-        try (Response response = http.newCall(new Request.Builder().url(url).header("User-Agent", "TVPlayer/0.8.8").build()).execute()) {
+    private <T> T request(OkHttpClient http,HttpUrl url,ReaderTask<T> task) throws IOException { return request(http,url,task,0); }
+    private <T> T request(OkHttpClient http,HttpUrl url,ReaderTask<T> task,long budgetNanos) throws IOException {
+        Call call=http.newCall(new Request.Builder().url(url).header("User-Agent", "TVPlayer/0.8.10").build());
+        if(budgetNanos>0) call.timeout().timeout(budgetNanos,TimeUnit.NANOSECONDS);
+        try (Response response = call.execute()) {
             if (!response.isSuccessful() || response.body() == null)
                 throw new IOException("Serwer zwrócił błąd HTTP " + response.code() + ".");
             // Parse directly from the response: no size-based rejection or full-body copy.
@@ -216,11 +219,13 @@ public final class SourceClient {
     List<Guide.Program> guide(Channel channel,boolean full) throws IOException {
         HttpUrl base=Guide.endpoint(channel); IOException failure=null; boolean responded=false;
         Map<Long,Guide.Program> combined=new TreeMap<>(); long now=System.currentTimeMillis()/1000;
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(8);
         for(String action:full?new String[]{"get_simple_data_table","get_short_epg"}:new String[]{"get_short_epg","get_simple_data_table"}) {
             HttpUrl.Builder request=base.newBuilder().setQueryParameter("action",action).removeAllQueryParameters("limit");
             if(action.equals("get_short_epg")) request.setQueryParameter("limit",full?"100":"4");
             try {
-                List<Guide.Program> items=request(guideClient,request.build(),reader -> Guide.parse(reader,channel.timezone()));
+                long remaining=deadline-System.nanoTime(); if(remaining<=0) break;
+                List<Guide.Program> items=request(guideClient,request.build(),reader -> Guide.parse(reader,channel.timezone()),Math.min(remaining,TimeUnit.SECONDS.toNanos(4)));
                 responded=true; for(Guide.Program item:items) combined.put(item.start(),item);
                 // Historical rows are not evidence that this endpoint provides current EPG.
                 if(items.stream().anyMatch(p -> p.end()>now)) return new ArrayList<>(combined.values());
