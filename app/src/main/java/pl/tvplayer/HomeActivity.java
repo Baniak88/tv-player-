@@ -143,7 +143,8 @@ public final class HomeActivity extends Activity {
             .setPositiveButton("Zmień źródło",(d,w) -> open("tv",null,true)).setNegativeButton("Zamknij",null).show();
     }
     private void settings() {
-        new AlertDialog.Builder(this).setTitle("Ustawienia").setItems(new String[]{"Źródło: dodaj lub zmień","Źródło: odśwież listę","Połączenie internetowe (bufor)","Uprawnienia aplikacji i PiP","O aplikacji"},(d,choice) -> {
+        new AlertDialog.Builder(this).setTitle("Ustawienia").setItems(new String[]{"Źródło: dodaj lub zmień","Źródło: odśwież listę","Połączenie internetowe (bufor)","Uprawnienia aplikacji i PiP","O aplikacji","Program TV (EPG): własny link XMLTV"},(d,choice) -> {
+            if(choice==5) { EpgSettings.choose(this,() -> Toast.makeText(this,EpgSettings.custom(this)==null?"Używam EPG dostawcy":"Zapisano własne źródło EPG",Toast.LENGTH_SHORT).show()); return; }
             if(choice==1) { refreshSource(); return; }
             if(choice==2) { PlaybackSettings.choose(this,() -> {}); return; }
             int index=choice==0?0:choice-2;

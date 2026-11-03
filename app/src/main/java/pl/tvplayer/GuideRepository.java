@@ -146,11 +146,14 @@ public final class GuideRepository {
         }
         stream=streamData(channel); if(stream!=null) return stream;
         if(!full && PlaybackSettings.weakInternet(context)) {
+            try { okhttp3.HttpUrl own=EpgSettings.custom(context); if(own!=null) { List<Guide.Program> stored=xml.cached(channel,own); if(usable(stored)) return persist(diskKey,stored,"XMLTV"); } }
+            catch(RuntimeException ignored) {}
             try { okhttp3.HttpUrl known=Guide.xmltv(channel); if(known!=null) { List<Guide.Program> stored=xml.cached(channel,known); if(usable(stored)) return persist(diskKey,stored,"XMLTV"); } }
             catch(java.io.IOException | IllegalArgumentException ignored) {}
             return new Data(Collections.emptyList(),"Oszczędzanie łącza","Dotknij EPG, aby pobrać pełny program TV.");
         }
         LinkedHashSet<okhttp3.HttpUrl> feeds=new LinkedHashSet<>();
+        okhttp3.HttpUrl own=EpgSettings.custom(context); if(own!=null) feeds.add(own);
         if(!channel.guideUrl().startsWith("xmltv:")) {
             try { feeds.addAll(source.discoverGuides(channel)); } catch(java.io.IOException | IllegalArgumentException ignored) {}
         }
