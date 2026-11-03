@@ -39,7 +39,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: OKTV-Player-1.1.4
+          name: OKTV-Player-1.1.5
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: OKTV-Player-1.1.4
+          name: OKTV-Player-1.1.5
           path: apk
       - name: Enable KVM
         run: |
@@ -105,7 +105,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: OKTV-Player-1.1.4
+          name: OKTV-Player-1.1.5
           path: apk
       - name: Publish directly installable APK
         env:
@@ -113,10 +113,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/app-debug.apk OKTV-Player-1.1.4.apk
-          gh release view v1.1.4 >/dev/null 2>&1 || gh release create v1.1.4 --target "$SOURCE_SHA" --prerelease --title "OKTV Player 1.1.4" --notes "EPG: gdy panel dostawcy odmawia (HTTP 403/404) nieznanej aplikacji, OKTV ponawia pobranie EPG i listy jako odtwarzacz VLC i zapamiętuje to dla serwera. Krótsze przyciski w oknie programu TV."
-          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v1.1.4" -f sha="$SOURCE_SHA" -F force=false >/dev/null
-          gh release upload v1.1.4 OKTV-Player-1.1.4.apk --clobber
+          cp apk/debug/app-debug.apk OKTV-Player-1.1.5.apk
+          gh release view v1.1.5 >/dev/null 2>&1 || gh release create v1.1.5 --target "$SOURCE_SHA" --prerelease --title "OKTV Player 1.1.5" --notes "EPG: przycisk Wstaw polskie EPG w oknie Link EPG, lepsze dopasowanie nazw kanałów (dopiski typu (NA), litera ł). Zawiera ponawianie EPG jako VLC z 1.1.4."
+          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v1.1.5" -f sha="$SOURCE_SHA" -F force=false >/dev/null
+          gh release upload v1.1.5 OKTV-Player-1.1.5.apk --clobber
 
 
 

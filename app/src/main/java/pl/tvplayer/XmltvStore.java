@@ -29,7 +29,8 @@ final class XmltvStore extends SQLiteOpenHelper {
     }
     @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion) {}
     static String normalize(String input) {
-        String s=java.text.Normalizer.normalize(input==null?"":input,java.text.Normalizer.Form.NFD).replaceAll("\\p{M}+","").toLowerCase(Locale.ROOT);
+        String s=java.text.Normalizer.normalize(input==null?"":input,java.text.Normalizer.Form.NFD).replaceAll("\\p{M}+","").toLowerCase(Locale.ROOT).replace('ł','l');
+        s=s.replaceAll("\\([^)]*\\)|\\[[^]]*\\]"," ").trim(); // "(NA)", "[HD]" and similar provider tags
         s=s.replaceFirst("^[|\\s]*(?:(?:pl|pol|uk|us|de|fr|it|es|cz|sk)[|\\s:_-]+)?(?:vip[|\\s:_-]+)?","");
         s=s.replaceAll("(?:[\\s|_-]+(?:raw|fhd|hd|uhd|4k|hevc|h265))+$","");
         return s.replaceAll("[^\\p{L}\\p{N}]","");

@@ -11,6 +11,7 @@ import okhttp3.HttpUrl;
 
 /** Optional XMLTV guide chosen by the user, for providers that do not serve EPG themselves. */
 final class EpgSettings {
+    static final String PUBLIC_PL = "https://epg.ovh/pl.xml";
     private EpgSettings() { }
     static HttpUrl custom(Context context) {
         String value = context.getSharedPreferences("epg-settings", Context.MODE_PRIVATE).getString("xmltv", "");
@@ -27,6 +28,12 @@ final class EpgSettings {
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI); input.setTextColor(Ui.TEXT); input.setHintTextColor(Ui.FAINT);
         if (current != null) input.setText(current.toString());
         LinearLayout.LayoutParams size = new LinearLayout.LayoutParams(-1, -2); size.topMargin = Ui.dp(activity, 12); body.addView(input, size);
+        // One tap for a public Polish guide, for providers whose panel serves no EPG at all.
+        android.widget.Button preset = Ui.button(activity, "Wstaw polskie EPG (epg.ovh)"); Ui.secondary(preset);
+        preset.setOnClickListener(v -> { input.setText(PUBLIC_PL); input.setSelection(input.getText().length()); });
+        LinearLayout.LayoutParams presetSize = new LinearLayout.LayoutParams(-1, Ui.dp(activity, 48)); presetSize.topMargin = Ui.dp(activity, 10); body.addView(preset, presetSize);
+        TextView note = new TextView(activity); note.setTextSize(12); note.setTextColor(Ui.FAINT); note.setPadding(0, Ui.dp(activity, 8), 0, 0);
+        note.setText("Publiczne źródło nie jest powiązane z Twoim dostawcą. Pierwsze pobranie może potrwać do minuty."); body.addView(note);
         AlertDialog dialog = new AlertDialog.Builder(activity).setTitle("Program TV (EPG)").setView(body)
             .setPositiveButton("Zapisz", null).setNegativeButton("Anuluj", null)
             .setNeutralButton(current == null ? "Wklej" : "Usuń", null).create();

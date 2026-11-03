@@ -7,5 +7,8 @@ public class XmltvNameTest {
         assertEquals(XmltvStore.normalize("Canal+ 1"),XmltvStore.normalize("PL| CANAL+ 1 FHD"));
         assertEquals(XmltvStore.normalize("TVN"),XmltvStore.normalize("PL| TVN HD"));
         assertEquals(XmltvStore.normalize("Polsat Film"),XmltvStore.normalize("PL| POLSAT FILM HD"));
+        assertEquals(XmltvStore.normalize("iTVN Extra"),XmltvStore.normalize("PL| ITVN EXTRA (NA)"));
+        assertEquals(XmltvStore.normalize("TVP 3 Wrocław"),XmltvStore.normalize("PL| TVP3 WROCLAW (NA)"));
+        assertEquals(XmltvStore.normalize("TVP 1"),XmltvStore.normalize("PL| TVP 1 HD"));
     }
 }
