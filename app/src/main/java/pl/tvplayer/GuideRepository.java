@@ -46,6 +46,8 @@ public final class GuideRepository {
     synchronized void streamStarted(Channel channel) { observing.put(channel.url(),observing.getOrDefault(channel.url(),0)+1); }
     synchronized void streamStopped(Channel channel) { int count=observing.getOrDefault(channel.url(),0); if(count<=1) observing.remove(channel.url()); else observing.put(channel.url(),count-1); }
     synchronized boolean isObserving(Channel channel) { return observing.containsKey(channel.url()); }
+    /** True while any channel is playing (preview or full screen); providers often allow one connection only. */
+    synchronized boolean isObservingAny() { return !observing.isEmpty(); }
     void acceptStream(Channel channel,List<Guide.Program> programs) {
         long now=System.currentTimeMillis()/1000;
         java.time.format.DateTimeFormatter server=java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(Guide.zone(channel.timezone()));

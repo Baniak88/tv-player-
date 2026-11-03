@@ -32,6 +32,14 @@ public final class GuideDialog {
     }
     static void openStream(Activity activity,Channel channel,Consumer<Channel> play) {
         boolean playing=GuideRepository.get(activity).isObserving(channel);
+        if(!playing && GuideRepository.get(activity).isObservingAny()) {
+            // Opening a second stream would be refused by single-connection accounts (HTTP 458/429).
+            new AlertDialog.Builder(activity).setTitle("Program TV")
+                .setMessage("Teraz odtwarzany jest inny kanał. Twój dostawca pozwala zwykle na jedno połączenie naraz, więc program ze strumienia można odczytać tylko z oglądanego kanału.\n\nWłącz ten kanał i ponownie stuknij EPG albo ustaw link EPG.")
+                .setNegativeButton("Zamknij",null).setNeutralButton("Link EPG",(d,w) -> EpgSettings.choose(activity,() -> open(activity,channel,java.util.concurrent.ForkJoinPool.commonPool(),play)))
+                .setPositiveButton("Włącz kanał",(d,w) -> play.accept(channel)).show();
+            return;
+        }
         ProgressDialog waiting=new ProgressDialog(activity);
         waiting.setMessage(playing?"Oczekiwanie na EPG w oglądanym kanale (do 20 s)…":"Odczyt EPG ze strumienia (do 20 s)…");
         waiting.setCancelable(true); waiting.setButton(android.content.DialogInterface.BUTTON_NEGATIVE,"Anuluj",(d,w) -> {});

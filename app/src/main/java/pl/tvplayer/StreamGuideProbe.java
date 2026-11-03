@@ -17,7 +17,7 @@ final class StreamGuideProbe {
         TsEitParser parser=new TsEitParser(channel.name());
         call=client.newCall(new Request.Builder().url(SourceClient.validate(channel.url())).header("User-Agent","TVPlayer/0.8.2").build());
         try(Response response=call.execute()) {
-            if(!response.isSuccessful() || response.body()==null) throw new IOException("Nie można otworzyć strumienia (HTTP "+response.code()+").");
+            if(!response.isSuccessful() || response.body()==null) throw new IOException(response.code()==458 || response.code()==429 || response.code()==509?"Nie można otworzyć strumienia: dostawca odrzucił kolejne połączenie (limit jednoczesnych połączeń, HTTP "+response.code()+"). Zatrzymaj podgląd lub oglądaj ten kanał i spróbuj ponownie.":"Nie można otworzyć strumienia (HTTP "+response.code()+").");
             byte[] buffer=new byte[32768]; int total=0; long ready=0; List<Guide.Program> result=Collections.emptyList();
             try(InputStream input=response.body().byteStream()) {
                 while(!cancelled && total<16*1024*1024) {
