@@ -59,6 +59,13 @@ final class XmltvStore extends SQLiteOpenHelper {
         }
         return read(channel,source);
     }
+    /** Why a feed gave nothing for this channel, in plain words, for the EPG error dialog. */
+    String describe(Channel channel,HttpUrl url) {
+        String source=key(url); SQLiteDatabase db=getReadableDatabase(); int stations=0;
+        try(Cursor cursor=db.rawQuery("SELECT COUNT(DISTINCT id) FROM stations WHERE source=?",new String[]{source})) { if(cursor.moveToFirst()) stations=cursor.getInt(0); }
+        if(stations==0) return "plik pobrany, ale nie zawiera kanałów z aktualnym programem.";
+        return "plik ma "+stations+" kanałów, ale żaden nie pasuje do „"+channel.name()+"” (szukano: "+(channel.epgId().isEmpty()?"":"ID „"+channel.epgId()+"”, ")+"nazwa „"+normalize(channel.name())+"”).";
+    }
     private boolean fresh(String source) {
         try(Cursor cursor=getReadableDatabase().rawQuery("SELECT updated FROM feeds WHERE source=?",new String[]{source})) { return cursor.moveToFirst() && System.currentTimeMillis()/1000-cursor.getLong(0)<3600; }
     }

@@ -141,8 +141,10 @@ public final class GuideRepository {
         catch(RuntimeException ignored) {}
         List<Guide.Program> programs=Collections.emptyList(); String failure="";
         if(!channel.guideUrl().startsWith("xmltv:")) {
-            try { programs=source.guide(channel,full); } catch(java.io.IOException e) { failure="API Xtream: "+safeFailure(e); }
+            String api=apiHost(channel);
+            try { programs=source.guide(channel,full); } catch(java.io.IOException e) { failure="• API Xtream"+api+": "+safeFailure(e); }
             if(usable(programs)) return persist(diskKey,programs,"Xtream");
+            if(failure.isEmpty()) failure="• API Xtream"+api+": serwer odpowiedział, ale bez aktualnego programu dla tego kanału.";
         }
         stream=streamData(channel); if(stream!=null) return stream;
         if(!full && PlaybackSettings.weakInternet(context)) {
@@ -154,6 +156,7 @@ public final class GuideRepository {
         }
         LinkedHashSet<okhttp3.HttpUrl> feeds=new LinkedHashSet<>();
         okhttp3.HttpUrl own=EpgSettings.custom(context); if(own!=null) feeds.add(own);
+        else failure+=(failure.isEmpty()?"":"\n")+"• Własny link EPG: nie ustawiono (przycisk „Ustaw EPG”).";
         if(!channel.guideUrl().startsWith("xmltv:")) {
             try { feeds.addAll(source.discoverGuides(channel)); } catch(java.io.IOException | IllegalArgumentException ignored) {}
         }
@@ -168,21 +171,32 @@ public final class GuideRepository {
                     }
                     return persist(diskKey,alternate,"XMLTV");
                 }
-                failure+=(failure.isEmpty()?"":"\n")+"XMLTV: brak aktualnego programu dopasowanego do kanału.";
-            } catch(java.io.IOException e) { failure+=(failure.isEmpty()?"":"\n")+"XMLTV: "+safeFailure(e); }
+                failure+=(failure.isEmpty()?"":"\n")+"• XMLTV "+url.host()+": "+xml.describe(channel,url);
+            } catch(java.io.IOException e) { failure+=(failure.isEmpty()?"":"\n")+"• XMLTV "+url.host()+": "+safeFailure(e); }
         }
         if(saved!=null) return new Data(saved.programs(),saved.source()+" · pamięć","");
-        return new Data(programs,"",failure.isEmpty()?"Nie znaleziono aktualnego programu w API ani w EPG dostawcy.":failure);
+        String header="Kanał: "+channel.name()+(channel.epgId().isEmpty()?" · brak ID EPG":" · ID EPG: "+channel.epgId())+"\n\nSprawdzone źródła:\n";
+        return new Data(programs,"",header+(failure.isEmpty()?"• brak źródeł EPG dla tego kanału.":failure));
     }
     private static boolean usable(List<Guide.Program> programs) { return programs!=null && programs.stream().anyMatch(p -> p.end()>System.currentTimeMillis()/1000); }
     private Data persist(String key,List<Guide.Program> programs,String sourceName) {
         try { disk.write(key,new Schedule(programs,sourceName,System.currentTimeMillis())); } catch(RuntimeException ignored) {}
         return new Data(programs,sourceName,"");
     }
+    /** " (host)" of the account API, never the path or credentials. */
+    private static String apiHost(Channel channel) {
+        try { okhttp3.HttpUrl api=Guide.endpoint(channel); return " ("+api.host()+(api.port()!=80 && api.port()!=443?":"+api.port():"")+")"; }
+        catch(java.io.IOException | RuntimeException e) { return ""; }
+    }
     private static String safeFailure(java.io.IOException error) {
         // Do not expose account URLs, query strings or credentials in dialogs.
         String text=error.getMessage(); java.util.regex.Matcher code=java.util.regex.Pattern.compile("HTTP ([0-9]{3})").matcher(text==null?"":text);
-        return code.find()?"serwer zwrócił HTTP "+code.group(1)+".":error instanceof java.io.InterruptedIOException?"przekroczono czas odpowiedzi.":"brak poprawnej odpowiedzi serwera.";
+        if(code.find()) return "serwer zwrócił HTTP "+code.group(1)+(code.group(1).equals("404")?" (nie ma takiego adresu na serwerze).":code.group(1).equals("401")||code.group(1).equals("403")?" (odmowa dostępu).":".");
+        if(error instanceof java.io.InterruptedIOException) return "przekroczono czas odpowiedzi.";
+        if(error instanceof java.net.UnknownHostException) return "nie znaleziono serwera (sprawdź adres i internet).";
+        // Our own messages are safe to show; anything that may contain an address is not.
+        if(text!=null && !text.contains("http") && !text.contains("@") && text.length()<120) return text;
+        return "brak poprawnej odpowiedzi serwera.";
     }
     static String summary(Data data,long now) {
         if(data==null) return "Wczytywanie EPG…";
