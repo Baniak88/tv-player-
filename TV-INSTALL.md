@@ -1,18 +1,22 @@
-# TV Player TV 0.9.0 — instalacja
+# TV Player TV 0.9.2 Preview — instalacja
 
 ## Fire TV Stick 4K
 
-Pobierz **TV-Player-FireTV-0.9.0.apk** z wydania. To gotowy APK, bez ZIP. Obsługiwane są Fire OS 6+ i Android TV 7.1+, w tym pierwsza generacja Sticka 4K. APK nie działa na Vega OS / 4K Select.
+Użyj przygotowanego pliku **TV-Player-FireTV-0.9.2-preview.apk**. To gotowy APK, bez ZIP. Obsługiwane są Fire OS 6+ i Android TV 7.1+, w tym pierwsza generacja Sticka 4K. APK nie działa na Vega OS / 4K Select.
 
 1. Pobierz APK w przeglądarce zalogowanej do GitHuba. Repozytorium jest prywatne — otwarcie linku w niezalogowanym Downloaderze może pokazać 404.
 2. Prześlij plik na Fire TV. Włącz instalowanie aplikacji z używanego instalatora, następnie otwórz APK i zainstaluj TV Player.
-3. Uruchom TV Player z listy aplikacji. Dodaj serwer, login i hasło Xtream albo adres listy M3U.
+3. Uruchom TV Player i wybierz **Dodaj / zmień źródło → Dodaj przez telefon**.
+4. Podłącz telefon i TV do tej samej sieci domowej. Zeskanuj QR z TV albo przepisz wyświetlony adres do przeglądarki telefonu.
+5. Wpisz sześciocyfrowy kod z TV i dane Xtream lub link M3U. Naciśnij **Połącz telewizor**. TV rozpocznie pobieranie kanałów.
+
+Formularz telefonu nie wymaga instalowania dodatkowej aplikacji ani konta pośrednika. Działa przez lokalne HTTP, dlatego używaj zaufanej sieci. Zamyka się po odebraniu danych, zamknięciu okna na TV lub po 5 minutach. Pięć błędnych kodów blokuje bieżącą sesję; otwórz ją ponownie na TV. Sieć gościnna z izolacją urządzeń może uniemożliwić połączenie. Nadal można wpisać źródło pilotem.
 
 Z komputera z Android platform-tools można użyć:
 
 ```sh
 adb connect ADRES_IP_FIRE_TV:5555
-adb install -r TV-Player-FireTV-0.9.0.apk
+adb install -r TV-Player-FireTV-0.9.2-preview.apk
 ```
 
 Pilot: strzałki i OK wybierają pozycję. Menu lub przytrzymanie OK otwiera EPG i ulubione. Wstecz wraca. Odtwarzacz pozostaje poziomy i reaguje na przyciski multimedialne. TV pobiera się jako pierwsze; duże katalogi filmów i seriali dopiero po wybraniu sekcji. Wersja TV ma osobną, szyfrowaną bibliotekę, niezależną od aplikacji telefonu.

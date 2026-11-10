@@ -19,6 +19,7 @@ final class XmltvStore extends SQLiteOpenHelper {
     private final java.util.concurrent.ExecutorService refreshWorker=java.util.concurrent.Executors.newSingleThreadExecutor();
     private final Set<String> refreshing=java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<String,Long> failures=new java.util.concurrent.ConcurrentHashMap<>();
+    private volatile boolean backgroundPaused;
     XmltvStore(Context context) { super(context,"epg-cache.db",null,1); setWriteAheadLoggingEnabled(true); }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE feeds (source TEXT PRIMARY KEY, updated INTEGER)");
@@ -40,13 +41,18 @@ final class XmltvStore extends SQLiteOpenHelper {
         catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
     void cancelDownloads() { generation.incrementAndGet(); client.dispatcher().cancelAll(); failures.clear(); }
+    void pauseBackground(boolean paused) { backgroundPaused=paused; if(paused) cancelDownloads(); }
     List<Guide.Program> cached(Channel channel,HttpUrl url) { return read(channel,key(url)); }
     List<Guide.Program> load(Channel channel,HttpUrl url) throws IOException {
+        return load(channel,url,false);
+    }
+    List<Guide.Program> load(Channel channel,HttpUrl url,boolean interactive) throws IOException {
         int started=generation.get(); String source=key(url); Object lock;
         synchronized(locks) { lock=locks.computeIfAbsent(source,k -> new Object()); }
         List<Guide.Program> saved=read(channel,source);
+        if(backgroundPaused && !interactive) return saved;
         if(saved.stream().anyMatch(p -> p.end()>System.currentTimeMillis()/1000)) {
-            if(!fresh(source) && System.currentTimeMillis()>=failures.getOrDefault(source,0L) && refreshing.add(source)) refreshWorker.execute(() -> {
+            if(!backgroundPaused && !fresh(source) && System.currentTimeMillis()>=failures.getOrDefault(source,0L) && refreshing.add(source)) refreshWorker.execute(() -> {
                 try { synchronized(lock) { refresh(source,url,channel.timezone()); failures.remove(source); } }
                 catch(IOException | RuntimeException ignored) { if(started==generation.get()) failures.put(source,System.currentTimeMillis()+60000); }
                 finally { refreshing.remove(source); }
@@ -55,7 +61,7 @@ final class XmltvStore extends SQLiteOpenHelper {
         }
         synchronized(lock) {
             if(System.currentTimeMillis()<failures.getOrDefault(source,0L)) throw new IOException("Źródło XMLTV jest chwilowo niedostępne.");
-            try { refresh(source,url,channel.timezone()); failures.remove(source); }
+            try { refresh(source,url,channel.timezone(),interactive); failures.remove(source); }
             catch(IOException e) { if(started==generation.get()) failures.put(source,System.currentTimeMillis()+60000); throw e; }
         }
         return read(channel,source);
@@ -93,6 +99,10 @@ final class XmltvStore extends SQLiteOpenHelper {
         }
     }
     private void refresh(String source,HttpUrl url,String timezone) throws IOException {
+        refresh(source,url,timezone,false);
+    }
+    private void refresh(String source,HttpUrl url,String timezone,boolean interactive) throws IOException {
+        if(backgroundPaused && !interactive) throw new IOException("Pobieranie w tle wstrzymane podczas odtwarzania.");
         SQLiteDatabase db=getWritableDatabase(); long now=System.currentTimeMillis()/1000;
         try(Cursor cursor=db.rawQuery("SELECT updated FROM feeds WHERE source=?",new String[]{source})) { if(cursor.moveToFirst() && now-cursor.getLong(0)<3600) return; }
         Response first=client.newCall(new Request.Builder().url(url).header("User-Agent",SourceClient.agent(url)).build()).execute();

@@ -14,6 +14,15 @@ public class TsEitParserTest {
         assertEquals(2,result.size()); assertEquals("Wiadomości ze strumienia",result.get(0).title()); assertEquals("Opis audycji",result.get(0).description());
         assertEquals(START,result.get(0).start()); assertEquals(START+3600,result.get(0).end()); assertTrue(result.get(0).current(START+10)); assertEquals("Następny program",result.get(1).title());
     }
+    @Test public void bulkReadsKeepSyncAcrossEveryPacketBoundary() {
+        byte[] data=EitFixture.concat(new byte[]{1,71,2,3},EitFixture.stream(START));
+        for(int chunk:new int[]{1,2,17,187,188,189,375,376,377,4096,32768}) {
+            TsEitParser parser=new TsEitParser("TVN");
+            for(int at=0;at<data.length;at+=chunk) parser.feed(data,at,Math.min(chunk,data.length-at));
+            assertEquals("Chunk size "+chunk,2,parser.programs().size());
+            assertEquals("Wiadomości ze strumienia",parser.programs().get(0).title());
+        }
+    }
     @Test public void resynchronizesAfterLeadingJunkAndFalseSync() {
         byte[] junk=new byte[133]; Arrays.fill(junk,(byte)3); junk[7]=71;
         assertEquals(2,read(EitFixture.concat(junk,EitFixture.stream(START))).programs().size());

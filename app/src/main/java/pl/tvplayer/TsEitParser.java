@@ -24,9 +24,14 @@ final class TsEitParser {
     }
     boolean feed(byte[] data,int offset,int length) {
         changed=false;
-        for(int i=offset;i<offset+length;i++) {
-            if(packetSize==0 && (data[i]&255)!=71) continue;
-            packet[packetSize++]=data[i];
+        int end=offset+length;
+        while(offset<end) {
+            if(packetSize==0) {
+                while(offset<end && (data[offset]&255)!=71) offset++;
+                if(offset==end) break;
+            }
+            int count=Math.min(end-offset,376-packetSize);
+            System.arraycopy(data,offset,packet,packetSize,count); packetSize+=count; offset+=count;
             if(packetSize==376) {
                 int discard=188;
                 if((packet[0]&255)==71 && (packet[188]&255)==71) packet();

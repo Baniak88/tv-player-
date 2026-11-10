@@ -23,12 +23,37 @@ public final class TvActivity extends Activity {
     private String section="tv",group="",query="",seriesTitle="";
     private boolean home=true,onlyFavorites,busy;
     private TvAccountStore.Account account;
+    private TvPhoneSetup phoneSetup;
     private LinearLayout page,body;
     private TextView status,heading;
     private ListView bouquets,list;
     private GridView posters;
     private BaseAdapter rows,covers;
     private int generation;
+    private final android.os.Handler ui=new android.os.Handler(android.os.Looper.getMainLooper());
+    private boolean scrolling,foreground;
+    private final Runnable guideRows=this::loadVisibleGuides;
+    private static final class ChannelRow {
+        LinearLayout view; ImageView logo; TextView name,epg,star; Channel channel; boolean requested;
+    }
+    private static final class Poster {
+        LinearLayout view; ImageView image; TextView name;
+    }
+    private void scheduleGuides() {
+        ui.removeCallbacks(guideRows);
+        if(foreground && !scrolling && !home) ui.postDelayed(guideRows,200);
+    }
+    private void loadVisibleGuides() {
+        if(home || list==null || !list.isShown() || scrolling) return;
+        for(int i=0;i<list.getChildCount();i++) {
+            Object tag=list.getChildAt(i).getTag();
+            if(!(tag instanceof ChannelRow row) || row.requested || !row.channel.kind().equals("tv")) continue;
+            Channel channel=row.channel; row.requested=true;
+            GuideRepository.get(this).request(channel,false,data -> {
+                if(row.channel==channel && row.view.isShown()) row.epg.setText(GuideRepository.summary(data,System.currentTimeMillis()/1000));
+            });
+        }
+    }
     private int dp(int n) { return Ui.dp(this,n); }
     private LinearLayout column() { LinearLayout l=new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
     private TextView text(String value,int size,int color) { return Ui.text(this,value,size,color); }
@@ -62,7 +87,7 @@ public final class TvActivity extends Activity {
         if(home) showHome(); else showCatalog();
     }
     private void showHome() {
-        home=true; body.removeAllViews();
+        home=true; ui.removeCallbacks(guideRows); body.removeAllViews();
         heading=text("Co oglądamy?",32,Ui.TEXT); heading.setTypeface(null,Typeface.BOLD); heading.setPadding(0,dp(18),0,dp(24)); body.addView(heading);
         LinearLayout tiles=new LinearLayout(this); int height=dp(240);
         Button live=button("▣\n\nTelewizja na żywo",() -> open("tv")); live.setTextSize(25);
@@ -90,9 +115,24 @@ public final class TvActivity extends Activity {
                 List<Channel> loaded=catalogs.get(kind);
                 if(loaded==null) loaded=new LibraryStore(this).loadSection(kind,favorites);
                 if(account!=null && account.type().equals("xtream") && !getPreferences(MODE_PRIVATE).getBoolean("loaded-"+kind,false)) {
-                    loaded=source.xtreamSection(account.server(),account.user(),account.password(),kind,this::progress);
-                    LibraryStore store=new LibraryStore(this); store.updateSection(kind,loaded);
-                    getPreferences(MODE_PRIVATE).edit().putBoolean("loaded-"+kind,true).apply();
+                    final List<Channel> cached=loaded;
+                    if(!cached.isEmpty()) runOnUiThread(() -> {
+                        if(isDestroyed() || request!=generation) return;
+                        items=cached; rebuildGroups(); status.setText("Zapisana biblioteka · sprawdzanie aktualizacji…");
+                    });
+                    try {
+                        loaded=source.xtreamSection(account.server(),account.user(),account.password(),kind,this::progress);
+                        LibraryStore store=new LibraryStore(this); store.updateSection(kind,loaded);
+                        getPreferences(MODE_PRIVATE).edit().putBoolean("loaded-"+kind,true).apply();
+                    } catch(Exception failure) {
+                        if(cached.isEmpty()) throw failure;
+                        catalogs.put(kind,cached);
+                        runOnUiThread(() -> {
+                            if(isDestroyed() || request!=generation) return;
+                            busy=false; items=cached; rebuildGroups(); status.setText("Dostawca niedostępny · korzystasz z zapisanej biblioteki.");
+                        });
+                        return;
+                    }
                 }
                 final List<Channel> result=loaded; catalogs.put(kind,result);
                 runOnUiThread(() -> { if(isDestroyed() || request!=generation) return; busy=false; items=result; rebuildGroups(); });
@@ -101,7 +141,7 @@ public final class TvActivity extends Activity {
     }
     private void progress(String value) { runOnUiThread(() -> { if(!isDestroyed()) status.setText(value); }); }
     private void showCatalog() {
-        home=false; body.removeAllViews();
+        home=false; scrolling=false; body.removeAllViews();
         LinearLayout bar=new LinearLayout(this); bar.setGravity(Gravity.CENTER_VERTICAL);
         String[] labels={"‹ Główna","TV","Filmy","Seriale","Szukaj","☆ Ulubione","Sortuj","Źródło"};
         for(int i=0;i<labels.length;i++) {
@@ -119,31 +159,43 @@ public final class TvActivity extends Activity {
         list=new ListView(this); list.setDividerHeight(dp(8)); list.setSelector(Ui.shape(this,0xFF303640,10,Ui.ACCENT)); list.setItemsCanFocus(false); list.setDrawSelectorOnTop(true); list.setSelector(Ui.shape(this,0x00000000,10,Ui.ACCENT));
         rows=new BaseAdapter() {
             public int getCount() { return shown.size(); } public Object getItem(int p) { return shown.get(p); } public long getItemId(int p) { return p; }
-            public View getView(int p,View reused,ViewGroup parent) { return channelRow(shown.get(p)); }
-        }; list.setAdapter(rows); catalog.addView(list,new FrameLayout.LayoutParams(-1,-1));
+            public View getView(int p,View reused,ViewGroup parent) { return channelRow(shown.get(p),reused); }
+        }; list.setOnScrollListener(new AbsListView.OnScrollListener() {
+            public void onScrollStateChanged(AbsListView view,int state) { scrolling=state!=SCROLL_STATE_IDLE; scheduleGuides(); }
+            public void onScroll(AbsListView view,int first,int count,int total) { scheduleGuides(); }
+        }); list.setAdapter(rows); catalog.addView(list,new FrameLayout.LayoutParams(-1,-1));
         posters=new GridView(this); posters.setNumColumns(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density>=1100?5:4); posters.setHorizontalSpacing(dp(14)); posters.setVerticalSpacing(dp(14)); posters.setSelector(Ui.shape(this,0xFF303640,12,Ui.ACCENT));
         covers=new BaseAdapter() {
             public int getCount() { return shown.size(); } public Object getItem(int p) { return shown.get(p); } public long getItemId(int p) { return p; }
-            public View getView(int p,View reused,ViewGroup parent) { return poster(shown.get(p)); }
+            public View getView(int p,View reused,ViewGroup parent) { return poster(shown.get(p),reused); }
         }; posters.setDrawSelectorOnTop(true); posters.setSelector(Ui.shape(this,0x00000000,12,Ui.ACCENT)); posters.setAdapter(covers); catalog.addView(posters,new FrameLayout.LayoutParams(-1,-1));
         AdapterView.OnItemClickListener click=(parent,v,position,id) -> select(shown.get(position)); list.setOnItemClickListener(click); posters.setOnItemClickListener(click);
         AdapterView.OnItemLongClickListener menu=(parent,v,position,id) -> { options(shown.get(position)); return true; }; list.setOnItemLongClickListener(menu); posters.setOnItemLongClickListener(menu);
         split.addView(catalog,new LinearLayout.LayoutParams(0,-1,1)); body.addView(split,new LinearLayout.LayoutParams(-1,0,1));
         filter(); bouquets.requestFocus();
     }
-    private View channelRow(Channel channel) {
-        LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(14),dp(10),dp(14),dp(10)); row.setMinimumHeight(dp(84)); row.setBackground(Ui.shape(this,Ui.SURFACE,10,0));
-        ImageView logo=new ImageView(this); logo.setScaleType(ImageView.ScaleType.FIT_CENTER); row.addView(logo,new LinearLayout.LayoutParams(dp(72),dp(52))); ImageLoader.get(this).load(channel.logo(),logo,dp(72),dp(52));
-        LinearLayout copy=column(); copy.setPadding(dp(16),0,dp(10),0);
-        TextView name=text(channel.name(),20,Ui.TEXT); name.setMaxLines(2); copy.addView(name);
-        TextView epg=text(channel.kind().equals("tv")?GuideRepository.summary(GuideRepository.get(this).peek(channel,false),System.currentTimeMillis()/1000):channel.group(),15,Ui.MUTED); epg.setMaxLines(2); copy.addView(epg); row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
-        if(channel.kind().equals("tv")) { row.setTag(channel.url()); GuideRepository.get(this).request(channel,false,data -> { if(channel.url().equals(row.getTag())) epg.setText(GuideRepository.summary(data,System.currentTimeMillis()/1000)); }); }
-        TextView star=text(favorites.contains(channel.url())?"★":"",22,Ui.STAR); row.addView(star); return row;
+    private View channelRow(Channel channel,View reused) {
+        ChannelRow row=reused!=null && reused.getTag() instanceof ChannelRow?(ChannelRow)reused.getTag():null;
+        if(row==null) {
+            row=new ChannelRow(); row.view=new LinearLayout(this); row.view.setGravity(Gravity.CENTER_VERTICAL); row.view.setPadding(dp(14),dp(10),dp(14),dp(10)); row.view.setMinimumHeight(dp(84)); row.view.setBackground(Ui.shape(this,Ui.SURFACE,10,0));
+            row.logo=new ImageView(this); row.logo.setScaleType(ImageView.ScaleType.FIT_CENTER); row.view.addView(row.logo,new LinearLayout.LayoutParams(dp(72),dp(52)));
+            LinearLayout copy=column(); copy.setPadding(dp(16),0,dp(10),0);
+            row.name=text("",20,Ui.TEXT); row.name.setMaxLines(2); copy.addView(row.name);
+            row.epg=text("",15,Ui.MUTED); row.epg.setMaxLines(2); copy.addView(row.epg); row.view.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+            row.star=text("",22,Ui.STAR); row.view.addView(row.star); row.view.setTag(row);
+        }
+        row.channel=channel; row.requested=false; row.name.setText(channel.name()); row.star.setText(favorites.contains(channel.url())?"★":"");
+        row.epg.setText(channel.kind().equals("tv")?GuideRepository.summary(GuideRepository.get(this).peek(channel,false),System.currentTimeMillis()/1000):channel.group());
+        ImageLoader.get(this).load(channel.logo(),row.logo,dp(72),dp(52)); scheduleGuides(); return row.view;
     }
-    private View poster(Channel channel) {
-        LinearLayout card=column(); card.setPadding(dp(5),dp(5),dp(5),dp(10)); card.setBackground(Ui.shape(this,Ui.SURFACE,12,0));
-        ImageView image=new ImageView(this); image.setScaleType(ImageView.ScaleType.CENTER_CROP); image.setBackgroundColor(Ui.SURFACE_HIGH); card.addView(image,new LinearLayout.LayoutParams(-1,dp(180))); ImageLoader.get(this).load(channel.logo(),image,dp(135),dp(180));
-        TextView name=text((favorites.contains(channel.url())?"★ ":"")+channel.name(),16,Ui.TEXT); name.setMaxLines(2); name.setPadding(dp(4),dp(7),dp(4),0); card.addView(name,new LinearLayout.LayoutParams(-1,dp(52))); return card;
+    private View poster(Channel channel,View reused) {
+        Poster card=reused!=null && reused.getTag() instanceof Poster?(Poster)reused.getTag():null;
+        if(card==null) {
+            card=new Poster(); card.view=column(); card.view.setPadding(dp(5),dp(5),dp(5),dp(10)); card.view.setBackground(Ui.shape(this,Ui.SURFACE,12,0));
+            card.image=new ImageView(this); card.image.setScaleType(ImageView.ScaleType.CENTER_CROP); card.image.setBackgroundColor(Ui.SURFACE_HIGH); card.view.addView(card.image,new LinearLayout.LayoutParams(-1,dp(180)));
+            card.name=text("",16,Ui.TEXT); card.name.setMaxLines(2); card.name.setPadding(dp(4),dp(7),dp(4),0); card.view.addView(card.name,new LinearLayout.LayoutParams(-1,dp(52))); card.view.setTag(card);
+        }
+        ImageLoader.get(this).load(channel.logo(),card.image,dp(135),dp(180)); card.name.setText((favorites.contains(channel.url())?"★ ":"")+channel.name()); return card.view;
     }
     private void rebuildGroups() {
         groups=new ArrayList<>(BouquetOrder.counts(items,getPreferences(MODE_PRIVATE).getString("sort-"+section,"provider")).keySet());
@@ -180,7 +232,10 @@ public final class TvActivity extends Activity {
     private void error(String message) { if(!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK",null).show(); }
     private void sourceDialog() {
         if(busy) return;
-        new AlertDialog.Builder(this).setTitle("Dodaj źródło").setItems(new String[]{"Konto Xtream Codes","Adres listy M3U"},(d,index) -> sourceForm(index==0)).setNegativeButton("Anuluj",null).show();
+        new AlertDialog.Builder(this).setTitle("Dodaj źródło").setItems(new String[]{"Dodaj przez telefon · ta sama sieć Wi-Fi","Konto Xtream Codes · wpisz pilotem","Adres listy M3U · wpisz pilotem"},(d,index) -> {
+            if(index==0) { if(phoneSetup==null) phoneSetup=new TvPhoneSetup(this); phoneSetup.show(this::importSource); }
+            else sourceForm(index==1);
+        }).setNegativeButton("Anuluj",null).show();
     }
     private void sourceForm(boolean xtream) {
         LinearLayout fields=column(); fields.setPadding(dp(24),dp(12),dp(24),0);
@@ -197,10 +252,14 @@ public final class TvActivity extends Activity {
     private void refresh() { if(busy) return; if(account==null) sourceDialog(); else importSource(account); }
     private void importSource(TvAccountStore.Account next) {
         if(busy) return; busy=true; status.setText("Łączenie ze źródłem…");
+        final Set<String> savedFavorites=new HashSet<>(favorites);
         worker.execute(() -> {
             try {
                 List<Channel> imported=next.type().equals("xtream")?source.xtreamSection(next.server(),next.user(),next.password(),"tv",this::progress):source.m3u(next.server());
-                new LibraryStore(this).save(imported,new HashSet<>(favorites)); new TvAccountStore(this).save(next);
+                LibraryStore store=new LibraryStore(this);
+                if(next.equals(account) && next.type().equals("xtream") && new java.io.File(getFilesDir(),"catalog.current").isFile()) store.updateSection("tv",imported);
+                else store.save(imported,savedFavorites);
+                new TvAccountStore(this).save(next);
                 getPreferences(MODE_PRIVATE).edit().putBoolean("loaded-tv",true).putBoolean("loaded-movie",!next.type().equals("xtream")).putBoolean("loaded-series",!next.type().equals("xtream")).apply();
                 runOnUiThread(() -> { if(isDestroyed()) return; account=next; catalogs.clear(); busy=false; section="tv"; group=""; query=""; seriesTitle=""; items=new ArrayList<>(); for(Channel channel:imported) if(channel.section().equals("tv")) items.add(channel); home=false; showCatalog(); rebuildGroups(); bouquets.requestFocus(); });
             } catch(Exception e) { runOnUiThread(() -> { if(!isDestroyed()) { busy=false; status.setText("Nie udało się dodać źródła."); error("Sprawdź adres, login, hasło i połączenie z internetem. Dotychczasowa biblioteka pozostaje dostępna."); } }); }
@@ -212,7 +271,8 @@ public final class TvActivity extends Activity {
         return super.onKeyUp(code,event);
     }
     @Override public void onBackPressed() { if(busy) { status.setText("Trwa pobieranie biblioteki…"); return; } if(!home && !seriesTitle.isEmpty()) { seriesTitle=""; open("series"); } else if(!home && (!query.isEmpty() || onlyFavorites)) { query=""; onlyFavorites=false; filter(); } else if(!home) showHome(); else new AlertDialog.Builder(this).setTitle("Zamknąć TV Player?").setPositiveButton("Wyjście",(d,w) -> finish()).setNegativeButton("Zostań",null).show(); }
-    @Override protected void onResume() { super.onResume(); worker.execute(() -> { try { Set<String> saved=new LibraryStore(this).loadFavorites(); runOnUiThread(() -> { if(!isDestroyed() && !favorites.equals(saved)) { favorites.clear(); favorites.addAll(saved); if(!home) filter(); } }); } catch(Exception ignored) {} }); if(!home && rows!=null) rows.notifyDataSetChanged(); }
-    @Override protected void onDestroy() { generation++; worker.shutdown(); super.onDestroy(); }
+    @Override protected void onResume() { super.onResume(); foreground=true; scheduleGuides(); worker.execute(() -> { try { Set<String> saved=new LibraryStore(this).loadFavorites(); runOnUiThread(() -> { if(!isDestroyed() && !favorites.equals(saved)) { favorites.clear(); favorites.addAll(saved); if(!home) filter(); } }); } catch(Exception ignored) {} }); if(!home && rows!=null) rows.notifyDataSetChanged(); }
+    @Override protected void onPause() { foreground=false; ui.removeCallbacks(guideRows); if(phoneSetup!=null) phoneSetup.close(); super.onPause(); }
+    @Override protected void onDestroy() { generation++; ui.removeCallbacksAndMessages(null); worker.shutdown(); super.onDestroy(); }
     @Override protected void onSaveInstanceState(Bundle state) { state.putString("section",section); state.putString("group",group); state.putBoolean("home",home); super.onSaveInstanceState(state); }
 }

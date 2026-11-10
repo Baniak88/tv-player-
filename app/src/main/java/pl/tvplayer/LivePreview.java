@@ -7,9 +7,7 @@ import android.text.TextUtils;
 import android.view.*;
 import android.widget.*;
 import androidx.media3.common.*;
-import androidx.media3.datasource.*;
 import androidx.media3.exoplayer.ExoPlayer;
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.ui.PlayerView;
 import java.util.*;
 import java.util.function.Consumer;
@@ -27,6 +25,7 @@ final class LivePreview {
     private final Handler ui=new Handler(Looper.getMainLooper());
     private final Runnable guideTick=new Runnable() { public void run() { updateGuide(); if(active && channel!=null) ui.postDelayed(this,10000); } };
     private ExoPlayer player;
+    private PlaybackRecovery recovery;
     private Player.Listener listener;
     private Channel channel;
     private boolean active,visible,observing,weak;
@@ -55,7 +54,7 @@ final class LivePreview {
         else { int height=Math.min(Math.round((activity.getResources().getDisplayMetrics().widthPixels-dp(32))*9f/16),Math.round(activity.getResources().getDisplayMetrics().heightPixels*0.21f)); panel.addView(picture,new LinearLayout.LayoutParams(-1,Math.max(dp(130),Math.min(dp(200),height)))); }
         LinearLayout controls=new LinearLayout(activity); controls.setGravity(Gravity.CENTER_VERTICAL); controls.setPadding(dp(4),0,dp(4),0);
         pause=Ui.button(activity,"Ⅱ"); pause.setContentDescription("Wstrzymaj podgląd"); pause.setTextSize(18); Ui.ghost(pause,Ui.TEXT); controls.addView(pause,new LinearLayout.LayoutParams(dp(48),dp(48)));
-        pause.setOnClickListener(v -> { if(player==null) { start(); return; } if(player.getPlayerError()!=null) { player.prepare(); player.play(); } else if(player.getPlayWhenReady()) player.pause(); else player.play(); });
+        pause.setOnClickListener(v -> { if(player==null) { start(); return; } if(player.getPlayerError()!=null) { recovery.retryNow(); } else if(player.getPlayWhenReady()) player.pause(); else player.play(); });
         title=Ui.text(activity,"Podgląd",14,Ui.TEXT); title.setMaxLines(1); title.setEllipsize(TextUtils.TruncateAt.END); title.setTypeface(null,android.graphics.Typeface.BOLD); controls.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         Button internet=Ui.button(activity,"⚙"); internet.setContentDescription("Ustawienia słabszego internetu"); Ui.ghost(internet,Ui.MUTED); controls.addView(internet,new LinearLayout.LayoutParams(dp(48),dp(48)));
         internet.setOnClickListener(v -> PlaybackSettings.choose(activity,() -> { release(); start(); selectionChanged.run(); }));
@@ -91,7 +90,7 @@ final class LivePreview {
         boolean same=channel!=null && channel.url().equals(selected.url());
         if(!same) { release(); guide=null; }
         channel=selected; remembered=selected.url(); title.setText("Na żywo · "+selected.name()); full.setEnabled(true); pause.setEnabled(true);
-        if(active && visible) { if(user && player!=null && player.getPlayerError()!=null && same) { player.prepare(); player.play(); } else start(); }
+        if(active && visible) { if(user && player!=null && player.getPlayerError()!=null && same) { recovery.retryNow(); } else start(); }
         rememberSelection();
         updateGuide(); if(active && visible) { ui.removeCallbacks(guideTick); ui.postDelayed(guideTick,1000); } if(user) selectionChanged.run();
     }
@@ -110,19 +109,18 @@ final class LivePreview {
         if(!active || !visible || channel==null || player!=null || activity.isFinishing()) return;
         activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         Context context=activity.getApplicationContext(); Channel current=channel; GuideRepository repository=GuideRepository.get(context);
-        DefaultDataSource.Factory upstream=new DefaultDataSource.Factory(context);
         player=new ExoPlayer.Builder(context).setLoadControl(PlaybackSettings.loadControl(context)).setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),true).setHandleAudioBecomingNoisy(true)
-            .setMediaSourceFactory(new DefaultMediaSourceFactory(() -> new EitDataSource(upstream.createDataSource(),current,repository))).build();
+            .setMediaSourceFactory(PlaybackNetwork.sources(context,current)).build();
         repository.streamStarted(current); observing=true; weak=PlaybackSettings.weakInternet(context);
         player.setTrackSelectionParameters(PlaybackSettings.tracks(context,player.getTrackSelectionParameters())); attach();
         MediaItem.Builder item=new MediaItem.Builder().setUri(current.url()); String path=android.net.Uri.parse(current.url()).getPath(); if(path!=null && path.endsWith(".ts")) item.setMimeType(MimeTypes.VIDEO_MP2T);
         player.setMediaItem(item.build()); player.prepare(); player.play();
     }
-    private void attach() { listener=events; player.addListener(listener); video.setPlayer(player); updatePause(); }
+    private void attach() { listener=events; player.addListener(listener); video.setPlayer(player); recovery=new PlaybackRecovery(player,true,text -> { notice.setText(text); notice.setVisibility(text.isEmpty()?View.GONE:View.VISIBLE); }); updatePause(); }
     private void updatePause() { boolean playing=player!=null && player.getPlayWhenReady(); pause.setText(playing?"Ⅱ":"▶"); pause.setContentDescription(playing?"Wstrzymaj podgląd":"Wznów podgląd"); }
     String handoff() {
         if(player==null || channel==null) return null;
-        ExoPlayer transferring=player; video.setPlayer(null); if(listener!=null) transferring.removeListener(listener); player=null; observing=false; listener=null;
+        closeRecovery(); ExoPlayer transferring=player; video.setPlayer(null); if(listener!=null) transferring.removeListener(listener); player=null; observing=false; listener=null;
         return PlaybackHandoff.offer(activity,transferring,channel);
     }
     void receive(String token,Channel returned) {
@@ -132,11 +130,13 @@ final class LivePreview {
         title.setText("Na żywo · "+returned.name()); rememberSelection(); attach(); updateGuide(); selectionChanged.run();
     }
     private void release() {
+        closeRecovery();
         activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if(player!=null) { video.setPlayer(null); if(listener!=null) player.removeListener(listener); player.release(); player=null; listener=null; }
         if(observing && channel!=null) { GuideRepository.get(activity).streamStopped(channel); observing=false; }
         notice.setVisibility(View.GONE);
     }
+    private void closeRecovery() { if(recovery!=null) { recovery.close(); recovery=null; } }
     private void rememberSelection() {
         if(channel==null) return;
         android.content.SharedPreferences prefs=activity.getSharedPreferences("live-preview",Context.MODE_PRIVATE); String key=hash(scope),identity=hash(channel.url()); int index=visibleChannels.indexOf(channel);

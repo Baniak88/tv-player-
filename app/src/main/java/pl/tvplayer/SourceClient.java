@@ -9,6 +9,8 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public final class SourceClient {
+    private static final java.util.regex.Pattern STREAM_ID=java.util.regex.Pattern.compile("[0-9]+");
+    private static final java.util.regex.Pattern EXTENSION=java.util.regex.Pattern.compile("[a-zA-Z0-9]{1,8}");
     static final ConnectionPool TRANSPORT_POOL=new ConnectionPool(8,5,TimeUnit.MINUTES);
     private final OkHttpClient client = new OkHttpClient.Builder().connectionPool(TRANSPORT_POOL)
             .connectTimeout(20, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS)
@@ -30,25 +32,45 @@ public final class SourceClient {
     /** Some IPTV panels hide endpoints (404/403) from unknown apps; retry once like a media player and remember it. */
     static boolean blockedAgent(int code) { return code==403 || code==404 || code==406 || code==451; }
     static void preferPlayerAgent(HttpUrl url) { PLAYER_HOSTS.add(url.host()); }
+    static boolean transientStatus(int code) { return code==408 || code==429 || code==500 || code==502 || code==503 || code==504; }
+    private static final class HttpFailure extends IOException {
+        final int code; final boolean retrySoon;
+        HttpFailure(Response response) {
+            super("Serwer zwrócił błąd HTTP "+response.code()+"."); code=response.code();
+            String after=response.header("Retry-After");
+            // Do not immediately retry a panel asking us to wait longer (including HTTP dates).
+            retrySoon=after==null || after.trim().matches("[01]");
+        }
+    }
     private <T> T request(OkHttpClient http,HttpUrl url,ReaderTask<T> task,long budgetNanos) throws IOException {
-        String agent=agent(url);
-        Call call=http.newCall(new Request.Builder().url(url).header("User-Agent", agent).build());
-        if(budgetNanos>0) call.timeout().timeout(budgetNanos,TimeUnit.NANOSECONDS);
-        try (Response response = call.execute()) {
-            if (!response.isSuccessful() && blockedAgent(response.code()) && agent.equals(AGENT)) {
-                response.close();
-                Call retry=http.newCall(new Request.Builder().url(url).header("User-Agent", PLAYER_AGENT).build());
-                if(budgetNanos>0) retry.timeout().timeout(budgetNanos,TimeUnit.NANOSECONDS);
-                try (Response second = retry.execute()) {
-                    if (!second.isSuccessful() || second.body() == null) throw new IOException("Serwer zwrócił błąd HTTP " + second.code() + ".");
-                    preferPlayerAgent(url);
-                    try (Reader reader = second.body().charStream()) { return task.read(reader); }
+        long budget=budgetNanos>0?budgetNanos:TimeUnit.MILLISECONDS.toNanos(http.callTimeoutMillis());
+        long deadline=System.nanoTime()+budget;
+        String agent=agent(url); boolean retried=false;
+        while(true) {
+            long remaining=deadline-System.nanoTime();
+            if(remaining<=0) throw new java.net.SocketTimeoutException("Upłynął czas pobierania danych.");
+            if(Thread.currentThread().isInterrupted()) throw new InterruptedIOException("Pobieranie anulowane.");
+            Call call=http.newCall(new Request.Builder().url(url).header("User-Agent",agent).build());
+            call.timeout().timeout(remaining,TimeUnit.NANOSECONDS);
+            try(Response response=call.execute()) {
+                if(!response.isSuccessful() && blockedAgent(response.code()) && agent.equals(AGENT)) {
+                    agent=PLAYER_AGENT; continue;
+                }
+                if(!response.isSuccessful()) throw new HttpFailure(response);
+                if(response.body()==null) throw new IOException("Pusta odpowiedź serwera.");
+                if(agent.equals(PLAYER_AGENT)) preferPlayerAgent(url);
+                try(Reader reader=response.body().charStream()) { return task.read(reader); }
+            } catch(IOException failure) {
+                if(retried || Thread.currentThread().isInterrupted()
+                    || failure instanceof HttpFailure && (!transientStatus(((HttpFailure)failure).code) || !((HttpFailure)failure).retrySoon)
+                    || failure instanceof javax.net.ssl.SSLException
+                    || failure instanceof com.google.gson.stream.MalformedJsonException
+                    || deadline-System.nanoTime()<TimeUnit.SECONDS.toNanos(1)) throw failure;
+                retried=true;
+                try { Thread.sleep(1000); } catch(InterruptedException interrupted) {
+                    Thread.currentThread().interrupt(); throw new InterruptedIOException("Pobieranie anulowane.");
                 }
             }
-            if (!response.isSuccessful() || response.body() == null)
-                throw new IOException("Serwer zwrócił błąd HTTP " + response.code() + ".");
-            // Parse directly from the response: no size-based rejection or full-body copy.
-            try (Reader reader = response.body().charStream()) { return task.read(reader); }
         }
     }
     public List<Channel> m3u(String url) throws IOException {
@@ -114,6 +136,8 @@ public final class SourceClient {
         JsonReader reader = new JsonReader(source);
         Map<String,Integer> ranks=new HashMap<>(); int order=0;
         for(String id:categories.keySet()) ranks.put(id,order++);
+        HttpUrl streams=base.newBuilder().addPathSegment(kind.equals("tv")?"live":"movie").addPathSegment(user).addPathSegment(pass).build();
+        HttpUrl series=api(base,user,pass,"get_series_info"),guideBase=api(base,user,pass,"get_simple_data_table");
         List<Channel> result = new ArrayList<>();
         reader.beginArray();
         while (reader.hasNext()) {
@@ -135,17 +159,15 @@ public final class SourceClient {
                 }
             }
             reader.endObject();
-            if (!id.matches("[0-9]+")) continue;
-            if (!extension.matches("[a-zA-Z0-9]{1,8}")) extension = "mp4";
+            if (!STREAM_ID.matcher(id).matches()) continue;
+            if (!EXTENSION.matcher(extension).matches()) extension = "mp4";
             String url;
             if (kind.equals("series")) {
-                url = base.newBuilder().addPathSegment("player_api.php").addQueryParameter("username",user)
-                    .addQueryParameter("password",pass).addQueryParameter("action","get_series_info").addQueryParameter("series_id",id).build().toString();
+                url = series.newBuilder().addQueryParameter("series_id",id).build().toString();
             } else {
-                url = base.newBuilder().addPathSegment(kind.equals("tv") ? "live" : "movie").addPathSegment(user).addPathSegment(pass)
-                    .addPathSegment(id + (kind.equals("tv") ? ".ts" : "." + extension)).build().toString();
+                url = streams.newBuilder().addPathSegment(id + (kind.equals("tv") ? ".ts" : "." + extension)).build().toString();
             }
-            String guide=kind.equals("tv")?api(base,user,pass,"get_simple_data_table").newBuilder().addQueryParameter("stream_id",id).build().toString():"";
+            String guide=kind.equals("tv")?guideBase.newBuilder().addQueryParameter("stream_id",id).build().toString():"";
             result.add(new Channel(name,url,categories.getOrDefault(category,"Bez kategorii"),epg,kind,guide,archive==1?Math.max(0,days):0,"UTC",ranks.getOrDefault(category,Integer.MAX_VALUE),icon,kind.equals("tv")?0:added));
         }
         reader.endArray();

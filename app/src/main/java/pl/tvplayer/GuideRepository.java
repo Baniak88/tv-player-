@@ -43,8 +43,8 @@ public final class GuideRepository {
         Entry entry=streams.get(channel.url()); long now=System.currentTimeMillis()/1000;
         return entry!=null && entry.until()>System.currentTimeMillis() && entry.data().programs().stream().anyMatch(p -> p.end()>now)?entry.data():null;
     }
-    synchronized void streamStarted(Channel channel) { observing.put(channel.url(),observing.getOrDefault(channel.url(),0)+1); }
-    synchronized void streamStopped(Channel channel) { int count=observing.getOrDefault(channel.url(),0); if(count<=1) observing.remove(channel.url()); else observing.put(channel.url(),count-1); }
+    synchronized void streamStarted(Channel channel) { observing.put(channel.url(),observing.getOrDefault(channel.url(),0)+1); xml.pauseBackground(true); }
+    synchronized void streamStopped(Channel channel) { int count=observing.getOrDefault(channel.url(),0); if(count<=1) observing.remove(channel.url()); else observing.put(channel.url(),count-1); if(observing.isEmpty()) xml.pauseBackground(false); }
     synchronized boolean isObserving(Channel channel) { return observing.containsKey(channel.url()); }
     /** True while any channel is playing (preview or full screen); providers often allow one connection only. */
     synchronized boolean isObservingAny() { return !observing.isEmpty(); }
@@ -149,12 +149,12 @@ public final class GuideRepository {
             if(failure.isEmpty()) failure="• API Xtream"+api+": serwer odpowiedział, ale bez aktualnego programu dla tego kanału.";
         }
         stream=streamData(channel); if(stream!=null) return stream;
-        if(!full && PlaybackSettings.weakInternet(context)) {
+        if(!full && (PlaybackSettings.weakInternet(context) || isObservingAny())) {
             try { okhttp3.HttpUrl own=EpgSettings.custom(context); if(own!=null) { List<Guide.Program> stored=xml.cached(channel,own); if(usable(stored)) return persist(diskKey,stored,"XMLTV"); } }
             catch(RuntimeException ignored) {}
             try { okhttp3.HttpUrl known=Guide.xmltv(channel); if(known!=null) { List<Guide.Program> stored=xml.cached(channel,known); if(usable(stored)) return persist(diskKey,stored,"XMLTV"); } }
             catch(java.io.IOException | IllegalArgumentException ignored) {}
-            return new Data(Collections.emptyList(),"Oszczędzanie łącza","Dotknij EPG, aby pobrać pełny program TV.");
+            return new Data(Collections.emptyList(),"Ochrona odtwarzania","Dotknij EPG, aby pobrać pełny program TV.");
         }
         LinkedHashSet<okhttp3.HttpUrl> feeds=new LinkedHashSet<>();
         okhttp3.HttpUrl own=EpgSettings.custom(context); if(own!=null) feeds.add(own);
@@ -165,7 +165,7 @@ public final class GuideRepository {
         try { okhttp3.HttpUrl url=Guide.xmltv(channel); if(url!=null) feeds.add(url); } catch(java.io.IOException | IllegalArgumentException ignored) {}
         for(okhttp3.HttpUrl url:feeds) {
             try {
-                List<Guide.Program> alternate=xml.load(channel,url);
+                List<Guide.Program> alternate=xml.load(channel,url,full);
                 if(usable(alternate)) {
                     if(full && !programs.isEmpty()) {
                         Map<Long,Guide.Program> combined=new TreeMap<>(); for(Guide.Program p:alternate) combined.put(p.start(),p); for(Guide.Program p:programs) combined.put(p.start(),p);
