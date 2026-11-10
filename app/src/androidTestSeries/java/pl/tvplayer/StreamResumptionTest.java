@@ -29,12 +29,13 @@ public class StreamResumptionTest {
                 if(!recovering.get()) return new MockResponse().setResponseCode(503);
                 return new MockResponse().setHeader("Content-Type","video/mp2t").setBody(new okio.Buffer().write(stream));
             }}); server.start();
+            String address=server.url("/live.ts").toString();
             ExoPlayer[] player=new ExoPlayer[1]; PlaybackRecovery[] recovery=new PlaybackRecovery[1];
             instrument.runOnMainSync(() -> {
                 player[0]=new ExoPlayer.Builder(context).setMediaSourceFactory(PlaybackNetwork.sources(context,null)).build();
                 player[0].addListener(new Player.Listener() { @Override public void onPlaybackStateChanged(int state) { if(state==Player.STATE_READY) ready.countDown(); } });
                 recovery[0]=new PlaybackRecovery(player[0],true,text -> { if(text.contains("ponawianie")) recovering.set(true); });
-                player[0].setMediaItem(new MediaItem.Builder().setUri(server.url("/live.ts").toString()).setMimeType(MimeTypes.VIDEO_MP2T).build());
+                player[0].setMediaItem(new MediaItem.Builder().setUri(address).setMimeType(MimeTypes.VIDEO_MP2T).build());
                 player[0].prepare(); player[0].play();
             });
             try {
