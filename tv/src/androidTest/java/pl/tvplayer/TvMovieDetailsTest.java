@@ -49,15 +49,15 @@ public class TvMovieDetailsTest {
     @Test public void catalogOpensMovieDetailsAndRemoteCanFavoriteAndPlay() throws Exception {
         Channel source=source(); new LibraryStore(context()).save(Collections.singletonList(source),new HashSet<>(Collections.singleton("https://example.com/keep.ts")));
         library=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK)); waitText(library,"Co oglądamy?");
-        key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(library,source.name());
+        TvTestUi.waitFor("Movie library has no input focus",library::hasWindowFocus); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(library,source.name());
         key(KeyEvent.KEYCODE_DPAD_CENTER); // The selected bouquet moves focus into the poster grid.
-        Instrumentation.ActivityMonitor details=instrument().addMonitor(MovieActivity.class.getName(),null,false); key(KeyEvent.KEYCODE_DPAD_CENTER); movie=(MovieActivity)details.waitForActivityWithTimeout(7000); instrument().removeMonitor(details); assertNotNull("Movie did not open its details",movie);
+        Instrumentation.ActivityMonitor details=instrument().addMonitor(MovieActivity.class.getName(),null,false); key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); movie=(MovieActivity)details.waitForActivityWithTimeout(7000); instrument().removeMonitor(details); assertNotNull("Movie did not open its details",movie);
         waitText(movie,"Aleksander Kowalski"); waitText(movie,"2024   ·   2 godz. 2 min   ·   ★ 8.2");
         long deadline=System.currentTimeMillis()+5000; while(!find(movie.getWindow().getDecorView(),"+  Moja lista").isEnabled() && System.currentTimeMillis()<deadline) Thread.sleep(80);
         assertEquals(1,apiCalls.get()); screenshot(); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(movie,"✓  Moja lista");
         deadline=System.currentTimeMillis()+5000; Set<String> saved=new HashSet<>(); while(System.currentTimeMillis()<deadline) { saved=new LibraryStore(context()).loadFavorites(); if(saved.contains(source.url())) break; Thread.sleep(80); }
         assertTrue(saved.contains(source.url())); assertTrue(saved.contains("https://example.com/keep.ts"));
-        key(KeyEvent.KEYCODE_DPAD_LEFT); Instrumentation.ActivityMonitor playback=instrument().addMonitor(PlayerActivity.class.getName(),null,false); key(KeyEvent.KEYCODE_DPAD_CENTER); player=playback.waitForActivityWithTimeout(7000); instrument().removeMonitor(playback);
+        key(KeyEvent.KEYCODE_DPAD_LEFT); Instrumentation.ActivityMonitor playback=instrument().addMonitor(PlayerActivity.class.getName(),null,false); key(KeyEvent.KEYCODE_MEDIA_PLAY); player=playback.waitForActivityWithTimeout(7000); instrument().removeMonitor(playback);
         assertNotNull("Remote did not start playback",player); assertEquals(source.url(),player.getIntent().getStringExtra("url")); assertTrue(player.getIntent().getBooleanExtra("television",false));
     }
     @Test public void m3uMovieCanResumeAndRestartWithoutMetadataApi() throws Exception {

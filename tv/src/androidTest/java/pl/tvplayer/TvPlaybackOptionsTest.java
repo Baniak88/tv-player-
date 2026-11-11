@@ -28,7 +28,7 @@ public class TvPlaybackOptionsTest {
     private byte[] asset(String name) throws Exception {
         try(InputStream input=instrument().getContext().getAssets().open(name);ByteArrayOutputStream output=new ByteArrayOutputStream()) { byte[] buffer=new byte[8192]; for(int n;(n=input.read(buffer))!=-1;) output.write(buffer,0,n); return output.toByteArray(); }
     }
-    private void options(String label) throws Exception { key(KeyEvent.KEYCODE_MENU); click(label); }
+    private void options(String label) throws Exception { waitFor("Player has no input focus",activity::hasWindowFocus); key(KeyEvent.KEYCODE_MENU); click(label); }
     private boolean selected(ExoPlayer player,int type,String language) {
         for(Tracks.Group group:player.getCurrentTracks().getGroups()) if(group.getType()==type) for(int i=0;i<group.length;i++) if(group.isTrackSelected(i) && language.equals(group.getTrackFormat(i).language)) return true;
         return false;

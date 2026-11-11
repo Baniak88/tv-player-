@@ -86,7 +86,17 @@ public class TvNavigationTest {
         try {
             instrument().waitForIdleSync(); assertEquals(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE,player.getRequestedOrientation());
             key(KeyEvent.KEYCODE_MENU); assertFalse(instrument().getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText("Ścieżka audio").isEmpty()); key(KeyEvent.KEYCODE_BACK);
-            key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); key(KeyEvent.KEYCODE_MEDIA_STOP);
+            key(KeyEvent.KEYCODE_MEDIA_PAUSE); assertPlayingIntent(player,false);
+            key(KeyEvent.KEYCODE_MEDIA_PLAY); assertPlayingIntent(player,true);
+            // Even a buffering/error-state player must pause; isPlaying() alone cannot decide this.
+            key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); assertPlayingIntent(player,false);
+            key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); assertPlayingIntent(player,true);
+            assertTrue("Media keys stole focus from the TV player",player.hasWindowFocus());
+            key(KeyEvent.KEYCODE_MEDIA_STOP);
         } finally { instrument().runOnMainSync(player::finish); instrument().waitForIdleSync(); long until=System.currentTimeMillis()+5000; while(!home.hasWindowFocus() && System.currentTimeMillis()<until) Thread.sleep(100); instrument().runOnMainSync(home::finish); instrument().waitForIdleSync(); Thread.sleep(500); }
+    }
+    private void assertPlayingIntent(PlayerActivity activity,boolean expected) throws Exception {
+        androidx.media3.exoplayer.ExoPlayer current=(androidx.media3.exoplayer.ExoPlayer)TvTestUi.field(activity,"player"); assertNotNull("Player was stopped by another media application",current);
+        instrument().runOnMainSync(() -> assertEquals(expected,current.getPlayWhenReady()));
     }
 }

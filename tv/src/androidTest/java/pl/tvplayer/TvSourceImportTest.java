@@ -17,6 +17,7 @@ public class TvSourceImportTest {
     private void start() throws Exception {
         home=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
         waitFor("Home missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null);
+        waitFor("Source screen has no input focus",home::hasWindowFocus);
     }
     @Before public void setup() throws Exception {
         systemReady();

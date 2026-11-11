@@ -353,11 +353,24 @@ public class PlayerActivity extends Activity {
         }
         super.finish();
     }
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        int code=event.getKeyCode();
+        if(television && (code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || code==KeyEvent.KEYCODE_MEDIA_PLAY || code==KeyEvent.KEYCODE_MEDIA_PAUSE || code==KeyEvent.KEYCODE_MEDIA_STOP)) {
+            // Consume DOWN as well as UP before the window can send it to another media app.
+            if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled()) {
+                if(code==KeyEvent.KEYCODE_MEDIA_STOP) finish();
+                else if(player!=null) {
+                    if(code==KeyEvent.KEYCODE_MEDIA_PAUSE || (code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE && player.getPlayWhenReady())) player.pause();
+                    else player.play();
+                }
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
     @Override public boolean onKeyUp(int code,KeyEvent event) {
         if(television && code==KeyEvent.KEYCODE_MENU) { showOptions(); return true; }
         if(television && code==KeyEvent.KEYCODE_INFO && !onDemand) { openGuide(); return true; }
-        if(television && code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE && player!=null) { if(player.isPlaying()) player.pause(); else player.play(); return true; }
-        if(television && code==KeyEvent.KEYCODE_MEDIA_STOP) { finish(); return true; }
         return super.onKeyUp(code,event);
     }
     private void chooseTrack(int type) {

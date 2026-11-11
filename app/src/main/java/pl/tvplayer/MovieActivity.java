@@ -135,9 +135,13 @@ public final class MovieActivity extends Activity {
     }
     private void playback(boolean fromStart) { if(fromStart) WatchProgress.restart(this,source.url()); startActivity(new Intent(this,PlayerActivity.class).putExtra("url",source.url()).putExtra("name",details.title()).putExtra("kind","movie").putExtra("television",television)); }
     private void favorite() { if(!favoritesReady) return; if(!favorites.add(source.url())) favorites.remove(source.url()); updateProgress(); Set<String> saved=new HashSet<>(favorites); worker.execute(() -> { try { new LibraryStore(this).saveFavorites(saved); } catch(Exception e) { runOnUiThread(() -> { if(!isDestroyed()) Toast.makeText(this,"Nie udało się zapisać Mojej listy.",Toast.LENGTH_LONG).show(); }); } }); }
-    @Override public boolean onKeyUp(int code,KeyEvent event) {
-        if(television && (code==KeyEvent.KEYCODE_MEDIA_PLAY || code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) { playback(false); return true; }
-        return super.onKeyUp(code,event);
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        int code=event.getKeyCode();
+        if(television && (code==KeyEvent.KEYCODE_MEDIA_PLAY || code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
+            if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled()) playback(false);
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
     @Override protected void onResume() { super.onResume(); updateProgress(); }
     @Override protected void onSaveInstanceState(Bundle state) { state.putInt("scroll",scroll.getScrollY()); super.onSaveInstanceState(state); }

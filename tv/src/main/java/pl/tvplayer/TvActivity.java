@@ -306,9 +306,16 @@ public final class TvActivity extends Activity {
             } catch(Exception e) { runOnUiThread(() -> { if(!isDestroyed()) { busy=false; status.setText("Nie udało się dodać źródła."); error("Sprawdź adres, login, hasło i połączenie z internetem. Dotychczasowa biblioteka pozostaje dostępna."); } }); }
         });
     }
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        int code=event.getKeyCode();
+        if(!home && (code==KeyEvent.KEYCODE_MEDIA_PLAY || code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
+            if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled()) { Channel selected=selected(); if(selected!=null) select(selected); }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
     @Override public boolean onKeyUp(int code,KeyEvent event) {
         if(!home && (code==KeyEvent.KEYCODE_MENU || code==KeyEvent.KEYCODE_INFO)) { Channel selected=selected(); if(selected!=null) options(selected); return true; }
-        if(!home && code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) { Channel selected=selected(); if(selected!=null) select(selected); return true; }
         return super.onKeyUp(code,event);
     }
     @Override public void onBackPressed() { if(busy) { status.setText("Trwa pobieranie biblioteki…"); return; } if(!home && !seriesTitle.isEmpty()) { seriesTitle=""; open("series"); } else if(!home && (!query.isEmpty() || onlyFavorites)) { query=""; onlyFavorites=false; filter(); } else if(!home) showHome(); else new AlertDialog.Builder(this).setTitle("Zamknąć TV Player?").setPositiveButton("Wyjście",(d,w) -> finish()).setNegativeButton("Zostań",null).show(); }
