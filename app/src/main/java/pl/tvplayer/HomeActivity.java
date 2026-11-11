@@ -23,27 +23,17 @@ public final class HomeActivity extends Activity {
     private Drawable interactive(boolean prominent) {
         return Ui.touch(this,prominent?Ui.SURFACE_HIGH:Ui.SURFACE,16,Ui.BORDER);
     }
-    /** Vivid gradient per section so the three entry points are recognisable at a glance. */
-    private Drawable gradient(String kind) {
-        int[] colors=kind.equals("tv")?new int[]{0xFFFF3D5E,0xFFB0186F}:kind.equals("movie")?new int[]{0xFF6A5CFF,0xFF3A2A9E}:new int[]{0xFF00B8D9,0xFF0B6E99};
-        StateListDrawable states=new StateListDrawable();
-        GradientDrawable pressed=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{Ui.lighter(colors[0]),Ui.lighter(colors[1])}); pressed.setCornerRadius(dp(18));
-        GradientDrawable focused=new GradientDrawable(GradientDrawable.Orientation.TL_BR,colors); focused.setCornerRadius(dp(18)); focused.setStroke(dp(3),0xFFFFFFFF);
-        GradientDrawable normal=new GradientDrawable(GradientDrawable.Orientation.TL_BR,colors); normal.setCornerRadius(dp(18));
-        states.addState(new int[]{android.R.attr.state_pressed},pressed); states.addState(new int[]{android.R.attr.state_focused},focused); states.addState(new int[]{},normal);
-        return states;
-    }
     private View tile(String label,String icon,boolean large,Runnable click) {
         LinearLayout box=column(); box.setGravity(Gravity.CENTER); box.setPadding(dp(12),dp(10),dp(12),dp(10));
-        box.setBackground(gradient(icon)); box.setElevation(dp(4)); box.setFocusable(true); box.setClickable(true); box.setContentDescription(label);
-        Icon image=new Icon(this,icon); box.addView(image,new LinearLayout.LayoutParams(dp(large?54:36),dp(large?54:36)));
+        box.setBackground(HomeStyle.tileBackground(this,icon)); box.setElevation(dp(4)); box.setFocusable(true); box.setClickable(true); box.setContentDescription(label);
+        HomeStyle.Icon image=new HomeStyle.Icon(this,icon); box.addView(image,new LinearLayout.LayoutParams(dp(large?54:36),dp(large?54:36)));
         TextView name=text(label,large?21:17,0xFFFFFFFF); name.setTypeface(null,Typeface.BOLD); name.setGravity(Gravity.CENTER); name.setMaxLines(2);
         name.setPadding(0,dp(large?12:10),0,0); box.addView(name); box.setOnClickListener(v -> click.run()); return box;
     }
     private View action(String label,String icon,Runnable click) {
         LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(14),dp(6),dp(12),dp(6));
         row.setBackground(interactive(false)); row.setFocusable(true); row.setClickable(true); row.setContentDescription(label);
-        Icon glyph=new Icon(this,icon); glyph.tint=Ui.ACCENT; row.addView(glyph,new LinearLayout.LayoutParams(dp(24),dp(24)));
+        HomeStyle.Icon glyph=new HomeStyle.Icon(this,icon); glyph.tint=Ui.ACCENT; row.addView(glyph,new LinearLayout.LayoutParams(dp(24),dp(24)));
         TextView t=text(label,15,Ui.TEXT); t.setPadding(dp(12),0,0,0); t.setMaxLines(1); t.setTypeface(null,Typeface.BOLD);
         // Shrink long labels ("Odśwież źródło") instead of wrapping them onto two lines.
         if(android.os.Build.VERSION.SDK_INT>=26) t.setAutoSizeTextTypeUniformWithConfiguration(11,15,1,android.util.TypedValue.COMPLEX_UNIT_SP); else t.setEllipsize(android.text.TextUtils.TruncateAt.END); row.addView(t,new LinearLayout.LayoutParams(0,dp(24),1));
@@ -158,40 +148,6 @@ public final class HomeActivity extends Activity {
     @Override public void onConfigurationChanged(Configuration configuration) { super.onConfigurationChanged(configuration); build(); }
     @Override protected void onDestroy() { worker.shutdown(); super.onDestroy(); }
 
-    private static final class Icon extends View {
-        private final String kind;
-        private final Paint paint=new Paint(3);
-        int tint=0xFFFFFFFF;
-        Icon(Context context,String kind) { super(context); this.kind=kind; setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); }
-        @Override protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas); canvas.save(); float scale=Math.min(getWidth(),getHeight())/48f;
-            canvas.translate((getWidth()-48*scale)/2,(getHeight()-48*scale)/2); canvas.scale(scale,scale);
-            paint.setColor(tint); paint.setStrokeWidth(2.4f); paint.setStyle(Paint.Style.STROKE); paint.setStrokeCap(Paint.Cap.ROUND); paint.setStrokeJoin(Paint.Join.ROUND);
-            switch(kind) {
-                case "tv":
-                    canvas.drawRoundRect(5,12,43,40,5,5,paint); canvas.drawLine(14,4,24,12,paint); canvas.drawLine(34,4,24,12,paint);
-                    canvas.drawRoundRect(11,18,37,34,3,3,paint); play(canvas,22,22,7); break;
-                case "movie": canvas.drawCircle(24,24,18,paint); play(canvas,20,16,13); break;
-                case "series":
-                    canvas.drawRect(6,17,42,40,paint); canvas.drawRect(6,8,42,17,paint);
-                    for(int x=8;x<40;x+=10) canvas.drawLine(x,17,x+7,8,paint); canvas.drawLine(6,23,42,23,paint); break;
-                case "account":
-                    canvas.drawCircle(24,15,7,paint); canvas.drawArc(10,25,38,46,180,180,false,paint);
-                    canvas.drawCircle(9,22,4,paint); canvas.drawCircle(39,22,4,paint); break;
-                case "source":
-                    for(int y=8;y<=32;y+=12) { canvas.drawRoundRect(7,y,41,y+8,2,2,paint); canvas.drawCircle(13,y+4,1,paint); } break;
-                case "settings":
-                    canvas.drawCircle(24,24,12,paint); canvas.drawCircle(24,24,4,paint);
-                    for(int i=0;i<8;i++) { canvas.save(); canvas.rotate(i*45,24,24); canvas.drawLine(24,6,24,11,paint); canvas.restore(); } break;
-                case "refresh":
-                    canvas.drawArc(8,8,40,40,35,285,false,paint); canvas.drawLine(36,4,39,14,paint); canvas.drawLine(39,14,29,13,paint); break;
-                default:
-                    canvas.drawLine(22,6,8,6,paint); canvas.drawLine(8,6,8,42,paint); canvas.drawLine(8,42,22,42,paint);
-                    canvas.drawLine(20,24,43,24,paint); canvas.drawLine(35,16,43,24,paint); canvas.drawLine(43,24,35,32,paint);
-            }
-            canvas.restore();
-        }
-        private void play(Canvas canvas,float x,float y,float size) { Path p=new Path(); p.moveTo(x,y); p.lineTo(x+size,y+size/2); p.lineTo(x,y+size); p.close(); canvas.drawPath(p,paint); }
-    }
+
 }
 

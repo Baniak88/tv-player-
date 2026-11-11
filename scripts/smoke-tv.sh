@@ -4,11 +4,19 @@ mkdir -p tv-smoke-output
 cleanup() {
   adb logcat -d -v brief -s AndroidRuntime TestRunner SeriesRemote > tv-smoke-output/runtime.txt
   tail -n 200 tv-smoke-output/runtime.txt
-  for name in tv-home tv-movies tv-bouquet series-television; do
+  for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup; do
     adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png" || true
   done
 }
 trap cleanup EXIT
+run_case() {
+  local test_class="$1" report="$2" expected="${3:-1}"
+  adb shell am force-stop pl.tvplayer.television
+  adb shell input keyevent KEYCODE_WAKEUP
+  adb shell wm dismiss-keyguard
+  adb shell am instrument -w -r -e class "$test_class" pl.tvplayer.television.test/androidx.test.runner.AndroidJUnitRunner | tee "tv-smoke-output/$report.txt"
+  grep -q "OK ($expected test" "tv-smoke-output/$report.txt"
+}
 adb shell settings put system accelerometer_rotation 0
 adb shell wm size 720x1280
 adb shell wm density 160
@@ -17,22 +25,18 @@ adb shell am start -W -n pl.tvplayer.television/pl.tvplayer.TvActivity
 sleep 3
 adb install -r apk/debug/tv-debug.apk
 adb install apk/androidTest/debug/tv-debug-androidTest.apk
-adb shell am force-stop pl.tvplayer.television
-adb shell input keyevent KEYCODE_WAKEUP
-adb shell wm dismiss-keyguard
-adb shell am instrument -w -r -e class "pl.tvplayer.SeriesActivityTest#televisionRemoteReachesSeasonPickerAndEpisodePlayback" pl.tvplayer.television.test/androidx.test.runner.AndroidJUnitRunner | tee tv-smoke-output/series-remote.txt
-grep -q 'OK (1 test)' tv-smoke-output/series-remote.txt
-for case in homeAndMoviesWorkWithRemoteOnly bouquetsAndItemOptionsWorkWithRemote credentialsAreEncryptedAndReadableAfterRestart playerKeepsLandscapeAndHandlesRemoteMenu; do
-  adb shell am force-stop pl.tvplayer.television
-  adb shell input keyevent KEYCODE_WAKEUP
-  adb shell wm dismiss-keyguard
-  adb shell am instrument -w -r -e class "pl.tvplayer.TvNavigationTest#$case" pl.tvplayer.television.test/androidx.test.runner.AndroidJUnitRunner | tee "tv-smoke-output/$case.txt"
-  grep -q 'OK (1 test)' "tv-smoke-output/$case.txt"
+run_case 'pl.tvplayer.SeriesActivityTest#televisionRemoteReachesSeasonPickerAndEpisodePlayback' series-remote
+for case in homeAndMoviesWorkWithRemoteOnly oktvHomeReachesManagementAndAboutWithRemote bouquetsAndItemOptionsWorkWithRemote credentialsAreEncryptedAndReadableAfterRestart playerKeepsLandscapeAndHandlesRemoteMenu; do
+  run_case "pl.tvplayer.TvNavigationTest#$case" "$case"
 done
-cat tv-smoke-output/*Remote*.txt tv-smoke-output/credentials*.txt > tv-smoke-output/navigation.txt
-echo 'TV_REMOTE_CHECKS_PASSED=5' | tee -a tv-smoke-output/navigation.txt
-for name in tv-home tv-movies tv-bouquet series-television; do
+for case in catalogOpensMovieDetailsAndRemoteCanFavoriteAndPlay m3uMovieCanResumeAndRestartWithoutMetadataApi; do
+  run_case "pl.tvplayer.TvMovieDetailsTest#$case" "$case"
+done
+cat tv-smoke-output/series-remote.txt tv-smoke-output/homeAndMoviesWorkWithRemoteOnly.txt tv-smoke-output/oktvHomeReachesManagementAndAboutWithRemote.txt tv-smoke-output/bouquetsAndItemOptionsWorkWithRemote.txt tv-smoke-output/credentialsAreEncryptedAndReadableAfterRestart.txt tv-smoke-output/playerKeepsLandscapeAndHandlesRemoteMenu.txt tv-smoke-output/catalogOpensMovieDetailsAndRemoteCanFavoriteAndPlay.txt tv-smoke-output/m3uMovieCanResumeAndRestartWithoutMetadataApi.txt > tv-smoke-output/navigation.txt
+echo 'TV_REMOTE_CHECKS_PASSED=8' | tee -a tv-smoke-output/navigation.txt
+run_case 'pl.tvplayer.PlaybackRecoveryTest,pl.tvplayer.PlaybackBandwidthTest,pl.tvplayer.StreamResumptionTest' playback 6
+run_case 'pl.tvplayer.TvPhoneSetupTest' phone-setup
+for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup; do
   adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png"
 done
-grep -q 'TV_REMOTE_CHECKS_PASSED=5' tv-smoke-output/navigation.txt
-
+grep -q 'TV_REMOTE_CHECKS_PASSED=8' tv-smoke-output/navigation.txt

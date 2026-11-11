@@ -1,7 +1,7 @@
 plugins { id 'com.android.application' }
 android {
     namespace 'pl.tvplayer'
-    sourceSets { main { java.srcDirs += ["src/phone/java"] }; androidTest { java.srcDirs += [rootProject.file("app/src/androidTestSeries/java")] } }
+    sourceSets { androidTest { java.srcDirs += [rootProject.file("app/src/androidTestSeries/java")] } }
     compileSdk 35
     buildFeatures { buildConfig true }
     defaultConfig {

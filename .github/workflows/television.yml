@@ -1,5 +1,8 @@
 name: TV platforms
 on:
+  push:
+    branches: [main, 'feature/tv-*', 'fix/**']
+    paths: ['tv/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/test/**', 'app/build.gradle', 'scripts/smoke-tv.sh', '.github/workflows/television.yml']
   pull_request:
     paths: ['tv/**', 'samsung/**', 'app/src/main/**', 'settings.gradle', 'scripts/*tv*', 'scripts/*samsung*', '.github/workflows/television.yml']
   workflow_dispatch:
@@ -20,7 +23,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.9'}
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - run: gradle :app:testDebugUnitTest :tv:lintDebug :tv:assembleDebug :tv:assembleDebugAndroidTest --no-daemon
+      - run: gradle :app:testDebugUnitTest :app:lintDebug :tv:lintDebug :tv:assembleDebug :tv:assembleDebugAndroidTest --no-daemon
       - name: Check signature and launcher
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose tv/build/outputs/apk/debug/tv-debug.apk
@@ -59,12 +62,12 @@ jobs:
         run: |
           python3 - <<'PY'
           import base64,json,pathlib
-          for name in ['tv-home','tv-movies','tv-bouquet','series-television']:
+          for name in ['tv-home','tv-movies','tv-bouquet','series-television','movie-television','tv-phone-setup']:
               image=pathlib.Path('tv-smoke-output',name+'.png')
               if image.exists() and image.read_bytes().startswith(bytes([137,80,78,71,13,10,26,10])):
                   pathlib.Path('/tmp',name+'.json').write_text(json.dumps({'encoding':'base64','content':base64.b64encode(image.read_bytes()).decode()}))
           PY
-          for name in tv-home tv-movies tv-bouquet series-television; do
+          for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup; do
             if [ ! -f "/tmp/$name.json" ]; then continue; fi
             ref=$(gh api "repos/$GH_REPO/git/blobs" --input "/tmp/$name.json" --jq '.sha')
             echo "UI_PREVIEW $name $ref"
@@ -97,7 +100,8 @@ jobs:
         if: always()
         with: {name: samsung-preview-report, path: tv-smoke-output/}
   publish-tv:
-    if: ${{ !startsWith(github.head_ref, 'feature/phone-') }}
+    # Source pushes and PRs validate code; publishing a preview is a manual action.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     needs: [fire-test, samsung-test]
     runs-on: ubuntu-latest
     permissions: {contents: write}
@@ -112,9 +116,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/tv-debug.apk TV-Player-FireTV-0.9.1.apk
-          gh release view v0.9.1-tv-preview >/dev/null 2>&1 || gh release create v0.9.1-tv-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Fire TV 0.9.1" --notes "Nowy ekran szczegółów serialu, wybór sezonu, miniatury odcinków, Moja lista i zapis postępu. APK na Fire OS 6+ i Android TV 7.1+, obsługa pilotem. Nie jest zgodny z Vega OS. Pakiet Samsung pozostaje dostępny osobno w wydaniu v0.9.0-tv-preview."
-          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v0.9.1-tv-preview" -f sha="$SOURCE_SHA" -F force=false >/dev/null
-          gh release upload v0.9.1-tv-preview TV-Player-FireTV-0.9.1.apk --clobber
+          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.3-preview.apk
+          gh release create v0.9.3-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.3 Preview" --notes "Interfejs OKTV Player 1.1.6 na TV: kolorowe kafelki, wspólne ikony, szczegóły filmów i seriali oraz sterowanie pilotem. Dodawanie źródła przez telefon w LAN i poprawki odtwarzania. APK na Fire OS 6+ i Android TV 7.1+, obsługa pilotem. Nie jest zgodny z Vega OS. Pakiet Samsung pozostaje dostępny osobno w wydaniu v0.9.0-tv-preview."
+          gh release upload v0.9.3-tv-preview OKTV-Player-TV-0.9.3-preview.apk
 
 

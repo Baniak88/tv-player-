@@ -21,7 +21,7 @@ public final class TvActivity extends Activity {
     private List<Channel> items=new ArrayList<>(),shown=new ArrayList<>();
     private List<String> groups=new ArrayList<>();
     private String section="tv",group="",query="",seriesTitle="";
-    private boolean home=true,onlyFavorites,busy;
+    private boolean home=true,onlyFavorites,busy,loadingAccount;
     private TvAccountStore.Account account;
     private TvPhoneSetup phoneSetup;
     private LinearLayout page,body;
@@ -37,7 +37,7 @@ public final class TvActivity extends Activity {
         LinearLayout view; ImageView logo; TextView name,epg,star; Channel channel; boolean requested;
     }
     private static final class Poster {
-        LinearLayout view; ImageView image; TextView name;
+        LinearLayout view; FrameLayout artwork; ImageView image; TextView name,placeholder,badge;
     }
     private void scheduleGuides() {
         ui.removeCallbacks(guideRows);
@@ -78,7 +78,7 @@ public final class TvActivity extends Activity {
     private void build() {
         page=column(); page.setBackgroundColor(Ui.BG); page.setPadding(dp(32),dp(18),dp(32),dp(16));
         LinearLayout header=new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView brand=text("TV PLAYER",19,Ui.TEXT); brand.setTypeface(null,Typeface.BOLD); header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
+        TextView brand=text(Ui.APP_NAME.toUpperCase(Locale.ROOT),18,Ui.ACCENT); brand.setTypeface(null,Typeface.BOLD); brand.setLetterSpacing(.08f); header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
         TextClock clock=new TextClock(this); clock.setTextColor(Ui.MUTED); clock.setTextSize(18); clock.setFormat24Hour("HH:mm"); clock.setFormat12Hour("HH:mm"); header.addView(clock);
         page.addView(header,new LinearLayout.LayoutParams(-1,dp(42)));
         body=column(); page.addView(body,new LinearLayout.LayoutParams(-1,0,1));
@@ -88,24 +88,39 @@ public final class TvActivity extends Activity {
     }
     private void showHome() {
         home=true; ui.removeCallbacks(guideRows); body.removeAllViews();
-        heading=text("Co oglądamy?",32,Ui.TEXT); heading.setTypeface(null,Typeface.BOLD); heading.setPadding(0,dp(18),0,dp(24)); body.addView(heading);
-        LinearLayout tiles=new LinearLayout(this); int height=dp(240);
-        Button live=button("▣\n\nTelewizja na żywo",() -> open("tv")); live.setTextSize(25);
-        LinearLayout.LayoutParams large=new LinearLayout.LayoutParams(0,height,1.2f); large.rightMargin=dp(18); tiles.addView(live,large);
-        LinearLayout middle=column();
-        Button films=button("▶  Filmy",() -> open("movie")),series=button("▤  Seriale",() -> open("series"));
-        live.setId(View.generateViewId()); films.setId(View.generateViewId()); series.setId(View.generateViewId());
-        live.setNextFocusRightId(films.getId()); films.setNextFocusLeftId(live.getId()); series.setNextFocusLeftId(live.getId());
-        films.setNextFocusDownId(series.getId()); series.setNextFocusUpId(films.getId());
-        LinearLayout.LayoutParams cell=new LinearLayout.LayoutParams(-1,0,1); cell.bottomMargin=dp(18); middle.addView(films,cell); middle.addView(series,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout.LayoutParams mid=new LinearLayout.LayoutParams(0,height,1); mid.rightMargin=dp(18); tiles.addView(middle,mid);
+        ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false);
+        LinearLayout content=column(); scroll.addView(content,new ScrollView.LayoutParams(-1,-2)); body.addView(scroll,new LinearLayout.LayoutParams(-1,-1));
+        heading=text("Co oglądamy?",32,Ui.TEXT); heading.setTypeface(null,Typeface.BOLD); heading.setPadding(0,dp(18),0,dp(26)); content.addView(heading);
+        LinearLayout tiles=new LinearLayout(this); int height=dp(300),gap=dp(16);
+        View live=HomeStyle.tvTile(this,"Telewizja na żywo","tv",true,() -> open("tv"));
+        LinearLayout.LayoutParams liveSize=new LinearLayout.LayoutParams(0,height,1.15f); liveSize.rightMargin=gap; tiles.addView(live,liveSize);
+        LinearLayout middle=column(),films=new LinearLayout(this),management=new LinearLayout(this);
+        View movies=HomeStyle.tvTile(this,"Filmy","movie",false,() -> open("movie"));
+        View series=HomeStyle.tvTile(this,"Seriale","series",false,() -> open("series"));
+        LinearLayout.LayoutParams movieSize=new LinearLayout.LayoutParams(0,-1,1); movieSize.rightMargin=gap; films.addView(movies,movieSize); films.addView(series,new LinearLayout.LayoutParams(0,-1,1));
+        View accountTile=HomeStyle.tvAction(this,"Konto","account",this::account);
+        View sourceTile=HomeStyle.tvAction(this,"Zmień źródło","source",this::sourceDialog);
+        LinearLayout.LayoutParams accountSize=new LinearLayout.LayoutParams(0,-1,1); accountSize.rightMargin=gap; management.addView(accountTile,accountSize); management.addView(sourceTile,new LinearLayout.LayoutParams(0,-1,1));
+        LinearLayout.LayoutParams filmRow=new LinearLayout.LayoutParams(-1,0,1.65f); filmRow.bottomMargin=gap; middle.addView(films,filmRow); middle.addView(management,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout.LayoutParams middleSize=new LinearLayout.LayoutParams(0,height,1.6f); middleSize.rightMargin=gap; tiles.addView(middle,middleSize);
         LinearLayout actions=column();
-        for(String label:new String[]{"Dodaj / zmień źródło","Odśwież bibliotekę","Informacje","Wyjście"}) {
-            Button action=button(label,() -> { if(label.startsWith("Dodaj")) sourceDialog(); else if(label.startsWith("Odśwież")) refresh(); else if(label.equals("Wyjście")) finish(); else info(); });
-            LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,0,1); size.bottomMargin=dp(10); actions.addView(action,size);
-        }
-        tiles.addView(actions,new LinearLayout.LayoutParams(0,height,1.1f)); body.addView(tiles);
-        status.setText(account==null?"Dodaj konto Xtream lub adres listy M3U, aby rozpocząć.":"OK — wybierz · Strzałki — nawigacja · Wstecz — powrót"); live.requestFocus(); live.post(() -> { if(home && !isFinishing()) live.requestFocus(); });
+        View settings=HomeStyle.tvAction(this,"Ustawienia","settings",this::settings);
+        View refresh=HomeStyle.tvAction(this,"Odśwież źródło","refresh",this::refresh);
+        View exit=HomeStyle.tvAction(this,"Wyjście","exit",this::finish);
+        View[] buttons={settings,refresh,exit};
+        for(int i=0;i<buttons.length;i++) { LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,0,1); if(i<buttons.length-1) size.bottomMargin=gap; actions.addView(buttons[i],size); }
+        tiles.addView(actions,new LinearLayout.LayoutParams(0,height,1.15f)); content.addView(tiles);
+        View[] focusable={live,movies,series,accountTile,sourceTile,settings,refresh,exit}; for(View view:focusable) view.setId(View.generateViewId());
+        live.setNextFocusRightId(movies.getId()); live.setNextFocusDownId(accountTile.getId());
+        movies.setNextFocusLeftId(live.getId()); movies.setNextFocusRightId(series.getId()); movies.setNextFocusDownId(accountTile.getId());
+        series.setNextFocusLeftId(movies.getId()); series.setNextFocusRightId(settings.getId()); series.setNextFocusDownId(sourceTile.getId());
+        accountTile.setNextFocusUpId(movies.getId()); accountTile.setNextFocusLeftId(live.getId()); accountTile.setNextFocusRightId(sourceTile.getId()); accountTile.setNextFocusDownId(refresh.getId());
+        sourceTile.setNextFocusUpId(series.getId()); sourceTile.setNextFocusLeftId(accountTile.getId()); sourceTile.setNextFocusRightId(settings.getId()); sourceTile.setNextFocusDownId(exit.getId());
+        settings.setNextFocusLeftId(series.getId()); settings.setNextFocusDownId(refresh.getId());
+        refresh.setNextFocusUpId(settings.getId()); refresh.setNextFocusLeftId(sourceTile.getId()); refresh.setNextFocusDownId(exit.getId());
+        exit.setNextFocusUpId(refresh.getId()); exit.setNextFocusLeftId(sourceTile.getId());
+        status.setText(account==null?"Dodaj konto lub listę M3U · Zmień źródło → Dodaj przez telefon":"OK — wybierz · Strzałki — nawigacja · Wstecz — powrót");
+        live.requestFocus(); live.post(() -> { if(home && !isFinishing()) live.requestFocus(); });
     }
     private void open(String kind) { if(busy) return; section=kind; group=""; query=""; seriesTitle=""; onlyFavorites=false; items=new ArrayList<>(); home=false; showCatalog(); load(kind); }
     private void load(String kind) {
@@ -147,7 +162,7 @@ public final class TvActivity extends Activity {
         for(int i=0;i<labels.length;i++) {
             final int index=i;
             Button b=button(labels[i],() -> { if(index==0) { if(!busy) showHome(); } else if(index>=1 && index<=3) open(new String[]{"tv","movie","series"}[index-1]); else if(index==4) search(); else if(index==5) { onlyFavorites=!onlyFavorites; filter(); } else if(index==6) sort(); else sourceDialog(); });
-            LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(0,dp(48),i==0?1.25f:1); size.rightMargin=dp(6); bar.addView(b,size);
+            LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(0,dp(48),i==0?1.25f:1); size.rightMargin=dp(6); if(i>=1 && i<=3 && section.equals(new String[]{"tv","movie","series"}[i-1])) Ui.televisionButton(b,true); bar.addView(b,size);
         }
         body.addView(bar);
         heading=text(title(section),24,Ui.TEXT); heading.setTypeface(null,Typeface.BOLD); heading.setPadding(0,dp(16),0,dp(12)); body.addView(heading);
@@ -190,12 +205,20 @@ public final class TvActivity extends Activity {
     }
     private View poster(Channel channel,View reused) {
         Poster card=reused!=null && reused.getTag() instanceof Poster?(Poster)reused.getTag():null;
+        int columns=Math.max(1,posters.getNumColumns());
+        int available=posters.getWidth()>0?posters.getWidth():getResources().getDisplayMetrics().widthPixels-dp(64+220);
+        int width=Math.max(dp(60),(available-dp(14)*(columns-1))/columns),height=width*3/2;
         if(card==null) {
             card=new Poster(); card.view=column(); card.view.setPadding(dp(5),dp(5),dp(5),dp(10)); card.view.setBackground(Ui.shape(this,Ui.SURFACE,12,0));
-            card.image=new ImageView(this); card.image.setScaleType(ImageView.ScaleType.CENTER_CROP); card.image.setBackgroundColor(Ui.SURFACE_HIGH); card.view.addView(card.image,new LinearLayout.LayoutParams(-1,dp(180)));
+            card.artwork=new FrameLayout(this); card.artwork.setBackground(Ui.shape(this,Ui.SURFACE_HIGH,10,0)); card.artwork.setClipToOutline(true); card.view.addView(card.artwork,new LinearLayout.LayoutParams(-1,height));
+            card.placeholder=text("",15,Ui.MUTED); card.placeholder.setGravity(Gravity.CENTER); card.placeholder.setPadding(dp(8),dp(8),dp(8),dp(8)); card.placeholder.setMaxLines(4); card.artwork.addView(card.placeholder,new FrameLayout.LayoutParams(-1,-1));
+            card.image=new ImageView(this); card.image.setScaleType(ImageView.ScaleType.CENTER_CROP); card.artwork.addView(card.image,new FrameLayout.LayoutParams(-1,-1));
+            card.badge=text("★",16,Ui.STAR); card.badge.setGravity(Gravity.CENTER); card.badge.setBackground(Ui.shape(this,0xCC0A0D14,14,0));
+            FrameLayout.LayoutParams badgeSize=new FrameLayout.LayoutParams(dp(30),dp(30),Gravity.TOP|Gravity.END); badgeSize.topMargin=dp(6); badgeSize.rightMargin=dp(6); card.artwork.addView(card.badge,badgeSize);
             card.name=text("",16,Ui.TEXT); card.name.setMaxLines(2); card.name.setPadding(dp(4),dp(7),dp(4),0); card.view.addView(card.name,new LinearLayout.LayoutParams(-1,dp(52))); card.view.setTag(card);
         }
-        ImageLoader.get(this).load(channel.logo(),card.image,dp(135),dp(180)); card.name.setText((favorites.contains(channel.url())?"★ ":"")+channel.name()); return card.view;
+        if(card.artwork.getLayoutParams().height!=height) card.artwork.setLayoutParams(new LinearLayout.LayoutParams(-1,height));
+        ImageLoader.get(this).load(channel.logo(),card.image,width,height); card.placeholder.setText(channel.name()); card.badge.setVisibility(favorites.contains(channel.url())?View.VISIBLE:View.GONE); card.name.setText(channel.name()); card.view.setContentDescription(channel.name()); return card.view;
     }
     private void rebuildGroups() {
         groups=new ArrayList<>(BouquetOrder.counts(items,getPreferences(MODE_PRIVATE).getString("sort-"+section,"provider")).keySet());
@@ -211,25 +234,43 @@ public final class TvActivity extends Activity {
         if(rows!=null) rows.notifyDataSetChanged(); if(covers!=null) covers.notifyDataSetChanged();
         boolean television=section.equals("tv") || !seriesTitle.isEmpty(); list.setVisibility(television?View.VISIBLE:View.GONE); posters.setVisibility(television?View.GONE:View.VISIBLE);
         heading.setText(!seriesTitle.isEmpty()?seriesTitle:title(section)+(onlyFavorites?" · Ulubione":"")+(group.isEmpty()?"":" · "+group));
-        status.setText(busy?"Wczytywanie biblioteki…":shown.isEmpty()?"Brak pozycji. Dodaj źródło lub zmień filtr.":Ui.count(shown.size())+" pozycji · OK — odtwórz · Menu — EPG i ulubione · Wstecz — powrót");
+        status.setText(busy?"Wczytywanie biblioteki…":shown.isEmpty()?"Brak pozycji. Dodaj źródło lub zmień filtr.":Ui.count(shown.size())+" pozycji · OK — "+(section.equals("tv")?"odtwórz":"szczegóły")+" · Menu — "+(section.equals("tv")?"EPG i ulubione":"opcje i ulubione")+" · Wstecz — powrót");
     }
     private Channel selected() { if(home || shown.isEmpty()) return null; int index=(list.getVisibility()==View.VISIBLE?list:posters).getSelectedItemPosition(); return index>=0 && index<shown.size()?shown.get(index):null; }
     private void options(Channel channel) {
-        List<String> actions=new ArrayList<>(); actions.add(channel.kind().equals("series")?"Odcinki":"Odtwórz"); if(channel.kind().equals("tv")) actions.add("Program TV i archiwum"); actions.add(favorites.contains(channel.url())?"Usuń z ulubionych":"Dodaj do ulubionych");
-        new AlertDialog.Builder(this).setTitle(channel.name()).setItems(actions.toArray(new String[0]),(d,index) -> { String action=actions.get(index); if(action.contains("ulubionych")) favorite(channel); else if(action.startsWith("Program")) GuideDialog.open(this,channel,worker,this::play); else select(channel); }).setNegativeButton("Zamknij",null).show();
+        List<String> actions=new ArrayList<>(); if(channel.kind().equals("movie")) actions.add("Szczegóły filmu"); actions.add(channel.kind().equals("series")?"Odcinki":"Odtwórz"); if(channel.kind().equals("tv")) actions.add("Program TV i archiwum"); actions.add(favorites.contains(channel.url())?"Usuń z ulubionych":"Dodaj do ulubionych");
+        new AlertDialog.Builder(this).setTitle(channel.name()).setItems(actions.toArray(new String[0]),(d,index) -> { String action=actions.get(index); if(action.contains("ulubionych")) favorite(channel); else if(action.startsWith("Program")) GuideDialog.open(this,channel,worker,this::play); else if(action.equals("Odtwórz")) play(channel); else select(channel); }).setNegativeButton("Zamknij",null).show();
     }
     private void favorite(Channel channel) {
         if(!favorites.add(channel.url())) favorites.remove(channel.url()); final Set<String> saved=new HashSet<>(favorites);
         worker.execute(() -> { try { new LibraryStore(this).saveFavorites(saved); } catch(Exception ignored) {} }); filter();
     }
     private void select(Channel channel) {
-        if(channel.kind().equals("series")) startActivity(SeriesActivity.intent(this,channel,true)); else play(channel);
+        if(channel.kind().equals("series")) startActivity(SeriesActivity.intent(this,channel,true)); else if(channel.kind().equals("movie")) startActivity(new Intent(this,MovieActivity.class).putExtra("television",true).putExtra("url",channel.url()).putExtra("name",channel.name()).putExtra("group",channel.group()).putExtra("logo",channel.logo())); else play(channel);
     }
     private void play(Channel channel) { startActivity(new Intent(this,PlayerActivity.class).putExtra("television",true).putExtra("url",channel.url()).putExtra("name",channel.name()).putExtra("kind",channel.kind()).putExtra("guide",channel.guideUrl()).putExtra("epgId",channel.epgId()).putExtra("days",channel.archiveDays()).putExtra("timezone",channel.timezone())); }
     private void search() { EditText field=new EditText(this); field.setSingleLine(true); field.setText(query); new AlertDialog.Builder(this).setTitle("Szukaj w sekcji").setView(field).setPositiveButton("Szukaj",(d,w) -> { query=field.getText().toString().trim(); group=""; filter(); }).setNegativeButton("Anuluj",null).show(); }
     private void sort() { new AlertDialog.Builder(this).setTitle("Kolejność bukietów").setItems(BouquetOrder.LABELS,(d,index) -> { getPreferences(MODE_PRIVATE).edit().putString("sort-"+section,BouquetOrder.MODES[index]).apply(); rebuildGroups(); }).show(); }
-    private void info() { new AlertDialog.Builder(this).setTitle("TV Player TV "+BuildConfig.VERSION_NAME).setMessage("Wersja na Fire OS 6+ i Android TV 7.1+.\n\nTV, filmy, seriale, bukiety dostawcy, ulubione i EPG.\n\nOK: odtwórz\nMenu / przytrzymanie OK: opcje pozycji\nPlay/Pause: sterowanie odtwarzaniem\n\nAplikacja odtwarza własne źródła użytkownika.").setPositiveButton("Zamknij",null).show(); }
-    private void error(String message) { if(!isDestroyed()) new AlertDialog.Builder(this).setTitle("TV Player").setMessage(message).setPositiveButton("OK",null).show(); }
+    private void account() {
+        if(loadingAccount) return; loadingAccount=true;
+        worker.execute(() -> {
+            try {
+                List<Channel> channels=new LibraryStore(this).loadSection("tv",new HashSet<>()); Set<String> bouquets=new HashSet<>(); for(Channel channel:channels) bouquets.add(channel.group());
+                runOnUiThread(() -> {
+                    loadingAccount=false; if(isFinishing() || isDestroyed()) return;
+                    okhttp3.HttpUrl address=account==null?null:okhttp3.HttpUrl.parse(account.server()==null?"":account.server()); String host=account==null?"Nie dodano źródła":address==null?"Nieprawidłowy zapis źródła":address.host();
+                    new AlertDialog.Builder(this).setTitle("Konto i biblioteka").setMessage("Źródło: "+host+"\nKanały TV: "+Ui.count(channels.size())+"\nBukiety TV: "+Ui.count(bouquets.size())+"\n\nDane dostępu są przechowywane w zaszyfrowanej bibliotece.").setPositiveButton("Zmień źródło",(d,w) -> sourceDialog()).setNegativeButton("Zamknij",null).show();
+                });
+            } catch(Exception failure) { runOnUiThread(() -> { loadingAccount=false; error("Nie można odczytać konta i biblioteki."); }); }
+        });
+    }
+    private void settings() {
+        new AlertDialog.Builder(this).setTitle("Ustawienia").setItems(new String[]{"Źródło: dodaj lub zmień","Źródło: odśwież listę","Połączenie internetowe (bufor)","Program TV (EPG): własny link XMLTV","O aplikacji"},(d,index) -> {
+            if(index==0) sourceDialog(); else if(index==1) refresh(); else if(index==2) PlaybackSettings.choose(this,() -> {}); else if(index==3) EpgSettings.choose(this,() -> GuideRepository.get(this).invalidateFailures()); else info();
+        }).setNegativeButton("Zamknij",null).show();
+    }
+    private void info() { new AlertDialog.Builder(this).setTitle(Ui.APP_NAME+" "+BuildConfig.VERSION_NAME).setMessage("Telewizja na żywo, filmy i seriale z Twojego źródła IPTV.\nProgram TV (EPG) i archiwum zależą od dostawcy.\n\nOK: wybierz lub odtwórz\nStrzałki: nawigacja\nMenu / przytrzymanie OK: opcje pozycji\nPlay/Pause: sterowanie odtwarzaniem").setPositiveButton("OK",null).show(); }
+    private void error(String message) { if(!isFinishing() && !isDestroyed()) new AlertDialog.Builder(this).setTitle(Ui.APP_NAME).setMessage(message).setPositiveButton("OK",null).show(); }
     private void sourceDialog() {
         if(busy) return;
         new AlertDialog.Builder(this).setTitle("Dodaj źródło").setItems(new String[]{"Dodaj przez telefon · ta sama sieć Wi-Fi","Konto Xtream Codes · wpisz pilotem","Adres listy M3U · wpisz pilotem"},(d,index) -> {

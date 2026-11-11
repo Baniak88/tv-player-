@@ -20,6 +20,11 @@ public class TvNavigationTest {
         if(view instanceof ViewGroup) for(int i=0;i<((ViewGroup)view).getChildCount();i++) { View hit=find(((ViewGroup)view).getChildAt(i),text); if(hit!=null) return hit; } return null;
     }
     private void waitText(View root,String text) throws Exception { long until=System.currentTimeMillis()+7000; while(find(root,text)==null && System.currentTimeMillis()<until) { Thread.sleep(100); instrument().waitForIdleSync(); } assertNotNull(text,find(root,text)); }
+    private android.view.accessibility.AccessibilityNodeInfo waitAccessible(String text) throws Exception {
+        long until=System.currentTimeMillis()+7000;
+        while(System.currentTimeMillis()<until) { android.view.accessibility.AccessibilityNodeInfo root=instrument().getUiAutomation().getRootInActiveWindow(); if(root!=null && !root.findAccessibilityNodeInfosByText(text).isEmpty()) return root; Thread.sleep(80); }
+        throw new AssertionError("Missing dialog text: "+text);
+    }
     private TvActivity start() throws Exception {
         new android.util.AtomicFile(new java.io.File(context().getFilesDir(),"tv-account.enc")).delete();
         new LibraryStore(context()).save(Arrays.asList(new Channel("Sport 1","https://example.com/sport.ts","Sport","","tv").withOrder(0),new Channel("Dzieci 1","https://example.com/kids.ts","Dzieci","","tv").withOrder(1),new Channel("Test Film","https://example.com/film.mp4","Kino","","movie")),Collections.emptySet());
@@ -31,11 +36,28 @@ public class TvNavigationTest {
     @Test public void homeAndMoviesWorkWithRemoteOnly() throws Exception {
         TvActivity activity=start();
         try {
-            assertEquals("Telewizja na żywo",((TextView)activity.getCurrentFocus()).getText().toString().replace("▣\n\n", "")); screenshot(activity,"tv-home.png");
-            key(KeyEvent.KEYCODE_DPAD_RIGHT); assertTrue(activity.getCurrentFocus() instanceof Button); assertEquals("▶  Filmy",((Button)activity.getCurrentFocus()).getText().toString());
+            assertEquals("Telewizja na żywo",activity.getCurrentFocus().getContentDescription().toString()); screenshot(activity,"tv-home.png");
+            key(KeyEvent.KEYCODE_DPAD_RIGHT); assertEquals("Filmy",activity.getCurrentFocus().getContentDescription().toString());
             key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(activity.getWindow().getDecorView(),"Test Film"); assertNull(find(activity.getWindow().getDecorView(),"Sport 1")); screenshot(activity,"tv-movies.png");
             key(KeyEvent.KEYCODE_BACK); waitText(activity.getWindow().getDecorView(),"Co oglądamy?");
         } finally { instrument().runOnMainSync(activity::finish); instrument().waitForIdleSync(); Thread.sleep(300); }
+    }
+    @Test public void oktvHomeReachesManagementAndAboutWithRemote() throws Exception {
+        TvActivity activity=start();
+        try {
+            assertNotNull(find(activity.getWindow().getDecorView(),"OKTV PLAYER"));
+            key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_RIGHT); assertEquals("Seriale",activity.getCurrentFocus().getContentDescription().toString());
+            key(KeyEvent.KEYCODE_DPAD_DOWN); assertEquals("Zmień źródło",activity.getCurrentFocus().getContentDescription().toString()); key(KeyEvent.KEYCODE_DPAD_CENTER);
+            waitAccessible("Dodaj przez telefon"); key(KeyEvent.KEYCODE_BACK);
+            key(KeyEvent.KEYCODE_DPAD_LEFT); assertEquals("Konto",activity.getCurrentFocus().getContentDescription().toString()); key(KeyEvent.KEYCODE_DPAD_CENTER);
+            long until=System.currentTimeMillis()+7000; boolean account=false;
+            while(System.currentTimeMillis()<until) { android.view.accessibility.AccessibilityNodeInfo root=instrument().getUiAutomation().getRootInActiveWindow(); if(root!=null && !root.findAccessibilityNodeInfosByText("Konto i biblioteka").isEmpty()) { account=true; break; } Thread.sleep(100); }
+            assertTrue("Account dialog missing",account); key(KeyEvent.KEYCODE_BACK);
+            key(KeyEvent.KEYCODE_DPAD_UP); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_RIGHT); assertEquals("Ustawienia",activity.getCurrentFocus().getContentDescription().toString()); key(KeyEvent.KEYCODE_DPAD_CENTER);
+            android.view.accessibility.AccessibilityNodeInfo settings=waitAccessible("O aplikacji"); java.util.List<android.view.accessibility.AccessibilityNodeInfo> about=settings.findAccessibilityNodeInfosByText("O aplikacji"); assertFalse(about.isEmpty());
+            android.view.accessibility.AccessibilityNodeInfo item=about.get(0); while(!item.isClickable() && item.getParent()!=null) item=item.getParent(); assertTrue(item.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)); instrument().waitForIdleSync();
+            waitAccessible("OKTV Player "+BuildConfig.VERSION_NAME); key(KeyEvent.KEYCODE_BACK);
+        } finally { instrument().runOnMainSync(activity::finish); instrument().waitForIdleSync(); }
     }
     @Test public void bouquetsAndItemOptionsWorkWithRemote() throws Exception {
         TvActivity activity=start();

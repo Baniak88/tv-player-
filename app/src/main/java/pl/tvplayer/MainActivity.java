@@ -697,7 +697,7 @@ public class MainActivity extends Activity {
             fullscreenToken=preview.handoff(); intent.putExtra("playback_handoff",fullscreenToken).putExtra("return_preview",true); startActivityForResult(intent,LIVE_FULLSCREEN);
         } else startActivity(intent);
     }
-    // MainActivity is a phone screen; keep the phone activity out of the shared TV source set.
+    // MainActivity is the phone library; TV opens the same movie details from its remote-friendly catalog.
     private void openMovie(Channel movie) { startActivity(new Intent().setClassName(this,"pl.tvplayer.MovieActivity").putExtra("url",movie.url()).putExtra("name",movie.name()).putExtra("group",movie.group()).putExtra("logo",movie.logo())); }
     private void openSeries(Channel series) { startActivity(SeriesActivity.intent(this,series,false)); }
     private void sourceMenu() {

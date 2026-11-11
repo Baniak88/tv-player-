@@ -42,7 +42,7 @@ public final class SeriesActivity extends Activity {
     private TextView text(String value,int size,int color) { return Ui.text(this,value,size,color); }
     private Button button(String label) {
         Button button=Ui.button(this,label); button.setTextSize(television?18:16); button.setFocusable(true); button.setFocusableInTouchMode(television);
-        if(television) { StateListDrawable background=new StateListDrawable(); background.addState(new int[]{android.R.attr.state_focused},Ui.shape(this,0xFF394253,10,Ui.TEXT)); background.addState(new int[]{},Ui.shape(this,Ui.SURFACE_HIGH,10,Ui.BORDER)); button.setBackground(background); button.setTextColor(Ui.TEXT); }
+        if(television) Ui.televisionButton(button,false);
         return button;
     }
     @Override public void onCreate(Bundle state) {
@@ -107,7 +107,7 @@ public final class SeriesActivity extends Activity {
         List<String> meta=new ArrayList<>(); if(!details.year().isEmpty()) meta.add(details.year()); if(!details.rating().isEmpty()&&!details.rating().equals("0")) meta.add("★ "+details.rating()); if(!details.seasons().isEmpty()) meta.add(details.seasons().size()==1?"1 sezon":details.seasons().size()+((details.seasons().size()%10>=2 && details.seasons().size()%10<=4 && (details.seasons().size()%100<12 || details.seasons().size()%100>14))?" sezony":" sezonów"));
         if(!meta.isEmpty()) { TextView info=text(android.text.TextUtils.join("   ·   ",meta),television?16:14,Ui.MUTED); info.setPadding(0,dp(10),0,dp(4)); copy.addView(info); }
         LinearLayout actions=new LinearLayout(this); actions.setPadding(0,dp(14),0,dp(10));
-        play=button("▶  Odtwórz"); if(!television) Ui.primary(play); play.setContentDescription("Odtwórz serial"); play.setOnClickListener(v -> { if(next!=null) play(next); });
+        play=button("▶  Odtwórz"); if(!television) Ui.primary(play); else Ui.televisionButton(play,true); play.setContentDescription("Odtwórz serial"); play.setOnClickListener(v -> { if(next!=null) play(next); });
         LinearLayout.LayoutParams primary=new LinearLayout.LayoutParams(0,dp(52),1); primary.rightMargin=dp(10); actions.addView(play,primary);
         star=button("+  Moja lista"); star.setTextSize(television?17:14); star.setOnClickListener(v -> toggleFavorite()); actions.addView(star,new LinearLayout.LayoutParams(dp(television?154:126),dp(52))); copy.addView(actions);
         playHint=text("",television?15:13,Ui.MUTED); copy.addView(playHint);

@@ -94,7 +94,7 @@ final class LocalSourceServer implements AutoCloseable {
         return null;
     }
     private static void reply(Socket socket,int status,String text) throws IOException {
-        String page=text.startsWith("<!doctype")?text:"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>TV Player</title><p>"+text+"</p>";
+        String page=text.startsWith("<!doctype")?text:"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>OKTV Player</title><p>"+text+"</p>";
         byte[] body=page.getBytes(StandardCharsets.UTF_8);
         String header="HTTP/1.1 "+status+" Response\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: "+body.length+"\r\nCache-Control: no-store\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: same-origin\r\nContent-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'\r\n\r\n";
         OutputStream output=socket.getOutputStream(); output.write(header.getBytes(StandardCharsets.US_ASCII)); output.write(body); output.flush();
@@ -106,11 +106,11 @@ final class LocalSourceServer implements AutoCloseable {
     }
     private static final String FORM="""
         <!doctype html><html lang="pl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Dodaj źródło do TV Player</title><style>
-        body{font:17px system-ui;background:#10151f;color:#f5f7fc;margin:0;padding:24px}main{max-width:440px;margin:auto}
-        label{display:block;margin:18px 0 6px}input,select,button{font:inherit;box-sizing:border-box;width:100%;padding:14px;border-radius:10px;border:1px solid #667080;background:#1b2432;color:white}
-        button{background:#bded73;color:#10151f;font-weight:700;margin-top:24px}p{color:#b9c1ce;line-height:1.5}h1{font-size:27px}</style>
-        <main><h1>Dodaj źródło do TV</h1><p>Wpisz kod z telewizora i dane od dostawcy. Telefon i TV muszą być w tej samej sieci.</p>
+        <title>Dodaj źródło do OKTV Player</title><style>
+        body{font:17px system-ui;background:#0a0d14;color:#f3f5fa;margin:0;padding:24px}main{max-width:440px;margin:auto}
+        label{display:block;margin:18px 0 6px}input,select,button{font:inherit;box-sizing:border-box;width:100%;padding:14px;border-radius:10px;border:1px solid #2a3350;background:#1c2335;color:white}
+        button{background:#ff3d5e;color:#fff;font-weight:700;margin-top:24px}p{color:#9da6bc;line-height:1.5}h1{font-size:27px}</style>
+        <main><p style="font-size:13px;font-weight:700;letter-spacing:.08em;color:#ff3d5e">OKTV PLAYER</p><h1>Dodaj źródło do TV</h1><p>Wpisz kod z telewizora i dane od dostawcy. Telefon i TV muszą być w tej samej sieci.</p>
         <form method="post" action="/source" autocomplete="off">
         <label for="code">Jednorazowy kod z TV</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
         <label for="type">Rodzaj źródła</label><select id="type" name="type"><option value="xtream">Konto Xtream (serwer, login, hasło)</option><option value="m3u">Link do listy M3U</option></select>

@@ -1,5 +1,7 @@
 # TV Player — Android
 
+Wersja TV: [OKTV Player TV 0.9.3 — interfejs na bazie 1.1.6](OKTV-TV-0.9.3.md). [Instalacja na Fire TV / Android TV](TV-INSTALL.md).
+
 Pierwsza wersja natywnego odtwarzacza IPTV po polsku na telefony z Androidem 8.0 lub nowszym.
 
 ## Funkcje

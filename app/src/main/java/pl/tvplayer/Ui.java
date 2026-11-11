@@ -70,6 +70,18 @@ final class Ui {
         b.setBackground(touch(b.getContext(), SURFACE_HIGH, 12, BORDER));
     }
 
+    /** The remote must remain visible even on a filled coral primary button. */
+    static void televisionButton(Button button,boolean primary) {
+        Context context=button.getContext(); int color=primary?ACCENT:SURFACE_HIGH;
+        StateListDrawable states=new StateListDrawable();
+        GradientDrawable focused=shape(context,color,12,0); focused.setStroke(dp(context,3),TEXT);
+        states.addState(new int[]{android.R.attr.state_pressed},shape(context,lighter(color),12,TEXT));
+        states.addState(new int[]{android.R.attr.state_focused},focused);
+        states.addState(new int[]{},shape(context,color,12,primary?0:BORDER));
+        button.setTextColor(buttonColors(TEXT)); button.setTypeface(null,android.graphics.Typeface.BOLD);
+        button.setBackground(states); button.setFocusable(true); button.setFocusableInTouchMode(true);
+    }
+
     /** Small tinted tag-style button (e.g. EPG in channel rows). */
     static void chip(Button b) {
         b.setTextColor(buttonColors(ACCENT)); b.setTypeface(null, android.graphics.Typeface.BOLD);
