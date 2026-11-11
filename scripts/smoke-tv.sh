@@ -34,8 +34,12 @@ for case in catalogOpensMovieDetailsAndRemoteCanFavoriteAndPlay m3uMovieCanResum
 done
 cat tv-smoke-output/series-remote.txt tv-smoke-output/homeAndMoviesWorkWithRemoteOnly.txt tv-smoke-output/oktvHomeReachesManagementAndAboutWithRemote.txt tv-smoke-output/bouquetsAndItemOptionsWorkWithRemote.txt tv-smoke-output/credentialsAreEncryptedAndReadableAfterRestart.txt tv-smoke-output/playerKeepsLandscapeAndHandlesRemoteMenu.txt tv-smoke-output/catalogOpensMovieDetailsAndRemoteCanFavoriteAndPlay.txt tv-smoke-output/m3uMovieCanResumeAndRestartWithoutMetadataApi.txt > tv-smoke-output/navigation.txt
 echo 'TV_REMOTE_CHECKS_PASSED=8' | tee -a tv-smoke-output/navigation.txt
-run_case 'pl.tvplayer.PlaybackRecoveryTest,pl.tvplayer.PlaybackBandwidthTest,pl.tvplayer.StreamResumptionTest' playback 6
+run_case 'pl.tvplayer.PlaybackRecoveryTest,pl.tvplayer.PlaybackBandwidthTest,pl.tvplayer.StreamResumptionTest' playback 8
 run_case 'pl.tvplayer.TvPhoneSetupTest' phone-setup
+run_case 'pl.tvplayer.TvSettingsTest' settings 4
+run_case 'pl.tvplayer.TvRecordingTest' recording 3
+run_case 'pl.tvplayer.TvPlaybackOptionsTest' playback-options 2
+run_case 'pl.tvplayer.TvSourceImportTest' source-import 2
 for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup; do
   adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png"
 done

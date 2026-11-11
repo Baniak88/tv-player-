@@ -2,9 +2,9 @@ name: TV platforms
 on:
   push:
     branches: [main, 'feature/tv-*', 'fix/**']
-    paths: ['tv/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/test/**', 'app/build.gradle', 'scripts/smoke-tv.sh', '.github/workflows/television.yml']
+    paths: ['tv/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'app/src/test/**', 'app/build.gradle', 'scripts/smoke-tv.sh', 'scripts/*firestick*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', '.github/workflows/television.yml']
   pull_request:
-    paths: ['tv/**', 'samsung/**', 'app/src/main/**', 'settings.gradle', 'scripts/*tv*', 'scripts/*samsung*', '.github/workflows/television.yml']
+    paths: ['tv/**', 'samsung/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'settings.gradle', 'scripts/*tv*', 'scripts/*samsung*', 'scripts/*firestick*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', '.github/workflows/television.yml']
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -28,6 +28,13 @@ jobs:
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose tv/build/outputs/apk/debug/tv-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging tv/build/outputs/apk/debug/tv-debug.apk
+      - name: Test and package Chromebook installer
+        run: |
+          bash -n scripts/install-firestick.sh
+          python3 -m unittest discover -s scripts/tests -v
+          python3 scripts/package-firestick.py
+      - uses: actions/upload-artifact@v4
+        with: {name: television-chromebook, path: dist/OKTV-FireStick-Chromebook.zip}
       - uses: actions/upload-artifact@v4
         with:
           name: television-apk
@@ -110,14 +117,16 @@ jobs:
         with: {name: television-apk, path: apk}
       - uses: actions/download-artifact@v4
         with: {name: samsung-widget, path: widget}
+      - uses: actions/download-artifact@v4
+        with: {name: television-chromebook, path: bundle}
       - name: Publish TV packages
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.3-preview.apk
-          gh release create v0.9.3-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.3 Preview" --notes "Interfejs OKTV Player 1.1.6 na TV: kolorowe kafelki, wspólne ikony, szczegóły filmów i seriali oraz sterowanie pilotem. Dodawanie źródła przez telefon w LAN i poprawki odtwarzania. APK na Fire OS 6+ i Android TV 7.1+, obsługa pilotem. Nie jest zgodny z Vega OS. Pakiet Samsung pozostaje dostępny osobno w wydaniu v0.9.0-tv-preview."
-          gh release upload v0.9.3-tv-preview OKTV-Player-TV-0.9.3-preview.apk
+          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.4-preview.apk
+          gh release create v0.9.4-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.4 Preview" --notes "Interfejs OKTV na TV, poprawki archiwum i obsługi nagrywania oraz paczka instalacyjna dla terminala Linux na Chromebooku. APK na Fire OS 6+ i Android TV 7.1+. Nie jest zgodny z Vega OS. Instrukcja Chromebooka znajduje się w paczce ZIP. Pakiet Samsung pozostaje dostępny osobno w wydaniu v0.9.0-tv-preview."
+          gh release upload v0.9.4-tv-preview OKTV-Player-TV-0.9.4-preview.apk bundle/OKTV-FireStick-Chromebook.zip
 
 

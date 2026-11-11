@@ -42,7 +42,7 @@ public final class RecordingService extends Service {
                 HttpUrl address=SourceClient.validate(url);
                 if(!address.encodedPath().endsWith(".ts")) throw new IOException("Nagrywanie wymaga bezpośredniego strumienia MPEG-TS.");
                 OkHttpClient client=new OkHttpClient.Builder().connectTimeout(20,TimeUnit.SECONDS).readTimeout(30,TimeUnit.SECONDS).build();
-                call=client.newCall(new Request.Builder().url(address).header("User-Agent","TVPlayer/0.4.0").build());
+                call=client.newCall(new Request.Builder().url(address).header("User-Agent",SourceClient.PLAYER_AGENT).build());
                 try(Response response=call.execute()) {
                     if(!response.isSuccessful() || response.body()==null) throw new IOException("Serwer odrzucił nagrywanie.");
                     String content=response.header("Content-Type","");

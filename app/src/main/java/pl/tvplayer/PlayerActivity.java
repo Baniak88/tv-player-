@@ -189,8 +189,10 @@ public class PlayerActivity extends Activity {
         new AlertDialog.Builder(this).setTitle("Opcje odtwarzania").setAdapter(optionRows(labels),(d,i) -> {
             if(labels.get(i).equals("Połączenie internetowe")) { PlaybackSettings.choose(this,() -> {
                 boolean playing=player!=null && player.getPlayWhenReady();
+                TrackSelectionParameters selections=player==null?null:player.getTrackSelectionParameters();
                 if(player!=null && onDemand) position=player.getCurrentPosition();
                 if(player!=null) { closeRecovery(); view.setPlayer(null); player.release(); player=null; } stopStreamObservation(); error.setVisibility(View.GONE); startPlayback(); if(player!=null && !playing) player.pause();
+                if(player!=null && selections!=null) player.setTrackSelectionParameters(PlaybackSettings.tracks(this,selections));
             }); return; }
             if(labels.get(i).equals("Głośność i jasność")) { adjustments.showDialog(); return; }
             if(labels.get(i).equals("Cofnij o 30 sekund")) {
@@ -255,13 +257,13 @@ public class PlayerActivity extends Activity {
     private void openGuide() {
         GuideDialog.open(this,liveChannel(),guideWorker,c -> {
             if(c.kind().equals("tv")) { if(player!=null) { player.seekToDefaultPosition(); player.play(); } return; }
-            startActivity(new android.content.Intent(this,PlayerActivity.class).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()));
+            startActivity(new android.content.Intent(this,PlayerActivity.class).putExtra("television",television).putExtra("url",c.url()).putExtra("name",c.name()).putExtra("kind",c.kind()));
         });
     }
     private void enterPip() {
         if(player==null) return;
         if(android.os.Build.VERSION.SDK_INT<26 || !getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
-            Toast.makeText(this,"Ten telefon nie udostępnia PiP.",Toast.LENGTH_LONG).show(); return;
+            Toast.makeText(this,"To urządzenie nie udostępnia PiP.",Toast.LENGTH_LONG).show(); return;
         }
         enteringPip=true; if(adjustments!=null) adjustments.dismissFeedback(); if(rotation!=null) rotation.disable();
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
@@ -284,10 +286,16 @@ public class PlayerActivity extends Activity {
             .setPositiveButton("Dalej",(dialog,which) -> new AlertDialog.Builder(this).setTitle("Maksymalny czas")
                 .setItems(new String[]{"30 minut","60 minut","120 minut"},(d,index) -> {
                     recordingMinutes=new int[]{30,60,120}[index];
-                    startActivityForResult(new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT)
-                        .addCategory(android.content.Intent.CATEGORY_OPENABLE).setType("video/mp2t")
-                        .putExtra(android.content.Intent.EXTRA_TITLE,"TV-"+System.currentTimeMillis()+".ts"),RECORD_FILE);
+                    if(!requestRecordingFile(this,RECORD_FILE)) Toast.makeText(this,"System nie udostępnia wyboru pliku. Nagrywanie wymaga systemowego menedżera dokumentów.",Toast.LENGTH_LONG).show();
                 }).show()).setNegativeButton("Anuluj",null).show();
+    }
+    static boolean requestRecordingFile(Activity activity,int request) {
+        try {
+            activity.startActivityForResult(new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT)
+                .addCategory(android.content.Intent.CATEGORY_OPENABLE).setType("video/mp2t")
+                .putExtra(android.content.Intent.EXTRA_TITLE,"TV-"+System.currentTimeMillis()+".ts"),request);
+            return true;
+        } catch(android.content.ActivityNotFoundException | SecurityException unavailable) { return false; }
     }
     @Override protected void onActivityResult(int request,int result,android.content.Intent data) {
         super.onActivityResult(request,result,data);
