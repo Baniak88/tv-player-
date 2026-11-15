@@ -10,7 +10,7 @@ final class TvCatalog {
     record Catalog(List<Channel> items,Map<String,List<Channel>> folders) {}
     private record Episode(Channel channel,int season,int number) {}
     static Catalog series(List<Channel> source) {
-        List<Channel> items=new ArrayList<>(); Map<String,List<Episode>> grouped=new LinkedHashMap<>(); Map<String,List<Channel>> folders=new LinkedHashMap<>(); Map<String,String> identities=new HashMap<>();
+        List<Channel> items=new ArrayList<>(); Map<String,List<Episode>> grouped=new LinkedHashMap<>(); Map<String,List<Channel>> folders=new LinkedHashMap<>(); Map<String,String> identities=new HashMap<>(); Map<String,Integer> folderPositions=new HashMap<>();
         for(Channel channel:source) {
             if(!channel.kind().equals("episode")) { items.add(channel); continue; }
             Matcher match=EPISODE.matcher(channel.name());
@@ -23,8 +23,11 @@ final class TvCatalog {
             List<Episode> episodes=grouped.get(key);
             if(episodes==null) {
                 episodes=new ArrayList<>(); grouped.put(key,episodes);
+                folderPositions.put(key,items.size());
                 items.add(new Channel(title,key,channel.group(),"","series").withLogo(channel.logo()).withOrder(channel.bouquetOrder()));
             }
+            int folderPosition=folderPositions.get(key);
+            if(items.get(folderPosition).logo().isEmpty() && !channel.logo().isEmpty()) items.set(folderPosition,items.get(folderPosition).withLogo(channel.logo()));
             episodes.add(new Episode(channel,Integer.parseInt(match.group(1)),Integer.parseInt(match.group(2))));
         }
         for(Map.Entry<String,List<Episode>> group:grouped.entrySet()) {

@@ -59,12 +59,20 @@ public final class M3uParser {
                     URI uri = baseUrl == null ? URI.create(line) : URI.create(baseUrl).resolve(line);
                     if ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) {
                         channels.add(new Channel(name.isEmpty() ? "Kanał " + (channels.size() + 1) : name,
-                                uri.toString(), group.isEmpty() ? "Bez kategorii" : group, epg,kind).withLogo(logo).withGuideSource(xmltv));
+                                uri.toString(), group.isEmpty() ? "Bez kategorii" : group, epg,kind).withLogo(artwork(logo,baseUrl)).withGuideSource(xmltv));
                     }
                 } catch (IllegalArgumentException ignored) { }
                 name = ""; group = "Bez kategorii"; epg = ""; logo = ""; kind="";
             }
         }
         return channels;
+    }
+    private static String artwork(String value,String baseUrl) {
+        if(value==null || value.trim().isEmpty()) return "";
+        okhttp3.HttpUrl absolute=okhttp3.HttpUrl.parse(value.trim());
+        if(absolute!=null) return absolute.toString();
+        okhttp3.HttpUrl base=baseUrl==null?null:okhttp3.HttpUrl.parse(baseUrl);
+        okhttp3.HttpUrl resolved=base==null?null:base.resolve(value.trim());
+        return resolved==null?"":resolved.toString();
     }
 }

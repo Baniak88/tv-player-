@@ -5,6 +5,25 @@ import java.util.*;
 import static org.junit.Assert.*;
 
 public class TvCatalogPresentationTest {
+    @Test public void seriesUsesFirstAvailableArtworkWithoutChangingEpisodeMetadata() {
+        Channel first=new Channel("Serial S01 E01","https://host/series/1.mp4","Seriale","");
+        Channel second=new Channel("Serial S01 E02","https://host/series/2.mp4","Seriale","").withLogo("https://images.example/poster.jpg");
+        Channel third=new Channel("Serial S01 E03","https://host/series/3.mp4","Seriale","").withLogo("https://images.example/still.jpg");
+        TvCatalog.Catalog catalog=TvCatalog.series(Arrays.asList(first,second,third));
+        Channel folder=catalog.items().get(0); assertEquals(second.logo(),folder.logo());
+        assertEquals(Arrays.asList(first,second,third),catalog.folders().get(folder.url()));
+        assertEquals(third.logo(),TvCatalog.seasons(catalog.folders().get(folder.url())).get(2).logo());
+        assertEquals(second.logo(),TvCatalog.series(Arrays.asList(second,third,first)).items().get(0).logo());
+    }
+    @Test public void m3uArtworkResolvesRelativeUrlsAndNeverLeaksIntoTheNextEntry() {
+        String text="#EXTM3U\n#EXTINF:-1 tvg-logo=\"../posters/film.jpg\",Film\n/movie/1.mp4\n#EXTINF:-1 tvg-logo=\"//images.example/series.jpg\",Serial S01 E01\n/series/2.mp4\n#EXTINF:-1,Bez obrazu\n/movie/3.mp4\n#EXTINF:-1 tvg-logo=\"file:///private.jpg\",Zły obraz\n/movie/4.mp4";
+        List<Channel> items=M3uParser.parse(text,"https://provider.example/catalog/list.m3u?token=playlist-only");
+        assertEquals("https://provider.example/posters/film.jpg",items.get(0).logo());
+        assertEquals("https://images.example/series.jpg",items.get(1).logo());
+        assertEquals("",items.get(2).logo()); assertEquals("",items.get(3).logo());
+        assertEquals("https://images.example/series.jpg",TvCatalog.series(Collections.singletonList(items.get(1))).items().get(0).logo());
+        assertEquals("https://images.example/A%20poster.jpg",M3uParser.parse("#EXTINF:-1 tvg-logo=\"https://images.example/A poster.jpg\",Film\nhttps://provider.example/movie/5.mp4",null).get(0).logo());
+    }
     @Test public void movieBouquetNamesDoNotTurnLiveChannelsIntoVod() {
         for(String group:Arrays.asList("UK| MOVIES","UK| MOVIES HEVC","UK| 24/7 MOVIES & SERIES","US| MOVIES NETWORK","PL| FILMY")) {
             Channel c=M3uParser.parse("#EXTINF:-1 tvg-id=\"sky.uk\" group-title=\""+group+"\",UK| SKY CINEMA ACTION FHD\nhttps://provider.example/u/p/123",null).get(0);
