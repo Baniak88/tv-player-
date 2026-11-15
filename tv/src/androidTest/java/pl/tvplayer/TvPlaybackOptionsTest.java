@@ -79,7 +79,10 @@ public class TvPlaybackOptionsTest {
             try { click("Oglądaj od początku"); archive=monitor.waitForActivityWithTimeout(10000); } finally { instrument().removeMonitor(monitor); }
             assertNotNull("Archive player missing",archive); assertTrue(archive.getIntent().getBooleanExtra("television",false)); assertEquals("movie",archive.getIntent().getStringExtra("kind"));
             assertTrue(archive.getIntent().getStringExtra("url").contains("/timeshift/test/pass/")); assertEquals(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE,archive.getRequestedOrientation()); assertTrue(epgCalls.get()>0);
-            ExoPlayer replay=(ExoPlayer)field(archive,"player"); playerWait("Archive HLS did not reach playback",() -> replay.getPlaybackState()==Player.STATE_READY); instrument().runOnMainSync(replay::pause);
+            // The archive player is created asynchronously after the activity starts; read it inside the wait.
+            final Activity replayActivity=archive; final ExoPlayer[] replay={null};
+            playerWait("Archive HLS did not reach playback",() -> { try { replay[0]=(ExoPlayer)field(replayActivity,"player"); } catch(Exception e) { return false; } return replay[0]!=null && replay[0].getPlaybackState()==Player.STATE_READY; });
+            instrument().runOnMainSync(replay[0]::pause);
         }
     }
 }

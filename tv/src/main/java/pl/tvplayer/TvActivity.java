@@ -107,7 +107,7 @@ public final class TvActivity extends Activity {
         worker.execute(() -> { try { account=new TvAccountStore(this).load(); } catch(Exception ignored) {} runOnUiThread(() -> { if(!isDestroyed()) { if(!home) load(section); else status.setText(account==null?"Dodaj konto Xtream lub adres listy M3U, aby rozpocząć.":"Biblioteka jest gotowa. Wybierz TV, filmy lub seriale."); } }); });
     }
     private void build() {
-        page=column(); page.setBackgroundColor(TV_BG); page.setPadding(dp(48),dp(16),dp(48),dp(14)); // overscan-safe sides; Fire TV "Calibrate display" covers the rest
+        page=column(); page.setBackgroundColor(TV_BG); page.setPadding(dp(32),dp(12),dp(32),dp(10)); // overscan-safe sides; Fire TV "Calibrate display" covers the rest
         LinearLayout header=new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
         TextView brand=text(Ui.APP_NAME.toUpperCase(Locale.ROOT),18,Ui.TEXT); brand.setTypeface(null,Typeface.BOLD); brand.setLetterSpacing(.08f); header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
         TextClock clock=new TextClock(this); clock.setTextColor(Ui.MUTED); clock.setTextSize(18); clock.setFormat24Hour("HH:mm"); clock.setFormat12Hour("HH:mm"); header.addView(clock);

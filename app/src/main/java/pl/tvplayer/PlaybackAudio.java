@@ -20,8 +20,9 @@ final class PlaybackAudio {
             }
         }.setEnableDecoderFallback(true)
             // FFmpeg decodes audio the device has no decoder for (Dolby AC-3/E-AC-3, MP2, DTS) instead of playing silence.
-            // In the compatibility (PCM) mode it is preferred, so every supported format reaches the TV as plain stereo.
-            .setExtensionRendererMode(pcm?DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER:DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON);
+            // Fallback only: platform decoders stay first (AAC in TS needs them), and in PCM mode Dolby is not passed
+            // through, so the FFmpeg renderer picks it up and outputs plain stereo.
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON);
     }
     static ChannelMixingAudioProcessor mixer() {
         ChannelMixingAudioProcessor mixer=new ChannelMixingAudioProcessor();
