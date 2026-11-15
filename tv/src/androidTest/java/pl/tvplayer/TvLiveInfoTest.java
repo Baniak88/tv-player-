@@ -45,6 +45,8 @@ public class TvLiveInfoTest {
         assertNotNull(find(activity.getWindow().getDecorView(),"Następnie  "+clock(now+1500)+"  Następna audycja"));
         instrument().runOnMainSync(() -> { android.widget.ProgressBar progress=(android.widget.ProgressBar)bar.getChildAt(2); assertTrue(progress.getProgress()>100 && progress.getProgress()<300); });
         instrument().runOnMainSync(() -> { View root=activity.getWindow().getDecorView(); Bitmap bitmap=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap)); try(FileOutputStream out=context().openFileOutput("tv095-live-info.png",0)) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } catch(IOException e) { throw new AssertionError(e); } finally { bitmap.recycle(); } });
+        // Rendering/compressing the screenshot on TCG can outlast the normal auto-hide timer.
+        key(KeyEvent.KEYCODE_INFO); assertEquals(View.VISIBLE,bar.getVisibility());
         key(KeyEvent.KEYCODE_DPAD_CENTER); assertEquals(View.GONE,bar.getVisibility()); key(KeyEvent.KEYCODE_INFO); assertEquals(View.VISIBLE,bar.getVisibility());
         key(KeyEvent.KEYCODE_BACK); assertFalse(activity.isFinishing()); assertEquals(View.GONE,bar.getVisibility());
         key(KeyEvent.KEYCODE_DPAD_CENTER); instrument().runOnMainSync(() -> bar.guide(new GuideRepository.Data(Collections.emptyList(),"",""))); assertNotNull(find(activity.getWindow().getDecorView(),"Brak bieżącego EPG od dostawcy"));
