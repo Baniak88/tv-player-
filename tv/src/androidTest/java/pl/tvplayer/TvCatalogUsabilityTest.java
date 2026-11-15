@@ -85,11 +85,15 @@ public class TvCatalogUsabilityTest {
         viewport(960,540); start(); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER);
         waitFor("Series did not group into two titles",() -> { try { return ((List<?>)field(home,"shown")).size()==2; } catch(Exception e) { return false; } });
         screenshot("tv095-series-960.png"); key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER);
-        waitFor("Season categories missing",() -> find(home.getWindow().getDecorView(),"Sezon 2")!=null); screenshot("tv095-episodes-960.png");
-        key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_RIGHT);
+        waitFor("Season categories missing",() -> find(home.getWindow().getDecorView(),"Sezon 2")!=null);
+        ListView seasons=(ListView)field(home,"bouquets"); waitFor("Season picker must receive remote focus",seasons::hasFocus);
+        screenshot("tv095-episodes-960.png");
+        key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_DOWN);
+        waitFor("Season 2 did not filter the episodes",() -> { try { return ((List<?>)field(home,"shown")).size()==1; } catch(Exception e) { return false; } });
+        key(KeyEvent.KEYCODE_DPAD_RIGHT);
         Instrumentation.ActivityMonitor monitor=instrument().addMonitor(PlayerActivity.class.getName(),null,false);
         try { key(KeyEvent.KEYCODE_MEDIA_PLAY); player=monitor.waitForActivityWithTimeout(10000); } finally { instrument().removeMonitor(monitor); }
-        assertNotNull("Episode did not start",player); assertEquals(server.url("/series/u/p/1.mp4?token=original").toString(),player.getIntent().getStringExtra("url")); assertTrue(player.getIntent().getBooleanExtra("television",false));
+        assertNotNull("Episode did not start",player); assertEquals(server.url("/series/u/p/3.mp4?token=original").toString(),player.getIntent().getStringExtra("url")); assertTrue(player.getIntent().getBooleanExtra("television",false));
         close(player); player=null; waitFor("Catalog did not regain focus",home::hasWindowFocus); key(KeyEvent.KEYCODE_BACK); key(KeyEvent.KEYCODE_BACK);
         waitFor("Back did not restore the series grid",() -> { try { return ((GridView)field(home,"posters")).getVisibility()==View.VISIBLE; } catch(Exception e) { return false; } });
     }

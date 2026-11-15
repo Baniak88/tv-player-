@@ -323,7 +323,7 @@ public final class TvActivity extends Activity {
     }
     private void openLocalSeries(Channel folder) {
         seriesRootItems=items; seriesParentGroup=group; seriesParentQuery=query; seriesParentFavorites=onlyFavorites; seriesFolderUrl=folder.url();
-        generation++; busy=false; items=TvCatalog.seasons(seriesFolders.get(folder.url())); seriesTitle=folder.name(); group=""; query=""; onlyFavorites=false; showCatalog(); rebuildGroups();
+        generation++; busy=false; items=TvCatalog.seasons(seriesFolders.get(folder.url())); seriesTitle=folder.name(); group=""; query=""; onlyFavorites=false; showCatalog(); rebuildGroups(); bouquets.requestFocus();
     }
     private void closeLocalSeries() {
         seriesTitle=""; items=seriesRootItems; group=seriesParentGroup; query=seriesParentQuery; onlyFavorites=seriesParentFavorites; showCatalog(); rebuildGroups();
