@@ -69,12 +69,12 @@ jobs:
         run: |
           python3 - <<'PY'
           import base64,json,pathlib
-          for name in ['tv-home','tv-movies','tv-bouquet','series-television','movie-television','tv-phone-setup']:
+          for name in ['tv-home','tv-movies','tv-bouquet','series-television','movie-television','tv-phone-setup','tv096-live-info','tv096-shelves']:
               image=pathlib.Path('tv-smoke-output',name+'.png')
               if image.exists() and image.read_bytes().startswith(bytes([137,80,78,71,13,10,26,10])):
                   pathlib.Path('/tmp',name+'.json').write_text(json.dumps({'encoding':'base64','content':base64.b64encode(image.read_bytes()).decode()}))
           PY
-          for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup; do
+          for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup tv096-live-info tv096-shelves; do
             if [ ! -f "/tmp/$name.json" ]; then continue; fi
             ref=$(gh api "repos/$GH_REPO/git/blobs" --input "/tmp/$name.json" --jq '.sha')
             echo "UI_PREVIEW $name $ref"
