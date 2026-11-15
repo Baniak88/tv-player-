@@ -398,6 +398,11 @@ public class PlayerActivity extends Activity {
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         int code=event.getKeyCode();
+        if(liveInfo!=null && (code==KeyEvent.KEYCODE_MEDIA_REWIND || code==KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
+            if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled() && player!=null && player.isCurrentMediaItemSeekable())
+                player.seekTo(Math.max(0,player.getCurrentPosition()+(code==KeyEvent.KEYCODE_MEDIA_REWIND?-10000:10000)));
+            return true;
+        }
         if(liveInfo!=null && (code==KeyEvent.KEYCODE_DPAD_CENTER || code==KeyEvent.KEYCODE_ENTER || code==KeyEvent.KEYCODE_INFO)) {
             if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled()) { if(code!=KeyEvent.KEYCODE_INFO && liveInfo.getVisibility()==View.VISIBLE) setLiveInfoVisible(false); else showLiveInfo(); }
             return true;

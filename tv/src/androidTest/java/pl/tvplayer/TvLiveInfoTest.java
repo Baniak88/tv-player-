@@ -54,6 +54,11 @@ public class TvLiveInfoTest {
         infoKey(KeyEvent.KEYCODE_INFO); assertEquals(View.VISIBLE,bar.getVisibility());
         infoKey(KeyEvent.KEYCODE_BACK); assertFalse(activity.isFinishing()); assertEquals(View.GONE,bar.getVisibility());
         infoKey(KeyEvent.KEYCODE_DPAD_CENTER); instrument().runOnMainSync(() -> bar.guide(new GuideRepository.Data(Collections.emptyList(),"",""))); assertNotNull(find(activity.getWindow().getDecorView(),"Brak bieżącego EPG od dostawcy"));
+        ExoPlayer current=player(); check("Live fixture not seekable",current::isCurrentMediaItemSeekable);
+        instrument().runOnMainSync(() -> { current.pause(); current.seekTo(5000); });
+        infoKey(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD); check("Remote fast-forward failed",() -> Math.abs(current.getCurrentPosition()-15000)<500);
+        infoKey(KeyEvent.KEYCODE_MEDIA_REWIND); check("Remote rewind failed",() -> Math.abs(current.getCurrentPosition()-5000)<500);
+        assertTrue("Media seek keys stole focus",activity.hasWindowFocus());
     }
     @Test public void pcmModeSelectsAndDecodesAacAndSurvivesPlayerRecreation() throws Exception {
         androidx.media3.common.audio.ChannelMixingAudioProcessor mixer=PlaybackAudio.mixer();
