@@ -17,6 +17,7 @@ import java.util.function.Consumer;
 final class LivePreview {
     final LinearLayout panel;
     private final Activity activity;
+    private final boolean television;
     private final PlayerView video;
     private final TextView title,schedule,notice;
     private final Button pause,full;
@@ -39,10 +40,13 @@ final class LivePreview {
             notice.setVisibility(notice.getText().length()==0?View.GONE:View.VISIBLE); updatePause();
         }
         @Override public void onPlayWhenReadyChanged(boolean ready,int reason) { updatePause(); }
-        @Override public void onPlayerError(PlaybackException error) { notice.setText("Nie można odtworzyć podglądu. Dotknij kanału, aby ponowić."); notice.setVisibility(View.VISIBLE); }
+        @Override public void onPlayerError(PlaybackException error) { notice.setText(television?"Nie można odtworzyć podglądu. Wybierz kanał i spróbuj ponownie.":"Nie można odtworzyć podglądu. Dotknij kanału, aby ponowić."); notice.setVisibility(View.VISIBLE); }
     };
     LivePreview(Activity activity,boolean wide,Bundle state,Consumer<Channel> fullscreen,Runnable selectionChanged) {
-        this.activity=activity; activity.setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC); this.fullscreen=fullscreen; this.selectionChanged=selectionChanged;
+        this(activity,wide,state,fullscreen,selectionChanged,false);
+    }
+    LivePreview(Activity activity,boolean wide,Bundle state,Consumer<Channel> fullscreen,Runnable selectionChanged,boolean television) {
+        this.activity=activity; this.television=television; activity.setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC); this.fullscreen=fullscreen; this.selectionChanged=selectionChanged;
         remembered=state==null?"":state.getString("preview_url","");
         panel=new LinearLayout(activity); panel.setOrientation(LinearLayout.VERTICAL); panel.setBackground(Ui.shape(activity,Ui.SURFACE,14,Ui.BORDER)); panel.setClipToOutline(true);
         FrameLayout picture=new FrameLayout(activity); picture.setBackgroundColor(0xFF000000);
@@ -50,24 +54,26 @@ final class LivePreview {
         picture.addView(video,new FrameLayout.LayoutParams(-1,-1));
         notice=Ui.text(activity,"",13,Ui.TEXT); notice.setGravity(Gravity.CENTER); notice.setPadding(dp(16),dp(10),dp(16),dp(10)); notice.setBackgroundColor(0xB3000000); notice.setVisibility(View.GONE);
         picture.addView(notice,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
-        if(wide) panel.addView(picture,new LinearLayout.LayoutParams(-1,0,1));
+        if(television) { float screen=activity.getResources().getDisplayMetrics().widthPixels/activity.getResources().getDisplayMetrics().density; panel.addView(picture,new LinearLayout.LayoutParams(-1,dp((screen>=1100?420:320)*9/16))); }
+        else if(wide) panel.addView(picture,new LinearLayout.LayoutParams(-1,0,1));
         else { int height=Math.min(Math.round((activity.getResources().getDisplayMetrics().widthPixels-dp(32))*9f/16),Math.round(activity.getResources().getDisplayMetrics().heightPixels*0.21f)); panel.addView(picture,new LinearLayout.LayoutParams(-1,Math.max(dp(130),Math.min(dp(200),height)))); }
         LinearLayout controls=new LinearLayout(activity); controls.setGravity(Gravity.CENTER_VERTICAL); controls.setPadding(dp(4),0,dp(4),0);
-        pause=Ui.button(activity,"Ⅱ"); pause.setContentDescription("Wstrzymaj podgląd"); pause.setTextSize(18); Ui.ghost(pause,Ui.TEXT); controls.addView(pause,new LinearLayout.LayoutParams(dp(48),dp(48)));
+        pause=Ui.button(activity,"Ⅱ"); pause.setId(View.generateViewId()); pause.setContentDescription("Wstrzymaj podgląd"); pause.setTextSize(18); Ui.ghost(pause,Ui.TEXT); controls.addView(pause,new LinearLayout.LayoutParams(dp(48),dp(48)));
         pause.setOnClickListener(v -> { if(player==null) { start(); return; } if(player.getPlayerError()!=null) { recovery.retryNow(); } else if(player.getPlayWhenReady()) player.pause(); else player.play(); });
-        title=Ui.text(activity,"Podgląd",14,Ui.TEXT); title.setMaxLines(1); title.setEllipsize(TextUtils.TruncateAt.END); title.setTypeface(null,android.graphics.Typeface.BOLD); controls.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        title=Ui.text(activity,"Podgląd",television?16:14,Ui.TEXT); title.setMaxLines(television?2:1); title.setEllipsize(TextUtils.TruncateAt.END); title.setTypeface(null,android.graphics.Typeface.BOLD); controls.addView(title,new LinearLayout.LayoutParams(0,-2,1));
         Button internet=Ui.button(activity,"⚙"); internet.setContentDescription("Ustawienia słabszego internetu"); Ui.ghost(internet,Ui.MUTED); controls.addView(internet,new LinearLayout.LayoutParams(dp(48),dp(48)));
         internet.setOnClickListener(v -> PlaybackSettings.choose(activity,() -> { release(); start(); selectionChanged.run(); }));
         full=Ui.button(activity,"⤢"); full.setTextSize(23); full.setContentDescription("Otwórz podgląd na pełnym ekranie"); Ui.ghost(full,Ui.TEXT); controls.addView(full,new LinearLayout.LayoutParams(dp(48),dp(48)));
         full.setOnClickListener(v -> { if(channel!=null) fullscreen.accept(channel); });
         panel.addView(controls,new LinearLayout.LayoutParams(-1,dp(48)));
-        schedule=Ui.text(activity,"",12,Ui.MUTED); schedule.setMaxLines(wide?2:1); schedule.setEllipsize(TextUtils.TruncateAt.END); schedule.setPadding(dp(12),0,dp(12),dp(8));
+        schedule=Ui.text(activity,"",television?14:12,Ui.MUTED); schedule.setMaxLines(television?4:wide?2:1); schedule.setEllipsize(TextUtils.TruncateAt.END); schedule.setPadding(dp(12),0,dp(12),dp(8));
         schedule.setContentDescription("Aktualny program podglądu"); schedule.setMinHeight(dp(24)); panel.addView(schedule,new LinearLayout.LayoutParams(-1,-2));
         schedule.setOnClickListener(v -> { if(channel!=null) GuideDialog.open(activity,channel,Runnable::run,c -> { if(c.kind().equals("tv")) select(c); else fullscreen.accept(c); }); });
         panel.setVisibility(View.GONE);
     }
     private int dp(int n) { return Ui.dp(activity,n); }
     Channel selected() { return channel; }
+    View controls() { return pause; }
     String selectedUrl() { return channel==null?"":channel.url(); }
     private boolean playable(Channel item) { String name=item.name().trim(); return item.kind().equals("tv") && !item.url().isEmpty() && !(name.startsWith("###") && name.endsWith("###")); }
     void show(List<Channel> channels,boolean show,String selectedScope) {
@@ -99,7 +105,7 @@ final class LivePreview {
         if(channel==null || !visible) return;
         GuideRepository repository=GuideRepository.get(activity); GuideRepository.Data data=repository.peek(channel,false);
         if(data!=null) { guide=data; schedule.setText(GuideRepository.summary(data,System.currentTimeMillis()/1000)); return; }
-        schedule.setText(guide==null?"Program TV · dotknij, aby sprawdzić EPG":GuideRepository.summary(guide,System.currentTimeMillis()/1000));
+        schedule.setText(guide==null?(television?"Program TV · Menu na kanale → Program TV i archiwum":"Program TV · dotknij, aby sprawdzić EPG"):GuideRepository.summary(guide,System.currentTimeMillis()/1000));
         // The channel rows already fetch provider EPG; the preview only observes their cache and EIT.
     }
     void resume() { active=true; if(player!=null && weak!=PlaybackSettings.weakInternet(activity)) release(); start(); ui.removeCallbacks(guideTick); ui.post(guideTick); }
@@ -109,10 +115,12 @@ final class LivePreview {
         if(!active || !visible || channel==null || player!=null || activity.isFinishing()) return;
         activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         Context context=activity.getApplicationContext(); Channel current=channel; GuideRepository repository=GuideRepository.get(context);
-        player=new ExoPlayer.Builder(context).setLoadControl(PlaybackSettings.loadControl(context)).setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),true).setHandleAudioBecomingNoisy(true)
+        ExoPlayer.Builder builder=television?new ExoPlayer.Builder(context,PlaybackAudio.renderers(context)):new ExoPlayer.Builder(context);
+        player=builder.setLoadControl(PlaybackSettings.loadControl(context)).setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),true).setHandleAudioBecomingNoisy(true)
             .setMediaSourceFactory(PlaybackNetwork.sources(context,current)).build();
         repository.streamStarted(current); observing=true; weak=PlaybackSettings.weakInternet(context);
         player.setTrackSelectionParameters(PlaybackSettings.tracks(context,player.getTrackSelectionParameters())); attach();
+        if(television) player.setTrackSelectionParameters(PlaybackAudio.tracks(context,player.getTrackSelectionParameters()));
         MediaItem.Builder item=new MediaItem.Builder().setUri(current.url()); String path=android.net.Uri.parse(current.url()).getPath(); if(path!=null && path.endsWith(".ts")) item.setMimeType(MimeTypes.VIDEO_MP2T);
         player.setMediaItem(item.build()); player.prepare(); player.play();
     }

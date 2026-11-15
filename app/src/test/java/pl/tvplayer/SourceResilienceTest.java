@@ -8,6 +8,35 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class SourceResilienceTest {
+    @Test public void completesMissingLiveBouquetFromPanelWithoutOpeningStreams() throws Exception {
+        try(MockWebServer server=new MockWebServer()) {
+            server.enqueue(new MockResponse().setBody("[{\"category_id\":\"1\",\"category_name\":\"Sport\"},{\"category_id\":\"2\",\"category_name\":\"UK | Movies\"}]"));
+            server.enqueue(new MockResponse().setBody("[{\"stream_id\":1,\"name\":\"Sport\",\"category_id\":\"1\"},{\"stream_id\":2,\"name\":\"Sky Cinema\",\"category_id\":\"2\"}]"));
+            List<Channel> current=List.of(new Channel("Sport",server.url("/live/u/p/1.ts").toString(),"Sport","","tv"));
+            List<Channel> result=new SourceClient().missingM3uLiveChannels(server.url("/get.php?username=u&password=p&type=m3u_plus").toString(),current);
+            assertEquals(1,result.size()); assertEquals("UK | Movies",result.get(0).group()); assertEquals("tv",result.get(0).kind());
+            assertTrue(server.takeRequest().getPath().contains("action=get_live_categories")); assertTrue(server.takeRequest().getPath().contains("action=get_live_streams")); assertEquals(2,server.getRequestCount());
+        }
+    }
+    @Test public void completeM3uSkipsTheLargeLiveStreamsDownload() throws Exception {
+        try(MockWebServer server=new MockWebServer()) {
+            server.enqueue(new MockResponse().setBody("[{\"category_id\":\"1\",\"category_name\":\"UK | Movies\"}]"));
+            List<Channel> current=List.of(new Channel("Sky",server.url("/1.ts").toString(),"UK Movies","","tv"));
+            assertTrue(new SourceClient().missingM3uLiveChannels(server.url("/get.php?username=u&password=p").toString(),current).isEmpty()); assertEquals(1,server.getRequestCount());
+        }
+    }
+    @Test public void plainM3uDoesNotGuessOrProbePanelCredentials() throws Exception {
+        try(MockWebServer server=new MockWebServer()) {
+            assertTrue(new SourceClient().missingM3uLiveChannels(server.url("/playlist.m3u").toString(),List.of()).isEmpty()); assertEquals(0,server.getRequestCount());
+        }
+    }
+    @Test public void unavailableOptionalPanelDoesNotInventChannels() throws Exception {
+        try(MockWebServer server=new MockWebServer()) {
+            server.enqueue(new MockResponse().setResponseCode(404));
+            try { new SourceClient().missingM3uLiveChannels(server.url("/get.php?username=u&password=p").toString(),List.of()); fail("Expected unavailable panel"); } catch(IOException expected) { assertTrue(expected.getMessage().contains("404")); }
+            assertEquals(1,server.getRequestCount());
+        }
+    }
     private static final String PLAYLIST="#EXTM3U\n#EXTINF:-1,TV Test\nhttps://example.com/live.ts\n";
     @Test public void transientProviderFailureRetriesGetOnce() throws Exception {
         try(MockWebServer server=new MockWebServer()) {

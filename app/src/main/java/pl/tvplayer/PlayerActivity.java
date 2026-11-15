@@ -112,7 +112,7 @@ public class PlayerActivity extends Activity {
         };
         if(!television) adjustments=new PlaybackAdjustments(this,root,state);
         setContentView(root); updateFullscreen();
-        if(!television && !onDemand) loadChannelQueue();
+        if(!onDemand) loadChannelQueue();
         // The system may drop the fullscreen flags (focus change, dialogs, rotation); restore them.
         getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(visibility -> {
             if(fullscreen && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN)==0) root.postDelayed(this::restoreImmersive,1500);
@@ -149,12 +149,14 @@ public class PlayerActivity extends Activity {
         if(previous!=null) previous.setContentDescription("Poprzedni kanał"); if(next!=null) next.setContentDescription("Następny kanał");
     }
     private void changeChannel(int offset) {
-        if(television || onDemand || channelQueue==null || !resumed || isFinishing() || isDestroyed() || enteringPip || isInPictureInPictureMode()) return; Channel channel=channelQueue.move(offset); if(channel==null) return;
-        // Stop observation while the intent still identifies the old channel.
-        if(player!=null) { closeRecovery(); view.setPlayer(null); player.release(); player=null; } stopStreamObservation();
+        if(onDemand || channelQueue==null || !resumed || isFinishing() || isDestroyed() || enteringPip || isInPictureInPictureMode()) return; Channel channel=channelQueue.move(offset); if(channel==null) return;
+        // One player: stop the old source before opening the next and retain the decoder/audio output.
+        ExoPlayer reusable=player;
+        if(player!=null) { closeRecovery(); view.setPlayer(null); if(playbackListener!=null) player.removeListener(playbackListener); player.stop(); player=null; } stopStreamObservation();
         url=channel.url(); position=0;
         getIntent().putExtra("url",url).putExtra("name",channel.name()).putExtra("kind","tv").putExtra("group",channel.group()).putExtra("logo",channel.logo()).putExtra("guide",channel.guideUrl()).putExtra("epgId",channel.epgId()).putExtra("days",channel.archiveDays()).putExtra("timezone",channel.timezone());
-        title.setText(channel.name()); error.setVisibility(View.GONE); startPlayback(); revealLiveControls();
+        title.setText(channel.name()); error.setVisibility(View.GONE); startPlayback(reusable); revealLiveControls();
+        if(liveInfo!=null) { liveInfo.channel(channel.name()); liveInfo.guide(null); showLiveInfo(); }
     }
     private void restoreImmersive() {
         if(isFinishing() || !fullscreen || enteringPip || isInPictureInPictureMode()) return;
@@ -350,12 +352,14 @@ public class PlayerActivity extends Activity {
     @Override protected void onResume() { super.onResume(); resumed=true; if(!isInPictureInPictureMode()) { updateFullscreen(); revealLiveControls(); } }
     @Override protected void onPause() { resumed=false; infoHandler.removeCallbacks(hideInfo); if(adjustments!=null) adjustments.dismissFeedback(); saveWatchProgress(); if(rotation!=null) rotation.disable(); super.onPause(); }
     @Override protected void onStart() { super.onStart(); startPlayback(); }
-    private void startPlayback() {
+    private void startPlayback() { startPlayback(null); }
+    private void startPlayback(ExoPlayer reusable) {
         if(url==null) return;
         if(player!=null) return;
         String token=getIntent().getStringExtra("playback_handoff"); getIntent().removeExtra("playback_handoff");
-        PlaybackHandoff.Transfer transfer=!television && !onDemand?PlaybackHandoff.take(token,url):null;
-        if(transfer!=null) { player=transfer.player(); streamObserved=true; }
+        PlaybackHandoff.Transfer transfer=!onDemand?PlaybackHandoff.take(token,url):null;
+        if(reusable!=null) { player=reusable; GuideRepository.get(this).streamStarted(liveChannel()); streamObserved=true; }
+        else if(transfer!=null) { player=transfer.player(); streamObserved=true; }
         else {
             android.content.Context playbackContext=!television && !onDemand?getApplicationContext():this;
             ExoPlayer.Builder builder=television?new ExoPlayer.Builder(playbackContext,PlaybackAudio.renderers(this)):new ExoPlayer.Builder(playbackContext);
@@ -385,11 +389,12 @@ public class PlayerActivity extends Activity {
         MediaItem.Builder item=new MediaItem.Builder().setUri(url);
         String path=android.net.Uri.parse(url).getPath();
         if(path!=null && path.endsWith(".ts")) item.setMimeType(MimeTypes.VIDEO_MP2T);
-        player.setMediaItem(item.build()); player.seekTo(position); player.prepare(); player.play();
+        player.setMediaSource(PlaybackNetwork.sources(this,onDemand?null:liveChannel()).createMediaSource(item.build()));
+        if(onDemand) player.seekTo(position); else player.seekToDefaultPosition(); player.prepare(); player.play();
         if(onDemand && position>5000) Toast.makeText(this,"Wznawiam oglądanie. Od początku: Opcje.",Toast.LENGTH_LONG).show();
     }
     @Override public void finish() {
-        if(!television && !onDemand && player!=null && getIntent().getBooleanExtra("return_preview",false)) {
+        if(!onDemand && player!=null && getIntent().getBooleanExtra("return_preview",false)) {
             closeRecovery(); ExoPlayer transferring=player; view.setPlayer(null); if(playbackListener!=null) transferring.removeListener(playbackListener); player=null; streamObserved=false;
             String token=PlaybackHandoff.offer(this,transferring,liveChannel());
             setResult(RESULT_OK,new android.content.Intent().putExtras(getIntent().getExtras()).putExtra("url",url).putExtra("playback_handoff",token));
@@ -398,6 +403,10 @@ public class PlayerActivity extends Activity {
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         int code=event.getKeyCode();
+        if(television && !onDemand && (code==KeyEvent.KEYCODE_CHANNEL_UP || code==KeyEvent.KEYCODE_CHANNEL_DOWN || code==KeyEvent.KEYCODE_DPAD_UP || code==KeyEvent.KEYCODE_DPAD_DOWN || code==KeyEvent.KEYCODE_MEDIA_NEXT || code==KeyEvent.KEYCODE_MEDIA_PREVIOUS)) {
+            if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled()) changeChannel(code==KeyEvent.KEYCODE_CHANNEL_UP || code==KeyEvent.KEYCODE_DPAD_UP || code==KeyEvent.KEYCODE_MEDIA_NEXT?1:-1);
+            return true;
+        }
         if(liveInfo!=null && (code==KeyEvent.KEYCODE_MEDIA_REWIND || code==KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
             if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled() && player!=null && player.isCurrentMediaItemSeekable())
                 player.seekTo(Math.max(0,player.getCurrentPosition()+(code==KeyEvent.KEYCODE_MEDIA_REWIND?-10000:10000)));
@@ -473,7 +482,7 @@ public class PlayerActivity extends Activity {
     private void closeRecovery() { if(recovery!=null) { recovery.close(); recovery=null; } }
     @Override protected void onSaveInstanceState(Bundle out) {
         if(adjustments!=null) adjustments.save(out);
-        if(!television && !onDemand && getIntent().getExtras()!=null) out.putBundle("live_channel",new Bundle(getIntent().getExtras()));
+        if(!onDemand && getIntent().getExtras()!=null) out.putBundle("live_channel",new Bundle(getIntent().getExtras()));
         out.putLong("position",player==null?position:player.getCurrentPosition()); out.putBoolean("fullscreen",fullscreen); super.onSaveInstanceState(out);
     }
 }

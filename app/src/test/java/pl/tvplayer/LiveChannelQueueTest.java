@@ -3,6 +3,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 import java.util.*;
 public class LiveChannelQueueTest {
+    @Test public void categorySearchKeepsTheWholeBouquetAvailableForZapping() { Channel a=channel("Sky Cinema","UK | Movies"),b=channel("Film4","UK | Movies"),c=channel("News","News"); LiveChannelQueue q=LiveChannelQueue.rebuild(Arrays.asList(a,b,c),Collections.emptySet(),"","UK Movies",false,a.url()); assertTrue(q.canNavigate()); assertEquals(b,q.move(1)); }
     private Channel channel(String name,String group) { return new Channel(name,"https://example.com/"+name+".ts",group,"","tv"); }
     @Test public void keepsProviderOrderAndWrapsInBothDirections() { Channel a=channel("A","Sport"),b=channel("B","Sport"),c=channel("C","Sport"); String token=LiveChannelQueue.remember(Arrays.asList(a,b,c),b.url()); LiveChannelQueue q=LiveChannelQueue.restore(token,b.url()); assertTrue(q.canNavigate()); assertEquals(c,q.move(1)); assertEquals(a,q.move(1)); assertEquals(c,q.move(-1)); }
     @Test public void skipsSeparatorsDuplicatesAndVodEntries() { Channel a=channel("A","Sport"),b=channel("B","Sport"),header=channel("### Sport ###","Sport"),movie=new Channel("Film","https://example.com/movie.mp4","Kino","","movie"); String token=LiveChannelQueue.remember(Arrays.asList(a,header,a,movie,b),a.url()); LiveChannelQueue q=LiveChannelQueue.restore(token,a.url()); assertEquals(b,q.move(1)); assertEquals(a,q.move(1)); }

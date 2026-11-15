@@ -51,7 +51,7 @@ public class TvSettingsTest {
         for(int i=0;i<BouquetOrder.LABELS.length;i++) { click("Opcje"); click("Sortuj"); click(BouquetOrder.LABELS[i]); assertEquals(BouquetOrder.MODES[i],home.getPreferences(0).getString("sort-tv","")); }
         click("Szukaj"); text("Beta"); click("Szukaj");
         waitFor("Search result missing",() -> find(home.getWindow().getDecorView(),"Beta")!=null); assertNull(find(home.getWindow().getDecorView(),"Alfa"));
-        click("☆ Ulubione"); assertNotNull(find(home.getWindow().getDecorView(),"Beta"));
+        click("Opcje"); click("☆ Ulubione"); assertNotNull(find(home.getWindow().getDecorView(),"Beta"));
         click("Szukaj"); text("Alfa"); click("Szukaj"); waitFor("Favorite filter did not hide nonfavorite",() -> find(home.getWindow().getDecorView(),"Alfa")==null);
     }
     @Test public void exitConfirmationCanCancelAndFinish() throws Exception {

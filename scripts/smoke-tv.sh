@@ -4,7 +4,7 @@ mkdir -p tv-smoke-output
 cleanup() {
   adb logcat -d -v brief -s AndroidRuntime TestRunner SeriesRemote > tv-smoke-output/runtime.txt
   tail -n 200 tv-smoke-output/runtime.txt
-  for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup; do
+  for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup tv096-streaming-home tv096-shelves tv096-bouquet-return tv096-streaming-series tv096-streaming-seasons tv096-failure tv096-live-info tv096-live-960 tv096-live-1280 tv096-movies-960 tv096-movies-1280 tv096-movies-list-960 tv096-movies-list-1280 tv096-series-960 tv096-episodes-960; do
     adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png" || true
   done
 }
@@ -18,7 +18,12 @@ run_case() {
   grep -q "OK ($expected test" "tv-smoke-output/$report.txt"
 }
 adb shell settings put system accelerometer_rotation 0
-adb shell wm size 720x1280
+physical_size=$(adb shell wm size | tr -d '\r')
+if [[ "$physical_size" =~ Physical\ size:\ ([0-9]+)x([0-9]+) ]] && (( BASH_REMATCH[1] > BASH_REMATCH[2] )); then
+  adb shell wm size 1280x720
+else
+  adb shell wm size 720x1280
+fi
 adb shell wm density 160
 adb install apk/debug/tv-debug.apk
 adb shell am start -W -n pl.tvplayer.television/pl.tvplayer.TvActivity
@@ -42,11 +47,12 @@ run_case 'pl.tvplayer.TvPlaybackOptionsTest' playback-options 2
 run_case 'pl.tvplayer.TvSourceImportTest' source-import 2
 run_case 'pl.tvplayer.TvCatalogUsabilityTest' catalog-usability 3
 run_case 'pl.tvplayer.TvLiveInfoTest' live-info-audio 2
-adb exec-out run-as pl.tvplayer.television cat files/tv095-live-info.png > tv-smoke-output/tv095-live-info.png
-for name in tv095-live-960 tv095-live-1280 tv095-movies-960 tv095-movies-1280 tv095-movies-list-960 tv095-movies-list-1280 tv095-series-960 tv095-episodes-960; do
+run_case 'pl.tvplayer.TvStreamingNavigationTest' streaming-navigation 4
+adb exec-out run-as pl.tvplayer.television cat files/tv096-live-info.png > tv-smoke-output/tv096-live-info.png
+for name in tv096-live-960 tv096-live-1280 tv096-movies-960 tv096-movies-1280 tv096-movies-list-960 tv096-movies-list-1280 tv096-series-960 tv096-episodes-960; do
   adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png"
 done
-for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup; do
+for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup tv096-streaming-home tv096-shelves tv096-bouquet-return tv096-streaming-series tv096-streaming-seasons tv096-failure tv096-live-info tv096-live-960 tv096-live-1280 tv096-movies-960 tv096-movies-1280 tv096-movies-list-960 tv096-movies-list-1280 tv096-series-960 tv096-episodes-960; do
   adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png"
 done
 grep -q 'TV_REMOTE_CHECKS_PASSED=8' tv-smoke-output/navigation.txt

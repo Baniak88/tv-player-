@@ -12,6 +12,12 @@ import static org.junit.Assert.*;
 final class TvTestUi {
     static Instrumentation instrument() { return InstrumentationRegistry.getInstrumentation(); }
     static Context context() { return instrument().getTargetContext(); }
+    static void resetNavigation() { context().getSharedPreferences("tv-navigation",0).edit().clear().commit(); }
+    static void landscape(int width,int height) throws Exception {
+        String physical; try(android.os.ParcelFileDescriptor.AutoCloseInputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(instrument().getUiAutomation().executeShellCommand("wm size"));java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream()) { byte[] bytes=new byte[512]; for(int n;(n=in.read(bytes))!=-1;) out.write(bytes,0,n); physical=out.toString("UTF-8"); }
+        java.util.regex.Matcher match=java.util.regex.Pattern.compile("Physical size:\\s*(\\d+)x(\\d+)").matcher(physical); assertTrue("Physical screen size missing",match.find()); boolean portrait=Integer.parseInt(match.group(1))<Integer.parseInt(match.group(2));
+        for(String command:new String[]{"wm size "+(portrait?height+"x"+width:width+"x"+height),"wm density 160"}) try(android.os.ParcelFileDescriptor.AutoCloseInputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(instrument().getUiAutomation().executeShellCommand(command))) { byte[] bytes=new byte[256]; while(in.read(bytes)!=-1) {} }
+    }
     static void waitFor(String message,BooleanSupplier condition) throws Exception {
         long until=System.currentTimeMillis()+15000;
         while(System.currentTimeMillis()<until) { if(condition.getAsBoolean()) return; Thread.sleep(250); }
@@ -41,6 +47,7 @@ final class TvTestUi {
     }
     /** TCG can show a system-server ANR after boot. Never dismiss an application ANR. */
     static void systemReady() throws Exception {
+        resetNavigation();
         AccessibilityNodeInfo system=node("Process system isn't responding");
         if(system==null) return;
         system.recycle(); android.util.Log.w("TvTestUi","Dismissing emulator system-server boot ANR with Wait");

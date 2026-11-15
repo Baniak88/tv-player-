@@ -16,6 +16,7 @@ import static org.junit.Assert.*;
 public class TvPhoneSetupTest {
     private Object field(Object value,String name) throws Exception { java.lang.reflect.Field field=value.getClass().getDeclaredField(name); field.setAccessible(true); return field.get(value); }
     @Test public void phoneFormDeliversAccountAndClosesPairingDialog() throws Exception {
+        TvTestUi.resetNavigation();
         Instrumentation instrument=InstrumentationRegistry.getInstrumentation(); Context context=instrument.getTargetContext();
         TvActivity activity=(TvActivity)instrument.startActivitySync(new Intent(context,TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
         TvPhoneSetup[] setup=new TvPhoneSetup[1]; AtomicReference<TvAccountStore.Account> received=new AtomicReference<>();

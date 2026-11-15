@@ -58,6 +58,7 @@ public class TvCatalogUsabilityTest {
         shell("wm size "+(portrait?height+"x"+width:width+"x"+height)); shell("wm density 160");
     }
     private void start() throws Exception {
+        resetNavigation();
         home=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
         home.getPreferences(0).edit().remove("list-movie").remove("list-series").commit();
         waitFor("Home missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null); waitFor("Home has no focus",home::hasWindowFocus);
@@ -82,36 +83,35 @@ public class TvCatalogUsabilityTest {
             ListView list=(ListView)field(home,"list"); GridView grid=(GridView)field(home,"posters"); assertEquals(View.VISIBLE,list.getVisibility()); assertEquals(View.GONE,grid.getVisibility());
             key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_RIGHT); waitFor("Right must enter the channel list",list::hasFocus);
             instrument().runOnMainSync(() -> { int full=0; for(int i=0;i<list.getChildCount();i++) if(list.getChildAt(i).getBottom()<=list.getHeight()) full++; assertTrue("Too few readable live rows",full>=5); });
-            screenshot("tv095-live-"+width+".png");
+            screenshot("tv096-live-"+width+".png");
             key(KeyEvent.KEYCODE_BACK); assertFalse(list.hasFocus()); assertNotNull(find(home.getWindow().getDecorView(),"UK| SKY CINEMA ACTION FHD 1")); key(KeyEvent.KEYCODE_BACK);
-            waitFor("Second Back must return home",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null);
+            assertNotNull(node("Nawigacja")); key(KeyEvent.KEYCODE_BACK); click("Główna"); waitFor("Home action missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null);
             key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Real film missing",() -> find(home.getWindow().getDecorView(),"Ostatni rejs – wersja reżyserska (2024) · 1")!=null);
-            grid=(GridView)field(home,"posters"); assertEquals(width==960?5:6,grid.getNumColumns()); assertNull(find(home.getWindow().getDecorView(),"UK| SKY CINEMA ACTION FHD 1"));
-            key(KeyEvent.KEYCODE_DPAD_RIGHT); // The right arrow also works without confirming the category.
-            GridView posters=grid; waitFor("Movie grid has no focus",posters::hasFocus);
-            TextView detail=(TextView)field(home,"selectionInfo"); assertTrue(detail.getText().toString().contains("wersja reżyserska (2024)"));
+            TvShelfView shelves=(TvShelfView)field(home,"shelves"); assertNotNull("Movies must use category shelves",shelves); waitFor("Shelf has no remote focus",shelves::hasFocus);
+            assertNull(find(home.getWindow().getDecorView(),"UK| SKY CINEMA ACTION FHD 1")); screenshot("tv096-movies-"+width+".png");
+            click("Opcje"); click("Widok"); click("Siatka plakatów");
+            grid=(GridView)field(home,"posters"); assertEquals(width==960?5:6,grid.getNumColumns());
             ImageView artwork=(ImageView)((android.widget.FrameLayout)((android.widget.LinearLayout)grid.getChildAt(0)).getChildAt(0)).getChildAt(1); assertEquals(ImageView.ScaleType.FIT_CENTER,artwork.getScaleType());
-            screenshot("tv095-movies-"+width+".png");
-            click("Opcje"); click("Widok: lista"); assertEquals(View.VISIBLE,((ListView)field(home,"list")).getVisibility()); screenshot("tv095-movies-list-"+width+".png");
-            click("Opcje"); click("Widok: plakaty"); assertEquals(View.VISIBLE,((GridView)field(home,"posters")).getVisibility());
+            click("Opcje"); click("Widok"); click("Lista"); assertEquals(View.VISIBLE,((ListView)field(home,"list")).getVisibility()); screenshot("tv096-movies-list-"+width+".png");
+            click("Opcje"); click("Widok"); click("Rzędy okładek"); assertNotNull(field(home,"shelves"));
             close(home); home=null;
         }
     }
     @Test public void flatM3uSeriesOpenFoldersSeasonsAndOriginalEpisodeWithRemote() throws Exception {
         viewport(960,540); start(); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER);
         waitFor("Series did not group into two titles",() -> { try { return ((List<?>)field(home,"shown")).size()==2; } catch(Exception e) { return false; } });
-        screenshot("tv095-series-960.png"); key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER);
+        screenshot("tv096-series-960.png"); waitFor("Series shelf has no focus",() -> { try { return ((TvShelfView)field(home,"shelves")).hasFocus(); } catch(Exception e) { return false; } }); key(KeyEvent.KEYCODE_DPAD_CENTER);
         waitFor("Season categories missing",() -> find(home.getWindow().getDecorView(),"Sezon 2")!=null);
-        ListView seasons=(ListView)field(home,"bouquets"); waitFor("Season picker must receive remote focus",seasons::hasFocus);
-        screenshot("tv095-episodes-960.png");
+        key(KeyEvent.KEYCODE_DPAD_LEFT); ListView seasons=(ListView)field(home,"bouquets"); waitFor("Season picker must receive remote focus",seasons::hasFocus);
+        screenshot("tv096-episodes-960.png");
         key(KeyEvent.KEYCODE_DPAD_DOWN); key(KeyEvent.KEYCODE_DPAD_DOWN);
         waitFor("Season 2 did not filter the episodes",() -> { try { return ((List<?>)field(home,"shown")).size()==1; } catch(Exception e) { return false; } });
         key(KeyEvent.KEYCODE_DPAD_RIGHT);
         Instrumentation.ActivityMonitor monitor=instrument().addMonitor(PlayerActivity.class.getName(),null,false);
         try { key(KeyEvent.KEYCODE_MEDIA_PLAY); player=monitor.waitForActivityWithTimeout(10000); } finally { instrument().removeMonitor(monitor); }
         assertNotNull("Episode did not start",player); assertEquals(server.url("/series/u/p/3.mp4?token=original").toString(),player.getIntent().getStringExtra("url")); assertTrue(player.getIntent().getBooleanExtra("television",false));
-        close(player); player=null; waitFor("Catalog did not regain focus",home::hasWindowFocus); key(KeyEvent.KEYCODE_BACK); key(KeyEvent.KEYCODE_BACK);
-        waitFor("Back did not restore the series grid",() -> { try { return ((GridView)field(home,"posters")).getVisibility()==View.VISIBLE; } catch(Exception e) { return false; } });
+        close(player); player=null; waitFor("Catalog did not regain focus",home::hasWindowFocus); key(KeyEvent.KEYCODE_BACK);
+        waitFor("Back did not restore the selected series shelf",() -> { try { TvShelfView shelves=(TvShelfView)field(home,"shelves"); return shelves!=null && shelves.selected()!=null && shelves.selected().name().equals("PL - Nocna cisza"); } catch(Exception e) { return false; } });
     }
-    @After public void cleanup() throws Exception { close(player); close(home); if(server!=null) server.shutdown(); shell("wm size 720x1280"); shell("wm density 160"); }
+    @After public void cleanup() throws Exception { close(player); close(home); if(server!=null) server.shutdown(); landscape(1280,720); }
 }

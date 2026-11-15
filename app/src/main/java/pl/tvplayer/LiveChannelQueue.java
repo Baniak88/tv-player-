@@ -20,7 +20,7 @@ final class LiveChannelQueue {
     static LiveChannelQueue restore(String token,String current) { synchronized(SESSIONS) { List<Channel> saved=SESSIONS.get(token); return saved==null?null:new LiveChannelQueue(saved,current); } }
     static LiveChannelQueue rebuild(List<Channel> items,Set<String> favorites,String group,String query,boolean onlyFavorites,String current) {
         List<Channel> scope=new ArrayList<>(); String search=query==null?"":query.trim().toLowerCase(Locale.ROOT);
-        for(Channel item:items) { if(group!=null && !group.isEmpty() && !group.equals(item.group())) continue; if(onlyFavorites && !favorites.contains(item.url())) continue; if(!search.isEmpty() && !TitleSearch.matches(item.name(),search)) continue; scope.add(item); }
+        for(Channel item:items) { if(group!=null && !group.isEmpty() && !group.equals(item.group())) continue; if(onlyFavorites && !favorites.contains(item.url())) continue; if(!search.isEmpty() && !TitleSearch.matches(item.name(),search) && !TitleSearch.matches(item.group(),search)) continue; scope.add(item); }
         return new LiveChannelQueue(scope,current);
     }
     private int indexOf(String url) { for(int i=0;i<channels.size();i++) if(channels.get(i).url().equals(url)) return i; return -1; }
