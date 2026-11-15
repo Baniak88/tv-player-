@@ -34,7 +34,7 @@ jobs:
         if: steps.audio-codecs.outputs.cache-hit != 'true'
         run: |
           sdkmanager 'ndk;26.1.10909125'
-          bash scripts/build-audio-codecs.sh
+          ANDROID_NDK_HOME="$ANDROID_HOME/ndk/26.1.10909125" bash scripts/build-audio-codecs.sh
       - uses: actions/cache/save@v4
         if: steps.audio-codecs.outputs.cache-hit != 'true'
         with:
