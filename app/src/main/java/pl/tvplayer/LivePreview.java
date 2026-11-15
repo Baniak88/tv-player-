@@ -115,7 +115,7 @@ final class LivePreview {
         if(!active || !visible || channel==null || player!=null || activity.isFinishing()) return;
         activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         Context context=activity.getApplicationContext(); Channel current=channel; GuideRepository repository=GuideRepository.get(context);
-        ExoPlayer.Builder builder=television?new ExoPlayer.Builder(context,PlaybackAudio.renderers(context)):new ExoPlayer.Builder(context);
+        ExoPlayer.Builder builder=new ExoPlayer.Builder(context,PlaybackAudio.renderers(context));
         player=builder.setLoadControl(PlaybackSettings.loadControl(context)).setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),true).setHandleAudioBecomingNoisy(true)
             .setMediaSourceFactory(PlaybackNetwork.sources(context,current)).build();
         repository.streamStarted(current); observing=true; weak=PlaybackSettings.weakInternet(context);

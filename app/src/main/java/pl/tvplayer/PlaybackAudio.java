@@ -18,7 +18,10 @@ final class PlaybackAudio {
                 // Without Context, capabilities stay explicitly PCM instead of following an HDMI broadcast.
                 return pcm?new DefaultAudioSink.Builder().setAudioCapabilities(AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES).setAudioProcessors(new AudioProcessor[]{mixer()}).build():super.buildAudioSink(ctx,floatOutput,playbackParams);
             }
-        }.setEnableDecoderFallback(true);
+        }.setEnableDecoderFallback(true)
+            // FFmpeg decodes audio the device has no decoder for (Dolby AC-3/E-AC-3, MP2, DTS) instead of playing silence.
+            // In the compatibility (PCM) mode it is preferred, so every supported format reaches the TV as plain stereo.
+            .setExtensionRendererMode(pcm?DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER:DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON);
     }
     static ChannelMixingAudioProcessor mixer() {
         ChannelMixingAudioProcessor mixer=new ChannelMixingAudioProcessor();

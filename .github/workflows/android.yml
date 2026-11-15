@@ -39,7 +39,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: OKTV-Player-1.1.6
+          name: OKTV-Player-1.1.7
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: OKTV-Player-1.1.6
+          name: OKTV-Player-1.1.7
           path: apk
       - name: Enable KVM
         run: |
@@ -105,7 +105,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: OKTV-Player-1.1.6
+          name: OKTV-Player-1.1.7
           path: apk
       - name: Publish directly installable APK
         env:
@@ -113,10 +113,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/app-debug.apk OKTV-Player-1.1.6.apk
-          gh release view v1.1.6 >/dev/null 2>&1 || gh release create v1.1.6 --target "$SOURCE_SHA" --prerelease --title "OKTV Player 1.1.6" --notes "EPG: gdy odtwarzany jest inny kanał, aplikacja nie otwiera drugiego połączenia (dostawcy z limitem jednego połączenia zwracali HTTP 458), tylko podpowiada włączenie kanału lub ustawienie linku EPG. Czytelny opis błędu limitu połączeń. Zawiera polskie EPG jednym przyciskiem z 1.1.5."
-          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v1.1.6" -f sha="$SOURCE_SHA" -F force=false >/dev/null
-          gh release upload v1.1.6 OKTV-Player-1.1.6.apk --clobber
+          cp apk/debug/app-debug.apk OKTV-Player-1.1.7.apk
+          gh release view v1.1.7 >/dev/null 2>&1 || gh release create v1.1.7 --target "$SOURCE_SHA" --prerelease --title "OKTV Player 1.1.7" --notes "Dźwięk: wbudowany programowy dekoder audio (FFmpeg) dla kanałów z dźwiękiem AC-3/E-AC-3 (Dolby), MP2 i DTS, które wcześniej mogły grać bez dźwięku, szczególnie na Fire TV. Tryb Stereo PCM w Opcjach używa go dla wszystkich formatów."
+          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v1.1.7" -f sha="$SOURCE_SHA" -F force=false >/dev/null
+          gh release upload v1.1.7 OKTV-Player-1.1.7.apk --clobber
 
 
 

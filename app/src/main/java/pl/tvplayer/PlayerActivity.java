@@ -363,7 +363,7 @@ public class PlayerActivity extends Activity {
         else if(transfer!=null) { player=transfer.player(); streamObserved=true; }
         else {
             android.content.Context playbackContext=!television && !onDemand?getApplicationContext():this;
-            ExoPlayer.Builder builder=television?new ExoPlayer.Builder(playbackContext,PlaybackAudio.renderers(this)):new ExoPlayer.Builder(playbackContext);
+            ExoPlayer.Builder builder=new ExoPlayer.Builder(playbackContext,PlaybackAudio.renderers(this));
             builder.setLoadControl(PlaybackSettings.loadControl(this));
             builder.setMediaSourceFactory(PlaybackNetwork.sources(this,onDemand?null:liveChannel()));
             if(television || !onDemand) builder.setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),true).setHandleAudioBecomingNoisy(true);
