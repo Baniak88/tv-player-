@@ -187,15 +187,15 @@ public final class TvActivity extends Activity {
         if(!home && list!=null || !home && shelves!=null) rememberLocation();
         homeRecovery=pendingLocation!=null && pendingLocation.home()?pendingLocation:null;
         home=true; seriesTitle=""; parentLocation=null; catalogGrid=false; pendingLocation=null; ui.removeCallbacks(guideRows); body.removeAllViews(); clearCatalogViews(); addNavigation();
-        heading=text("Co oglądamy?",22,Ui.TEXT); heading.setTypeface(null,Typeface.BOLD); heading.setPadding(dp(5),dp(4),0,dp(8)); body.addView(heading);
+        // No page title on home: the three centred section tiles are the page. The detached heading keeps shared code simple.
+        heading=text("",22,Ui.TEXT);
         shelves=createShelves(); body.addView(shelves,new LinearLayout.LayoutParams(-1,0,1)); showHomeRows(true);
-        status.setText(account==null?"Dodaj źródło w Opcje → Źródło → Dodaj przez telefon":"←→ wybór · ↑↓ kategorie · OK otwórz · Menu opcje");
+        status.setText(account==null?"Dodaj źródło w Opcje → Źródło → Dodaj przez telefon":"← → wybierz  ·  OK otwórz  ·  ↓ Twoja biblioteka  ·  Menu opcje");
         rememberLocation(); loadHomePreviews();
     }
     private void showHomeRows(boolean focus) {
         if(!home || shelves==null) return;
         List<Channel> shortcuts=new ArrayList<>(); shortcuts.add(new Channel("Telewizja na żywo","section:tv","Oglądaj","","shortcut")); shortcuts.add(new Channel("Filmy","section:movie","Oglądaj","","shortcut")); shortcuts.add(new Channel("Seriale","section:series","Oglądaj","","shortcut"));
-        TvBrowseState last=readLocation(navigationStore().getString("last-browse","")); if(last!=null) shortcuts.add(new Channel("Wróć do przeglądania","action:resume","Oglądaj","","shortcut"));
         List<TvShelfCatalog.Shelf> rows=new ArrayList<>(); rows.add(new TvShelfCatalog.Shelf("start","Oglądaj",shortcuts,shortcuts.size())); rows.addAll(homePreview);
         TvBrowseState anchor=homeRecovery!=null?homeRecovery:focus?null:location(); boolean ready=homeRecovery==null || rows.stream().anyMatch(row -> row.key().equals(homeRecovery.shelfKey()));
         shelves.submit(rows,anchor,ready && (homeRecovery!=null || focus || shelves.hasFocus())); if(ready) homeRecovery=null;
@@ -328,15 +328,16 @@ public final class TvActivity extends Activity {
         LinearLayout split=new LinearLayout(this);
         rail=new ListView(this); rail.setId(View.generateViewId()); rail.setDivider(null); rail.setSelector(catalogCursor()); rail.setDrawSelectorOnTop(true); rail.setItemsCanFocus(false); rail.setPadding(0,0,dp(10),0);
         rail.setOnItemClickListener((parent,view,position,id) -> openRail(position));
-        // Netflix style: the category list slides in with Left on the first card and hides again when focus leaves it,
-        // so the shelves keep their full width and their remembered card.
-        rail.setFocusable(false); rail.setVisibility(View.GONE); rail.setOnFocusChangeListener((view,focused) -> { if(!focused) { view.setFocusable(false); view.setVisibility(View.GONE); } });
+        // Canal+ style: the category list is always shown on the left. It is focusable only after Left on the first card,
+        // so initial focus and returning from a category grid always land on the remembered card.
+        rail.setFocusable(false); rail.setBackground(Ui.shape(this,Ui.SURFACE,12,0)); rail.setPadding(dp(6),dp(6),dp(6),dp(6)); rail.setClipToPadding(false);
+        rail.setOnFocusChangeListener((view,focused) -> { if(!focused) view.setFocusable(false); });
         rail.setOnKeyListener((view,key,event) -> {
             if(key!=KeyEvent.KEYCODE_DPAD_RIGHT) return false;
             if(event.getAction()==KeyEvent.ACTION_DOWN && event.getRepeatCount()==0 && shelves!=null) shelves.focusCurrent();
             return true;
         });
-        split.addView(rail,new LinearLayout.LayoutParams(dp(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density>=1100?230:200),-1));
+        LinearLayout.LayoutParams railSize=new LinearLayout.LayoutParams(dp(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density>=1100?230:196),-1); railSize.rightMargin=dp(14); railSize.bottomMargin=dp(8); split.addView(rail,railSize);
         FrameLayout content=new FrameLayout(this); shelves=createShelves(); content.addView(shelves,new FrameLayout.LayoutParams(-1,-1));
         emptyState=text("Brak pozycji. Wybierz kategorię lub odśwież źródło.",19,Ui.MUTED); emptyState.setGravity(Gravity.CENTER); content.addView(emptyState,new FrameLayout.LayoutParams(-1,-1));
         split.addView(content,new LinearLayout.LayoutParams(0,-1,1)); body.addView(split,new LinearLayout.LayoutParams(-1,0,1)); bindRail(); filter();
@@ -463,7 +464,7 @@ public final class TvActivity extends Activity {
             boolean focus=catalogReady && (firstFocus || anchor.contentFocus()); shelves.submit(data,anchor,focus); if(!focus && pendingLocation!=null) focusNavigation(); if(catalogReady) pendingLocation=null;
             if(emptyState!=null) emptyState.setVisibility(catalogReady && shown.isEmpty()?View.VISIBLE:View.GONE);
             heading.setText(title(section)+(onlyFavorites?" · Moja lista":"")+(group.isEmpty()?"":" · "+group));
-            status.setText(busy?"Wczytywanie biblioteki…":Ui.count(shown.size())+" pozycji · ← na pierwszej okładce: lista kategorii · ↑↓ rzędy · OK szczegóły"); return;
+            status.setText(busy?"Wczytywanie biblioteki…":Ui.count(shown.size())+" pozycji  ·  ← kategorie  ·  ↑↓ rzędy  ·  OK szczegóły  ·  Menu opcje"); return;
         }
         if(list==null) return;
         if(rows!=null) rows.notifyDataSetChanged(); if(covers!=null) covers.notifyDataSetChanged();
@@ -603,7 +604,7 @@ public final class TvActivity extends Activity {
         // The category list is reached only on purpose: Left on the first card of a shelf. It never takes initial focus,
         // so returning from a category grid restores the previously selected card.
         if(code==KeyEvent.KEYCODE_DPAD_LEFT && rail!=null && shelves!=null && shelves.hasFocus() && shelves.index()==0) {
-            if(event.getAction()==KeyEvent.ACTION_DOWN) { rail.setVisibility(View.VISIBLE); rail.setFocusable(true); rail.requestFocus(); }
+            if(event.getAction()==KeyEvent.ACTION_DOWN) { rail.setFocusable(true); rail.requestFocus(); }
             return true;
         }
         if((!home || shelves!=null) && (code==KeyEvent.KEYCODE_MEDIA_PLAY || code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {

@@ -20,7 +20,7 @@ public class TvSettingsTest {
         new android.util.AtomicFile(new java.io.File(context().getFilesDir(),"tv-account.enc")).delete();
         new LibraryStore(context()).save(Arrays.asList(new Channel("Alfa","https://example.com/a.ts","Sport","","tv"),new Channel("Beta","https://example.com/b.ts","Dzieci","","tv")),Collections.singleton("https://example.com/b.ts"));
         home=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
-        waitFor("Home missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null);
+        waitFor("Home missing",() -> find(home.getWindow().getDecorView(),"Kanały i program TV")!=null);
         waitFor("Home has no input focus",home::hasWindowFocus);
     }
     @After public void cleanup() { close(home); context().getSharedPreferences("playback-network",0).edit().clear().commit(); context().getSharedPreferences("epg-settings",0).edit().clear().commit(); }

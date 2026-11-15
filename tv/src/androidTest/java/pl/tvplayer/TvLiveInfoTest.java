@@ -43,9 +43,10 @@ public class TvLiveInfoTest {
         Channel channel=new Channel("Kanał demonstracyjny",server.url("/audio.mkv").toString(),"","","tv");
         GuideRepository.get(context()).acceptStream(channel,Arrays.asList(new Guide.Program("Wieczorny seans","",now-300,now+1500,""),new Guide.Program("Następna audycja","",now+1500,now+3000,"")));
         start(true); TvLiveInfoBar bar=(TvLiveInfoBar)field(activity,"liveInfo"); assertNotNull(bar);
-        infoKey(KeyEvent.KEYCODE_INFO); waitFor("Current programme missing",() -> find(activity.getWindow().getDecorView(),"Teraz  "+clock(now-300)+"–"+clock(now+1500)+"  Wieczorny seans")!=null);
-        assertNotNull(find(activity.getWindow().getDecorView(),"Następnie  "+clock(now+1500)+"  Następna audycja"));
-        instrument().runOnMainSync(() -> { android.widget.ProgressBar progress=(android.widget.ProgressBar)bar.getChildAt(2); assertTrue(progress.getProgress()>100 && progress.getProgress()<300); });
+        infoKey(KeyEvent.KEYCODE_INFO); waitFor("Current programme missing",() -> find(activity.getWindow().getDecorView(),"Wieczorny seans")!=null);
+        assertNotNull(find(activity.getWindow().getDecorView(),clock(now-300)+" – "+clock(now+1500))); assertNotNull(find(activity.getWindow().getDecorView(),"TERAZ")); assertNotNull(find(activity.getWindow().getDecorView(),"POTEM"));
+        assertNotNull(find(activity.getWindow().getDecorView(),"Następna audycja")); assertNotNull(find(activity.getWindow().getDecorView(),clock(now+1500)));
+        instrument().runOnMainSync(() -> { android.widget.ProgressBar progress; try { progress=(android.widget.ProgressBar)field(bar,"progress"); } catch(Exception e) { throw new AssertionError(e); } assertTrue(progress.getProgress()>100 && progress.getProgress()<300); });
         instrument().runOnMainSync(() -> { View root=activity.getWindow().getDecorView(); Bitmap bitmap=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap)); try(FileOutputStream out=context().openFileOutput("tv096-live-info.png",0)) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } catch(IOException e) { throw new AssertionError(e); } finally { bitmap.recycle(); } });
         // Rendering/compressing the screenshot on TCG can outlast the normal auto-hide timer.
         infoKey(KeyEvent.KEYCODE_INFO); assertEquals(View.VISIBLE,bar.getVisibility());
@@ -53,6 +54,8 @@ public class TvLiveInfoTest {
         instrument().runOnMainSync(() -> activity.onWindowFocusChanged(true)); assertEquals("Window focus must not reopen a dismissed overlay",View.GONE,bar.getVisibility());
         infoKey(KeyEvent.KEYCODE_INFO); assertEquals(View.VISIBLE,bar.getVisibility());
         infoKey(KeyEvent.KEYCODE_BACK); assertFalse(activity.isFinishing()); assertEquals(View.GONE,bar.getVisibility());
+        // Right opens the player options during live TV (the Fire TV remote's Menu key is easy to miss).
+        infoKey(KeyEvent.KEYCODE_DPAD_RIGHT); waitFor("Right must open live options",() -> node("Ścieżka audio")!=null); key(KeyEvent.KEYCODE_BACK); waitFor("Options must close",activity::hasWindowFocus); assertFalse(activity.isFinishing());
         infoKey(KeyEvent.KEYCODE_DPAD_CENTER); instrument().runOnMainSync(() -> bar.guide(new GuideRepository.Data(Collections.emptyList(),"",""))); assertNotNull(find(activity.getWindow().getDecorView(),"Brak bieżącego EPG od dostawcy"));
         ExoPlayer current=player(); check("Live fixture not seekable",current::isCurrentMediaItemSeekable);
         instrument().runOnMainSync(() -> { current.pause(); current.seekTo(5000); });

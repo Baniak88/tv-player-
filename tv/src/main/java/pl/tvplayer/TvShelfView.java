@@ -36,7 +36,10 @@ final class TvShelfView extends RecyclerView {
     private int dp(int n) { return Ui.dp(getContext(),n); }
     private boolean home() { return !shelves.isEmpty() && !shelves.get(0).channels().isEmpty() && shelves.get(0).channels().get(0).kind().equals("shortcut"); }
     private boolean compact() { return getResources().getDisplayMetrics().heightPixels/getResources().getDisplayMetrics().density<650; }
-    private int heroHeight() { return dp(home()?(compact()?112:150):compact()?96:124); }
+    // Home shows the three section tiles alone; the title banner only belongs to film and series shelves.
+    private int heroHeight() { return home()?0:dp(compact()?96:124); }
+    private int tileWidth() { return dp(compact()?232:272); }
+    private int tileHeight() { return dp(compact()?150:176); }
     private int artworkHeight() { return dp(compact()?144:180); }
     private int cardsHeight() { return dp(compact()?204:240); }
     private TextView text(String value,int size,int color) { return Ui.text(getContext(),value,size,color); }
@@ -69,15 +72,16 @@ final class TvShelfView extends RecyclerView {
     }
     private void mountFocus(int rowIndex,int index,TvBrowseState anchor,int request,int attempt) {
         postDelayed(() -> {
-            if(request!=focusGeneration || !isAttachedToWindow() || attempt>20) return;
+            if(request!=focusGeneration || !isAttachedToWindow() || attempt>60) return;
             ViewHolder holder=findViewHolderForAdapterPosition(rowIndex+1);
             if(!(holder instanceof Row row)) { vertical.scrollToPositionWithOffset(rowIndex+1,rowIndex==0?heroHeight():0); mountFocus(rowIndex,index,anchor,request,attempt+1); return; }
             TvShelfCatalog.Shelf shelf=shelves.get(rowIndex); int target=Math.min(index,shelf.channels().size()+(shelf.more()?1:0)-1);
             if(target<0) return;
             if(anchor!=null && attempt==0) row.layout.scrollToPositionWithOffset(anchor.categoryFirst(),anchor.categoryTop());
             ViewHolder card=row.cards.findViewHolderForAdapterPosition(target);
-            if(card==null) { row.layout.scrollToPositionWithOffset(target,0); mountFocus(rowIndex,index,null,request,attempt+1); return; }
-            card.itemView.requestFocus();
+            if(card==null || card.itemView.getWidth()==0) { row.layout.scrollToPositionWithOffset(target,0); mountFocus(rowIndex,index,null,request,attempt+1); return; }
+            // A card that is not laid out yet can refuse focus; keep trying instead of leaving focus elsewhere.
+            if(!card.itemView.requestFocus() || !card.itemView.hasFocus()) mountFocus(rowIndex,index,null,request,attempt+1);
         },attempt==0?0:32);
     }
     private void describe(Channel channel,TvShelfCatalog.Shelf row) {
@@ -89,20 +93,22 @@ final class TvShelfView extends RecyclerView {
     }
     private static String shortcutLine(String url) {
         switch(url) {
-            case "section:tv": return "Kanały na żywo z programem TV i podglądem";
-            case "section:movie": return "Filmy od Twojego dostawcy · kategorie i Moja lista";
-            case "section:series": return "Seriale, sezony i odcinki · kontynuuj oglądanie";
-            default: return "Wróć tam, gdzie skończyłeś";
+            case "section:tv": return "Kanały i program TV";
+            case "section:movie": return "Kategorie i Moja lista";
+            case "section:series": return "Sezony i odcinki";
+            default: return "";
         }
     }
     /** Colourful Canal+/Netflix style tiles for the home shortcuts; white focus ring for the remote. */
     private StateListDrawable shortcutBackground(String url) {
         int[] colors=url.equals("section:tv")?new int[]{0xFFFF3D5E,0xFFB0186F}:url.equals("section:movie")?new int[]{0xFF6A5CFF,0xFF35279A}:url.equals("section:series")?new int[]{0xFF00B8D9,0xFF0B6E99}:new int[]{0xFF4A4E58,0xFF2A2D34};
         StateListDrawable states=new StateListDrawable();
-        GradientDrawable focused=new GradientDrawable(GradientDrawable.Orientation.TL_BR,colors); focused.setCornerRadius(dp(12)); focused.setStroke(dp(4),0xFFFFFFFF);
-        GradientDrawable normal=new GradientDrawable(GradientDrawable.Orientation.TL_BR,colors); normal.setCornerRadius(dp(12));
+        GradientDrawable focused=new GradientDrawable(GradientDrawable.Orientation.TL_BR,colors); focused.setCornerRadius(dp(16)); focused.setStroke(dp(4),0xFFFFFFFF);
+        // Unfocused tiles are dimmed so the focused one clearly stands out from across the room.
+        GradientDrawable normal=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{dim(colors[0]),dim(colors[1])}); normal.setCornerRadius(dp(16));
         states.addState(new int[]{android.R.attr.state_focused},focused); states.addState(new int[]{},normal); return states;
     }
+    private static int dim(int color) { return android.graphics.Color.rgb(android.graphics.Color.red(color)*7/10,android.graphics.Color.green(color)*7/10,android.graphics.Color.blue(color)*7/10); }
     private final class Hero extends ViewHolder {
         TextView title,subtitle,hint; ImageView image;
         Hero(LinearLayout view) {
@@ -126,12 +132,13 @@ final class TvShelfView extends RecyclerView {
         }
     }
     private final class Card extends ViewHolder {
-        LinearLayout view; ImageView image; TextView title,placeholder;
+        LinearLayout view; ImageView image; TextView title,placeholder,caption;
         Card(LinearLayout view) {
             super(view); this.view=view; view.setOrientation(LinearLayout.VERTICAL); view.setPadding(dp(5),dp(5),dp(5),dp(5)); view.setBackground(cardBackground()); view.setFocusable(true); view.setFocusableInTouchMode(true); view.setDescendantFocusability(FOCUS_BLOCK_DESCENDANTS);
             FrameLayout art=new FrameLayout(getContext()); art.setBackgroundColor(Ui.SURFACE_HIGH); placeholder=text("",22,Ui.FAINT); placeholder.setGravity(Gravity.CENTER); art.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
             image=new ImageView(getContext()); image.setScaleType(ImageView.ScaleType.FIT_CENTER); art.addView(image,new FrameLayout.LayoutParams(-1,-1)); view.addView(art,new LinearLayout.LayoutParams(-1,artworkHeight()));
             title=text("",16,Ui.TEXT); title.setMaxLines(2); title.setEllipsize(android.text.TextUtils.TruncateAt.END); title.setPadding(dp(3),dp(5),dp(3),0); view.addView(title,new LinearLayout.LayoutParams(-1,dp(45)));
+            caption=text("",14,0xD9FFFFFF); caption.setGravity(Gravity.CENTER_HORIZONTAL); caption.setSingleLine(true); caption.setVisibility(GONE); view.addView(caption,new LinearLayout.LayoutParams(-1,-2));
             RecyclerView.LayoutParams size=new RecyclerView.LayoutParams(dp(142),-1); size.rightMargin=dp(12); view.setLayoutParams(size);
         }
     }
@@ -143,9 +150,13 @@ final class TvShelfView extends RecyclerView {
             return type==0?new Hero(view):new Row(view);
         }
         @Override public void onBindViewHolder(ViewHolder holder,int position) {
-            if(holder instanceof Hero h) { hero=h; h.itemView.getLayoutParams().height=heroHeight(); h.subtitle.setVisibility(View.VISIBLE); h.hint.setVisibility(View.VISIBLE); if(!shelves.isEmpty()) { TvShelfCatalog.Shelf row=shelves.get(rowIndex(selectedShelf)); describe(row.channels().isEmpty()?null:row.channels().get(Math.min(selectedIndex,row.channels().size()-1)),row); } return; }
+            if(holder instanceof Hero h) { hero=h; h.itemView.getLayoutParams().height=heroHeight(); h.itemView.setVisibility(home()?INVISIBLE:VISIBLE); h.subtitle.setVisibility(View.VISIBLE); h.hint.setVisibility(View.VISIBLE); if(!shelves.isEmpty()) { TvShelfCatalog.Shelf row=shelves.get(rowIndex(selectedShelf)); describe(row.channels().isEmpty()?null:row.channels().get(Math.min(selectedIndex,row.channels().size()-1)),row); } return; }
             Row row=(Row)holder; TvShelfCatalog.Shelf shelf=shelves.get(position-1); row.title.setText(shelf.title()+"   ›");
-            boolean shortcuts=!shelf.channels().isEmpty() && shelf.channels().get(0).kind().equals("shortcut"); row.cards.getLayoutParams().height=shortcuts?dp(132):cardsHeight();
+            boolean shortcuts=!shelf.channels().isEmpty() && shelf.channels().get(0).kind().equals("shortcut");
+            // Section tiles sit centred as one symmetric group; content shelves start at the left edge.
+            row.title.setVisibility(shortcuts?GONE:VISIBLE); ((LinearLayout)row.itemView).setGravity(shortcuts?Gravity.CENTER_HORIZONTAL:Gravity.START);
+            row.itemView.setPadding(0,dp(shortcuts?(compact()?10:22):14),0,dp(shortcuts?(compact()?12:20):6));
+            row.cards.getLayoutParams().width=shortcuts?-2:-1; row.cards.getLayoutParams().height=shortcuts?tileHeight()+dp(8):cardsHeight(); row.cards.requestLayout();
             row.cards.setAdapter(new CardAdapter(shelf,position-1,shortcuts)); row.layout.scrollToPositionWithOffset(rowPositions.getOrDefault(shelf.key(),0),0);
         }
     }
@@ -156,16 +167,25 @@ final class TvShelfView extends RecyclerView {
         @Override public Card onCreateViewHolder(ViewGroup parent,int type) { return new Card(new LinearLayout(getContext())); }
         @Override public void onBindViewHolder(Card card,int position) {
             Channel channel=position<shelf.channels().size()?shelf.channels().get(position):null;
-            card.view.getLayoutParams().width=dp(shortcuts?218:142); card.view.getChildAt(0).getLayoutParams().height=shortcuts?dp(72):artworkHeight();
-            if(shortcuts && channel!=null) {
+            boolean tile=shortcuts && channel!=null; RecyclerView.LayoutParams size=(RecyclerView.LayoutParams)card.view.getLayoutParams();
+            size.width=tile?tileWidth():dp(142); size.height=tile?tileHeight():-1; size.leftMargin=tile?dp(12):0; size.rightMargin=dp(12);
+            LinearLayout.LayoutParams art=(LinearLayout.LayoutParams)card.view.getChildAt(0).getLayoutParams(); art.height=tile?0:artworkHeight(); art.weight=tile?1:0;
+            LinearLayout.LayoutParams label=(LinearLayout.LayoutParams)card.title.getLayoutParams(); label.height=tile?-2:dp(45);
+            card.view.setGravity(tile?Gravity.CENTER_HORIZONTAL:Gravity.NO_GRAVITY); card.view.setPadding(dp(tile?12:5),dp(tile?16:5),dp(tile?12:5),dp(tile?14:5));
+            ImageLoader.get(getContext()).load(tile || channel==null?"":channel.logo(),card.image,dp(132),dp(180));
+            if(tile) {
                 card.view.setBackground(shortcutBackground(channel.url())); card.view.getChildAt(0).setBackgroundColor(0);
-                card.placeholder.setTextSize(34); card.placeholder.setTextColor(0xFFFFFFFF); card.title.setTextColor(0xFFFFFFFF); card.title.setTypeface(null,Typeface.BOLD);
+                card.image.setScaleType(ImageView.ScaleType.CENTER_INSIDE); card.image.setImageDrawable(new TvTileIcon(TvTileIcon.kind(channel.url()),dp(compact()?54:64))); card.placeholder.setText("");
+                card.title.setTextSize(compact()?20:22); card.title.setTextColor(0xFFFFFFFF); card.title.setTypeface(null,Typeface.BOLD); card.title.setGravity(Gravity.CENTER_HORIZONTAL); card.title.setMaxLines(1);
+                card.caption.setText(shortcutLine(channel.url())); card.caption.setVisibility(VISIBLE);
             } else {
+                card.image.setScaleType(ImageView.ScaleType.FIT_CENTER);
                 card.view.setBackground(cardBackground()); card.view.getChildAt(0).setBackgroundColor(Ui.SURFACE_HIGH);
-                card.placeholder.setTextSize(22); card.placeholder.setTextColor(Ui.FAINT); card.title.setTextColor(Ui.TEXT); card.title.setTypeface(null,Typeface.NORMAL);
+                card.placeholder.setTextSize(22); card.placeholder.setTextColor(Ui.FAINT); card.placeholder.setText(channel==null?"→":"▶");
+                card.title.setTextSize(16); card.title.setTextColor(Ui.TEXT); card.title.setTypeface(null,Typeface.NORMAL); card.title.setGravity(Gravity.START); card.title.setMaxLines(2); card.caption.setVisibility(GONE);
             }
-            String label=channel==null?"Pokaż wszystkie · "+Ui.count(shelf.total()):channel.name(); card.title.setText(label); card.placeholder.setText(channel==null?"→":shortcuts?channel.url().equals("section:tv")?"TV":channel.url().equals("section:movie")?"▶":channel.url().equals("section:series")?"▤":"↩":"▶");
-            card.view.setContentDescription(channel==null?"Pokaż wszystkie: "+shelf.title():channel.name()); ImageLoader.get(getContext()).load(channel==null?"":channel.logo(),card.image,dp(132),dp(180));
+            card.title.setText(channel==null?"Pokaż wszystkie · "+Ui.count(shelf.total()):channel.name());
+            card.view.setContentDescription(channel==null?"Pokaż wszystkie: "+shelf.title():channel.name());
             card.view.setOnClickListener(v -> { int current=card.getBindingAdapterPosition(); if(current==RecyclerView.NO_POSITION) return; if(current>=shelf.channels().size()) actions.more(shelf); else actions.open(shelf.channels().get(current)); });
             card.view.setOnLongClickListener(v -> { int current=card.getBindingAdapterPosition(); if(current>=0 && current<shelf.channels().size()) actions.options(shelf.channels().get(current)); return true; });
             card.view.setOnFocusChangeListener((v,focused) -> { int current=card.getBindingAdapterPosition(); if(focused && current>=0) { Channel selected=current<shelf.channels().size()?shelf.channels().get(current):null; selectedShelf=shelf.key(); selectedIndex=current; selectedChannel=selected; rowPositions.put(shelf.key(),current); describe(selected,shelf); actions.selected(selected,shelf.key(),current); } });

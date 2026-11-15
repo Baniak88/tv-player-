@@ -83,7 +83,7 @@ public class PlayerActivity extends Activity {
         if(television) full.setVisibility(View.GONE);
         if(television && !onDemand) {
             view.setUseController(false); back.setFocusable(false); settings.setFocusable(false);
-            liveInfo=new TvLiveInfoBar(this); liveInfo.channel(getIntent().getStringExtra("name"));
+            liveInfo=new TvLiveInfoBar(this); liveInfo.channel(getIntent().getStringExtra("name")); liveInfo.logo(getIntent().getStringExtra("logo"));
             liveInfo.guide(null); liveInfo.audio("Audio: oczekiwanie na ścieżkę");
             root.addView(liveInfo,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
         }
@@ -156,7 +156,7 @@ public class PlayerActivity extends Activity {
         url=channel.url(); position=0;
         getIntent().putExtra("url",url).putExtra("name",channel.name()).putExtra("kind","tv").putExtra("group",channel.group()).putExtra("logo",channel.logo()).putExtra("guide",channel.guideUrl()).putExtra("epgId",channel.epgId()).putExtra("days",channel.archiveDays()).putExtra("timezone",channel.timezone());
         title.setText(channel.name()); error.setVisibility(View.GONE); startPlayback(reusable); revealLiveControls();
-        if(liveInfo!=null) { liveInfo.channel(channel.name()); liveInfo.guide(null); showLiveInfo(); }
+        if(liveInfo!=null) { liveInfo.channel(channel.name()); liveInfo.logo(channel.logo()); liveInfo.guide(null); showLiveInfo(); }
     }
     private void restoreImmersive() {
         if(isFinishing() || !fullscreen || enteringPip || isInPictureInPictureMode()) return;
@@ -406,6 +406,12 @@ public class PlayerActivity extends Activity {
         int code=event.getKeyCode();
         if(television && !onDemand && (code==KeyEvent.KEYCODE_CHANNEL_UP || code==KeyEvent.KEYCODE_CHANNEL_DOWN || code==KeyEvent.KEYCODE_DPAD_UP || code==KeyEvent.KEYCODE_DPAD_DOWN || code==KeyEvent.KEYCODE_MEDIA_NEXT || code==KeyEvent.KEYCODE_MEDIA_PREVIOUS)) {
             if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled()) changeChannel(code==KeyEvent.KEYCODE_CHANNEL_UP || code==KeyEvent.KEYCODE_DPAD_UP || code==KeyEvent.KEYCODE_MEDIA_NEXT?1:-1);
+            return true;
+        }
+        // Fire TV remotes deliver Menu to whichever view holds focus, so handle it here instead of relying on onKeyUp.
+        // Right/Left are free during live TV (Up/Down zap), so they give one-press access to options and the guide.
+        if(television && (code==KeyEvent.KEYCODE_MENU || code==KeyEvent.KEYCODE_SETTINGS || liveInfo!=null && (code==KeyEvent.KEYCODE_DPAD_RIGHT || code==KeyEvent.KEYCODE_DPAD_LEFT || code==KeyEvent.KEYCODE_GUIDE))) {
+            if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled()) { if(code==KeyEvent.KEYCODE_DPAD_LEFT || code==KeyEvent.KEYCODE_GUIDE) openGuide(); else showOptions(); }
             return true;
         }
         if(liveInfo!=null && (code==KeyEvent.KEYCODE_MEDIA_REWIND || code==KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {

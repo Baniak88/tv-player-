@@ -100,7 +100,10 @@ public class TvStreamingNavigationTest {
         assertTrue("Closing the TV preview must retain the TV shell's screen-on policy",(home.getWindow().getAttributes().flags & WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)!=0);
         for(int i=0;i<21;i++) remote(KeyEvent.KEYCODE_DPAD_RIGHT); waitFor("More card missing",() -> { try { return shelves().index()==24; } catch(Exception e) { return false; } });
         remote(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Complete bouquet missing",() -> { try { return ((List<?>)field(home,"shown")).size()==30 && field(home,"shelves")==null; } catch(Exception e) { return false; } });
-        remote(KeyEvent.KEYCODE_BACK); waitFor("Back lost the shelf more card",() -> { try { return shelves()!=null && shelves().hasFocus() && shelves().index()==24; } catch(Exception e) { return false; } }); assertFalse((Boolean)field(home,"home"));
+        remote(KeyEvent.KEYCODE_BACK);
+        try { waitFor("Back lost the shelf more card",() -> { try { return shelves()!=null && shelves().hasFocus() && shelves().index()==24; } catch(Exception e) { return false; } }); }
+        catch(AssertionError lost) { capture("tv099-back-lost.png"); throw new AssertionError(lost.getMessage()+"; "+focusReport(),lost); }
+        assertFalse((Boolean)field(home,"home"));
     }
     @Test public void m3uSeasonAndEpisodeResumeAfterRecreationAndBackReturnsToSeries() throws Exception {
         start(true); remote(KeyEvent.KEYCODE_DPAD_RIGHT); remote(KeyEvent.KEYCODE_DPAD_RIGHT); remote(KeyEvent.KEYCODE_DPAD_CENTER); waitSelected("Nocna cisza"); capture("tv096-streaming-series.png");
@@ -137,4 +140,9 @@ public class TvStreamingNavigationTest {
     }
     private int images(View view) { int count=view instanceof ImageView && ((ImageView)view).getDrawable()!=null?1:0; if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++) count+=images(group.getChildAt(i)); return count; }
     @After public void cleanup() throws Exception { refreshGate.countDown(); close(child); close(home); if(server!=null) server.shutdown(); landscape(1280,720); }
+    private String focusReport() {
+        String[] out={""}; instrument().runOnMainSync(() -> { try { TvShelfView view=(TvShelfView)field(home,"shelves"); View focus=home.getCurrentFocus();
+            out[0]="shelves="+(view==null?"null":"hasFocus="+view.hasFocus()+",index="+view.index()+",shelf="+view.shelf()+",width="+view.getWidth())+", focus="+(focus==null?"null":focus.getClass().getSimpleName()+"/"+focus.getContentDescription())+", section="+field(home,"section")+", catalogReady="+field(home,"catalogReady");
+        } catch(Exception e) { out[0]=e.toString(); } }); return out[0];
+    }
 }

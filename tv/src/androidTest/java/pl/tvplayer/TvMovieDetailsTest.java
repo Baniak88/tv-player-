@@ -49,7 +49,7 @@ public class TvMovieDetailsTest {
     }
     @Test public void catalogOpensMovieDetailsAndRemoteCanFavoriteAndPlay() throws Exception {
         Channel source=source(); new LibraryStore(context()).save(Collections.singletonList(source),new HashSet<>(Collections.singleton("https://example.com/keep.ts")));
-        library=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK)); waitText(library,"Co oglądamy?");
+        library=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK)); waitText(library,"Kanały i program TV");
         TvTestUi.waitFor("Movie library has no input focus",library::hasWindowFocus); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(library,source.name());
         TvTestUi.waitFor("Movie shelf has no focus",() -> { try { return ((TvShelfView)TvTestUi.field(library,"shelves")).hasFocus(); } catch(Exception e) { return false; } });
         Instrumentation.ActivityMonitor details=instrument().addMonitor(MovieActivity.class.getName(),null,false); key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); movie=(MovieActivity)details.waitForActivityWithTimeout(7000); instrument().removeMonitor(details); assertNotNull("Movie did not open its details",movie);

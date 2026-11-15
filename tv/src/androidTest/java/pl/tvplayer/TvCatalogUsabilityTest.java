@@ -61,7 +61,7 @@ public class TvCatalogUsabilityTest {
         resetNavigation();
         home=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
         home.getPreferences(0).edit().remove("list-movie").remove("list-series").commit();
-        waitFor("Home missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null); waitFor("Home has no focus",home::hasWindowFocus);
+        waitFor("Home missing",() -> find(home.getWindow().getDecorView(),"Kanały i program TV")!=null); waitFor("Home has no focus",home::hasWindowFocus);
         waitHomeShortcut();
         try { waitFor("Window/resources did not apply requested viewport "+viewportWidth+" at density 160",() -> {
             boolean[] ready={false}; instrument().runOnMainSync(() -> { android.util.DisplayMetrics metrics=home.getResources().getDisplayMetrics(); ready[0]=metrics.widthPixels==viewportWidth && metrics.densityDpi==160 && home.getWindow().getDecorView().getWidth()==viewportWidth; }); return ready[0];
@@ -87,7 +87,7 @@ public class TvCatalogUsabilityTest {
             instrument().runOnMainSync(() -> { int full=0; for(int i=0;i<list.getChildCount();i++) if(list.getChildAt(i).getBottom()<=list.getHeight()) full++; assertTrue("Too few readable live rows",full>=5); });
             screenshot("tv096-live-"+width+".png");
             key(KeyEvent.KEYCODE_BACK); assertFalse(list.hasFocus()); assertNotNull(find(home.getWindow().getDecorView(),"UK| SKY CINEMA ACTION FHD 1")); key(KeyEvent.KEYCODE_BACK);
-            assertNotNull(node("Nawigacja")); key(KeyEvent.KEYCODE_BACK); key(KeyEvent.KEYCODE_DPAD_UP); key(KeyEvent.KEYCODE_DPAD_UP); key(KeyEvent.KEYCODE_DPAD_LEFT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Home action missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null);
+            assertNotNull(node("Nawigacja")); key(KeyEvent.KEYCODE_BACK); key(KeyEvent.KEYCODE_DPAD_UP); key(KeyEvent.KEYCODE_DPAD_UP); key(KeyEvent.KEYCODE_DPAD_LEFT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Home action missing",() -> find(home.getWindow().getDecorView(),"Kanały i program TV")!=null);
             waitHomeShortcut(); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Real film missing",() -> { try { return home.hasWindowFocus() && !(Boolean)field(home,"home") && field(home,"section").equals("movie") && (Boolean)field(home,"catalogReady") && find(home.getWindow().getDecorView(),"Ostatni rejs – wersja reżyserska (2024) · 1")!=null; } catch(Exception e) { return false; } });
             TvShelfView shelves=(TvShelfView)field(home,"shelves"); assertNotNull("Movies must use category shelves",shelves); waitFor("Shelf has no remote focus",shelves::hasFocus);
             instrument().runOnMainSync(() -> { View hero=shelves.getLayoutManager().findViewByPosition(0); assertNotNull("Selected title banner must remain visible",hero); assertTrue("Selected title banner was clipped",hero.getTop()>=0); });
