@@ -41,6 +41,8 @@ run_case 'pl.tvplayer.TvRecordingTest' recording 3
 run_case 'pl.tvplayer.TvPlaybackOptionsTest' playback-options 2
 run_case 'pl.tvplayer.TvSourceImportTest' source-import 2
 run_case 'pl.tvplayer.TvCatalogUsabilityTest' catalog-usability 3
+run_case 'pl.tvplayer.TvLiveInfoTest' live-info-audio 2
+adb exec-out run-as pl.tvplayer.television cat files/tv095-live-info.png > tv-smoke-output/tv095-live-info.png
 for name in tv095-live-960 tv095-live-1280 tv095-movies-960 tv095-movies-1280 tv095-movies-list-960 tv095-movies-list-1280 tv095-series-960 tv095-episodes-960; do
   adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png"
 done

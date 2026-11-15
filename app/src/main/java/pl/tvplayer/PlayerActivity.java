@@ -28,6 +28,9 @@ public class PlayerActivity extends Activity {
     private OrientationEventListener rotation;
     private int sensorOrientation=ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR;
     private LinearLayout toolbar;
+    private TvLiveInfoBar liveInfo;
+    private final android.os.Handler infoHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable hideInfo=() -> setLiveInfoVisible(false);
     private final java.util.concurrent.ExecutorService guideWorker=java.util.concurrent.Executors.newSingleThreadExecutor();
     private static final int RECORD_FILE=72;
     private int recordingMinutes=60;
@@ -78,8 +81,14 @@ public class PlayerActivity extends Activity {
         full.setOnClickListener(v -> { fullscreen=!fullscreen; updateFullscreen(); });
         root.addView(top,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
         if(television) full.setVisibility(View.GONE);
+        if(television && !onDemand) {
+            view.setUseController(false); back.setFocusable(false); settings.setFocusable(false);
+            liveInfo=new TvLiveInfoBar(this); liveInfo.channel(getIntent().getStringExtra("name"));
+            liveInfo.guide(null); liveInfo.audio("Audio: oczekiwanie na ścieżkę");
+            root.addView(liveInfo,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+        }
         // The top bar follows the player controls everywhere: films and series hide it together with the controls, like live TV.
-        view.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener)(visibility -> { if(!isInPictureInPictureMode()) toolbar.setVisibility(visibility); }));
+        view.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener)(visibility -> { if(liveInfo==null && !isInPictureInPictureMode()) toolbar.setVisibility(visibility); }));
         if(onDemand && !television) view.setControllerShowTimeoutMs(4000);
         if(!television && !onDemand) {
             view.setShowPreviousButton(true); view.setShowNextButton(true); view.setShowRewindButton(false); view.setShowFastForwardButton(false);
@@ -165,9 +174,23 @@ public class PlayerActivity extends Activity {
         full.setText(fullscreen?"↙":"⤢");
     }
     private void revealLiveControls() {
+        if(liveInfo!=null) { showLiveInfo(); return; }
         if(view==null || television || onDemand || !resumed || isFinishing() || enteringPip || isInPictureInPictureMode()) return;
         view.showController();
     }
+    private void setLiveInfoVisible(boolean visible) {
+        if(liveInfo==null) return;
+        liveInfo.setVisibility(visible?View.VISIBLE:View.GONE); toolbar.setVisibility(visible?View.VISIBLE:View.GONE);
+        infoHandler.removeCallbacks(hideInfo);
+    }
+    private void showLiveInfo() {
+        if(liveInfo==null || !resumed || isFinishing()) return;
+        setLiveInfoVisible(true); liveInfo.update();
+        if(player!=null) liveInfo.audio(PlaybackAudio.description(player.getCurrentTracks()));
+        GuideRepository.get(this).request(liveChannel(),false,data -> { if(resumed && !isDestroyed() && liveInfo!=null) liveInfo.guide(data); });
+        infoHandler.postDelayed(hideInfo,6500);
+    }
+    @Override public void onBackPressed() { if(liveInfo!=null && liveInfo.getVisibility()==View.VISIBLE) { setLiveInfoVisible(false); return; } super.onBackPressed(); }
     @Override public boolean dispatchTouchEvent(MotionEvent event) {
         if(adjustments!=null) {
             int result=adjustments.touch(event,view,toolbar,resumed && fullscreen && !enteringPip && !isInPictureInPictureMode() && !error.isShown());
@@ -186,7 +209,9 @@ public class PlayerActivity extends Activity {
         labels.add("Cofnij o 30 sekund");
         if(adjustments!=null) labels.add("Głośność i jasność");
         labels.add("Połączenie internetowe");
+        if(television) labels.add("Zgodność dźwięku");
         new AlertDialog.Builder(this).setTitle("Opcje odtwarzania").setAdapter(optionRows(labels),(d,i) -> {
+            if(labels.get(i).equals("Zgodność dźwięku")) { chooseAudioOutput(); return; }
             if(labels.get(i).equals("Połączenie internetowe")) { PlaybackSettings.choose(this,() -> {
                 boolean playing=player!=null && player.getPlayWhenReady();
                 TrackSelectionParameters selections=player==null?null:player.getTrackSelectionParameters();
@@ -211,6 +236,20 @@ public class PlayerActivity extends Activity {
                 case 5: if(RecordingService.active) stopService(new android.content.Intent(this,RecordingService.class)); else chooseRecording(); break;
             }
         }).show();
+    }
+    private void chooseAudioOutput() {
+        boolean previous=PlaybackAudio.pcm(this);
+        new AlertDialog.Builder(this).setTitle("Zgodność dźwięku")
+            .setSingleChoiceItems(new String[]{"Automatycznie · HDMI / Dolby","Stereo PCM · gdy brak dźwięku"},previous?1:0,(dialog,index) -> {
+                dialog.dismiss(); if(previous==(index==1)) return;
+                PlaybackAudio.pcm(this,index==1);
+                if(player==null) return;
+                boolean playing=player.getPlayWhenReady(); position=onDemand?player.getCurrentPosition():0;
+                TrackSelectionParameters tracks=player.getTrackSelectionParameters().buildUpon().clearOverridesOfType(C.TRACK_TYPE_AUDIO).setTrackTypeDisabled(C.TRACK_TYPE_AUDIO,false)
+                    .setMaxAudioChannelCount(Integer.MAX_VALUE).setPreferredAudioMimeTypes().build();
+                closeRecovery(); view.setPlayer(null); player.release(); player=null; stopStreamObservation(); error.setVisibility(View.GONE);
+                startPlayback(); player.setTrackSelectionParameters(PlaybackAudio.tracks(this,PlaybackSettings.tracks(this,tracks))); if(!playing) player.pause();
+            }).setNegativeButton("Zamknij",null).show();
     }
     /** Options as large rows with an icon and a one-line hint; labels stay exact for accessibility services. */
     private ListAdapter optionRows(List<String> labels) {
@@ -308,7 +347,7 @@ public class PlayerActivity extends Activity {
         }
     }
     @Override protected void onResume() { super.onResume(); resumed=true; if(!isInPictureInPictureMode()) { updateFullscreen(); revealLiveControls(); } }
-    @Override protected void onPause() { resumed=false; if(adjustments!=null) adjustments.dismissFeedback(); saveWatchProgress(); if(rotation!=null) rotation.disable(); super.onPause(); }
+    @Override protected void onPause() { resumed=false; infoHandler.removeCallbacks(hideInfo); if(adjustments!=null) adjustments.dismissFeedback(); saveWatchProgress(); if(rotation!=null) rotation.disable(); super.onPause(); }
     @Override protected void onStart() { super.onStart(); startPlayback(); }
     private void startPlayback() {
         if(url==null) return;
@@ -317,20 +356,23 @@ public class PlayerActivity extends Activity {
         PlaybackHandoff.Transfer transfer=!television && !onDemand?PlaybackHandoff.take(token,url):null;
         if(transfer!=null) { player=transfer.player(); streamObserved=true; }
         else {
-            ExoPlayer.Builder builder=new ExoPlayer.Builder(!television && !onDemand?getApplicationContext():this);
+            android.content.Context playbackContext=!television && !onDemand?getApplicationContext():this;
+            ExoPlayer.Builder builder=television?new ExoPlayer.Builder(playbackContext,PlaybackAudio.renderers(this)):new ExoPlayer.Builder(playbackContext);
             builder.setLoadControl(PlaybackSettings.loadControl(this));
             builder.setMediaSourceFactory(PlaybackNetwork.sources(this,onDemand?null:liveChannel()));
-            if(!television && !onDemand) builder.setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),true).setHandleAudioBecomingNoisy(true);
+            if(television || !onDemand) builder.setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),true).setHandleAudioBecomingNoisy(true);
             player=builder.build();
             GuideRepository.get(this).streamStarted(liveChannel()); streamObserved=true;
         }
         player.setTrackSelectionParameters(PlaybackSettings.tracks(this,player.getTrackSelectionParameters()));
+        if(television) player.setTrackSelectionParameters(PlaybackAudio.tracks(this,player.getTrackSelectionParameters()));
         final ExoPlayer current=player; view.setPlayer(!television && !onDemand?channelControls(player):player);
         if(!television && !onDemand) describeChannelButtons();
         playbackListener=new Player.Listener() {
+            @Override public void onTracksChanged(Tracks tracks) { if(player==current && liveInfo!=null) liveInfo.audio(PlaybackAudio.description(tracks)); }
             @Override public void onPlayerError(PlaybackException e) {
                 if(player!=current) return;
-                message.setText("Nie można odtworzyć materiału. Sprawdź internet, dostępność źródła lub kodeki telefonu.\nKod: "+e.getErrorCodeName());
+                message.setText("Nie można odtworzyć materiału. Sprawdź internet, dostępność źródła lub kodeki urządzenia.\nKod: "+e.getErrorCodeName());
                 error.setVisibility(View.VISIBLE);
             }
         }; player.addListener(playbackListener);
@@ -355,6 +397,10 @@ public class PlayerActivity extends Activity {
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         int code=event.getKeyCode();
+        if(liveInfo!=null && (code==KeyEvent.KEYCODE_DPAD_CENTER || code==KeyEvent.KEYCODE_ENTER || code==KeyEvent.KEYCODE_INFO)) {
+            if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled()) { if(code!=KeyEvent.KEYCODE_INFO && liveInfo.getVisibility()==View.VISIBLE) setLiveInfoVisible(false); else showLiveInfo(); }
+            return true;
+        }
         if(television && (code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || code==KeyEvent.KEYCODE_MEDIA_PLAY || code==KeyEvent.KEYCODE_MEDIA_PAUSE || code==KeyEvent.KEYCODE_MEDIA_STOP)) {
             // Consume DOWN as well as UP before the window can send it to another media app.
             if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled()) {
@@ -411,6 +457,7 @@ public class PlayerActivity extends Activity {
         super.onStop();
     }
     @Override protected void onDestroy() {
+        infoHandler.removeCallbacksAndMessages(null);
         if(adjustments!=null) adjustments.dismissFeedback();
         if(player!=null) { saveWatchProgress(); closeRecovery(); view.setPlayer(null); player.release(); player=null; }
         stopStreamObservation();

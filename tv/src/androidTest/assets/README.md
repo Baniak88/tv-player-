@@ -1,1 +1,3 @@
 `multitrack.mkv` is a generated 90-second 160×90 solid-color H.264 video with two silent AAC tracks (Polski/English) and two embedded SubRip subtitle tracks. It contains no third-party media. Used only in the instrumentation APK to test real Media3 track selection, decoded cues, seeking and buffer changes. It is not included in the installed application APK.
+
+`audio-compat.mkv` is a generated 20-second 160×90 solid-color H.264 video with an AC-3 440 Hz tone marked default and an AAC 880 Hz alternative. It tests PCM compatibility, audio decoding counters and the live information overlay. No provider media is included.
