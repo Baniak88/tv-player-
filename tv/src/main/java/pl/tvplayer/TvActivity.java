@@ -281,7 +281,7 @@ public final class TvActivity extends Activity {
             if(event.getAction()==KeyEvent.ACTION_DOWN && event.getRepeatCount()==0) chooseGroup(bouquets.getSelectedItemPosition(),true);
             return true;
         });
-        int sidebar=section.equals("tv") || !seriesTitle.isEmpty() || catalogGrid?(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density>=1100?220:200):0;
+        int sidebar=section.equals("tv") || !seriesTitle.isEmpty()?(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density>=1100?220:200):0;
         if(sidebar==0) bouquets.setVisibility(View.GONE);
         split.addView(bouquets,new LinearLayout.LayoutParams(dp(sidebar),-1));
         FrameLayout catalog=new FrameLayout(this);
