@@ -16,7 +16,7 @@ public final class M3uParser {
     public static List<Channel> parse(Reader source, String baseUrl) throws IOException {
         BufferedReader reader = source instanceof BufferedReader ? (BufferedReader) source : new BufferedReader(source);
         List<Channel> channels = new ArrayList<>();
-        String name = "", group = "Bez kategorii", epg = "", logo = "", xmltv = "";
+        String name = "", group = "Bez kategorii", epg = "", logo = "", xmltv = "", kind="";
         String raw;
         while ((raw = reader.readLine()) != null) {
             String line = raw.replace("\uFEFF", "").trim();
@@ -38,13 +38,19 @@ public final class M3uParser {
                     if (line.charAt(i) == ',' && !quoted) { comma = i; break; }
                 }
                 name = comma >= 0 ? line.substring(comma + 1).trim() : "Kanał";
-                group = "Bez kategorii"; epg = ""; logo = "";
+                group = "Bez kategorii"; epg = ""; logo = ""; kind="";
                 Matcher matcher = ATTRIBUTE.matcher(comma >= 0 ? line.substring(0, comma) : line);
                 while (matcher.find()) {
                     if (matcher.group(1).equals("group-title")) group = matcher.group(2);
                     if (matcher.group(1).equals("tvg-id")) epg = matcher.group(2);
                     if (matcher.group(1).equals("tvg-logo")) logo = matcher.group(2);
                     if (matcher.group(1).equals("tvg-name") && name.isEmpty()) name = matcher.group(2);
+                    if (matcher.group(1).equals("tvg-type") || matcher.group(1).equals("stream-type") || matcher.group(1).equals("type")) {
+                        String type=matcher.group(2).toLowerCase(java.util.Locale.ROOT);
+                        if(type.equals("movie") || type.equals("vod")) kind="movie";
+                        else if(type.equals("episode")) kind="episode";
+                        else if(type.equals("live") || type.equals("tv")) kind="tv";
+                    }
                 }
             } else if (line.startsWith("#EXTGRP:")) {
                 group = line.substring(8).trim();
@@ -53,10 +59,10 @@ public final class M3uParser {
                     URI uri = baseUrl == null ? URI.create(line) : URI.create(baseUrl).resolve(line);
                     if ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) {
                         channels.add(new Channel(name.isEmpty() ? "Kanał " + (channels.size() + 1) : name,
-                                uri.toString(), group.isEmpty() ? "Bez kategorii" : group, epg).withLogo(logo).withGuideSource(xmltv));
+                                uri.toString(), group.isEmpty() ? "Bez kategorii" : group, epg,kind).withLogo(logo).withGuideSource(xmltv));
                     }
                 } catch (IllegalArgumentException ignored) { }
-                name = ""; group = "Bez kategorii"; epg = ""; logo = "";
+                name = ""; group = "Bez kategorii"; epg = ""; logo = ""; kind="";
             }
         }
         return channels;

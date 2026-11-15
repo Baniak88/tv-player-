@@ -1,10 +1,10 @@
-# OKTV Player TV 0.9.4 Preview — instalacja
+# OKTV Player TV 0.9.5 Preview — instalacja
 
 **Chromebook:** pobierz `OKTV-FireStick-Chromebook.zip` i skorzystaj z [instrukcji terminala Linux](CHROMEBOOK-FIRESTICK.md). Paczka zawiera APK i instalator ADB sprawdzający adres urządzenia, sumę APK i wynik aktualizacji.
 
 ## Fire TV Stick 4K
 
-Użyj przygotowanego pliku **OKTV-Player-TV-0.9.4-preview.apk** lub paczki Chromebooka. Obsługiwane są Fire OS 6+ i Android TV 7.1+, w tym pierwsza generacja Sticka 4K. APK nie działa na Vega OS / 4K Select.
+Użyj przygotowanego pliku **OKTV-Player-TV-0.9.5-preview.apk** lub paczki Chromebooka. Obsługiwane są Fire OS 6+ i Android TV 7.1+, w tym pierwsza generacja Sticka 4K. APK nie działa na Vega OS / 4K Select.
 
 1. Pobierz APK w przeglądarce zalogowanej do GitHuba. Repozytorium jest prywatne — otwarcie linku w niezalogowanym Downloaderze może pokazać 404.
 2. Prześlij plik na Fire TV. Włącz instalowanie aplikacji z używanego instalatora, następnie otwórz APK i zainstaluj TV Player.
@@ -18,7 +18,7 @@ Z komputera z Android platform-tools można użyć:
 
 ```sh
 adb connect ADRES_IP_FIRE_TV:5555
-adb -s ADRES_IP_FIRE_TV:5555 install -r OKTV-Player-TV-0.9.4-preview.apk
+adb -s ADRES_IP_FIRE_TV:5555 install -r OKTV-Player-TV-0.9.5-preview.apk
 ```
 
 Pilot: strzałki i OK wybierają pozycję. Menu lub przytrzymanie OK otwiera EPG i ulubione. Wstecz wraca. Odtwarzacz pozostaje poziomy i reaguje na przyciski multimedialne. TV pobiera się jako pierwsze; duże katalogi filmów i seriali dopiero po wybraniu sekcji. Wersja TV ma osobną, szyfrowaną bibliotekę, niezależną od aplikacji telefonu.

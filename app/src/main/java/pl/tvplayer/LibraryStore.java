@@ -16,7 +16,7 @@ import javax.crypto.spec.GCMParameterSpec;
 final class LibraryStore {
     private static final Object LOCK=new Object();
     /** Bumped when Channel classification changes and saved sections must be re-partitioned. */
-    private static final String KINDS_VERSION="2";
+    private static final String KINDS_VERSION="3";
     /** Decrypted sections shared by all screens; keyed by file name and validated by size and time. */
     private static final Map<String,Cached> CACHE=Collections.synchronizedMap(new HashMap<>());
     private static final class Cached {
@@ -189,6 +189,7 @@ final class LibraryStore {
             String current=generation();
             if(current==null) {
                 List<Channel> old=loadLegacy(favorites);
+                for(int i=0;i<old.size();i++) old.set(i,Channel.repairKind(old.get(i)));
                 if(!old.isEmpty() || !favorites.isEmpty()) { save(old,favorites); loadedFingerprints.put(section,fingerprint("catalog-"+generation()+"-"+section+".enc")); }
                 List<Channel> result=new ArrayList<>(); for(Channel c:old) if(c.section().equals(section)) result.add(c);
                 return result;
@@ -196,7 +197,8 @@ final class LibraryStore {
             if(!kindsCurrent()) {
                 // One-time repair: live channels named "… Film" were stored in the movie section.
                 List<Channel> all=new ArrayList<>(); Set<String> stars=new HashSet<>();
-                for(String part:new String[]{"tv","movie","series"}) for(Channel c:decodeSection(current,part)) all.add(Channel.repairKind(c));
+                boolean v2=kindVersion().equals("2");
+                for(String part:new String[]{"tv","movie","series"}) for(Channel c:decodeSection(current,part)) all.add(v2?Channel.repairMovieBouquet(c):Channel.repairKind(c));
                 readFavorites(stars); save(all,stars); current=generation();
             }
             List<Channel> result=readSection(current,section);
@@ -221,9 +223,9 @@ final class LibraryStore {
         }
     }
     private boolean kindsCurrent() {
-        try { return KINDS_VERSION.equals(new String(file("catalog.kinds").readFully(),StandardCharsets.UTF_8).trim()); }
-        catch(IOException missing) { return false; }
+        return KINDS_VERSION.equals(kindVersion());
     }
+    private String kindVersion() { try { return new String(file("catalog.kinds").readFully(),StandardCharsets.UTF_8).trim(); } catch(IOException missing) { return ""; } }
     private List<Channel> readSection(String generation,String section) throws Exception {
         String name="catalog-"+generation+"-"+section+".enc"; File source=new File(context.getFilesDir(),name);
         Cached cached=CACHE.get(name); List<Channel> hit=cached==null?null:cached.valid(source);

@@ -48,7 +48,7 @@ public class TvSettingsTest {
     }
     @Test public void searchFavoritesAndAllBouquetOrdersWork() throws Exception {
         key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("TV catalog missing",() -> find(home.getWindow().getDecorView(),"Sport")!=null);
-        for(int i=0;i<BouquetOrder.LABELS.length;i++) { click("Sortuj"); click(BouquetOrder.LABELS[i]); assertEquals(BouquetOrder.MODES[i],home.getPreferences(0).getString("sort-tv","")); }
+        for(int i=0;i<BouquetOrder.LABELS.length;i++) { click("Opcje"); click("Sortuj"); click(BouquetOrder.LABELS[i]); assertEquals(BouquetOrder.MODES[i],home.getPreferences(0).getString("sort-tv","")); }
         click("Szukaj"); text("Beta"); click("Szukaj");
         waitFor("Search result missing",() -> find(home.getWindow().getDecorView(),"Beta")!=null); assertNull(find(home.getWindow().getDecorView(),"Alfa"));
         click("☆ Ulubione"); assertNotNull(find(home.getWindow().getDecorView(),"Beta"));

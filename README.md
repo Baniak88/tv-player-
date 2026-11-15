@@ -1,8 +1,8 @@
 # TV Player — Android
 
-Wersja TV: **OKTV Player TV 0.9.4-preview**. [Prosta instalacja z terminala Chromebooka na Fire Stick](CHROMEBOOK-FIRESTICK.md). [Pozostałe sposoby instalacji na TV](TV-INSTALL.md). [Wygląd interfejsu na bazie OKTV 1.1.6](OKTV-TV-0.9.3.md).
+Wersja TV: **OKTV Player TV 0.9.5-preview**. [Prosta instalacja z terminala Chromebooka na Fire Stick](CHROMEBOOK-FIRESTICK.md). [Pozostałe sposoby instalacji na TV](TV-INSTALL.md). [Wygląd interfejsu na bazie OKTV 1.1.6](OKTV-TV-0.9.3.md).
 
-[Zakres i wyniki testów wersji TV 0.9.4](TEST-TV-0.9.4.md).
+[Zmiany katalogu TV 0.9.5](OKTV-TV-0.9.5.md). [Poprzedni raport testów 0.9.4](TEST-TV-0.9.4.md).
 
 Pierwsza wersja natywnego odtwarzacza IPTV po polsku na telefony z Androidem 8.0 lub nowszym.
 
