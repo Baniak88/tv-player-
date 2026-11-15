@@ -26,7 +26,7 @@ public class SeriesActivityTest {
         new LibraryStore(context()).save(Collections.emptyList(),Collections.emptySet());
         server=new MockWebServer(); server.setDispatcher(new Dispatcher() {
             @Override public MockResponse dispatch(RecordedRequest request) {
-                if(request.getPath().contains("player_api.php")) { attempts++; if(failFirst && attempts==1) return new MockResponse().setResponseCode(503); return new MockResponse().setHeader("Content-Type","application/json").setBody(empty?"{\"info\":null,\"episodes\":[]}":fixture()); }
+                if(request.getPath().contains("player_api.php")) { attempts++; if(failFirst && attempts<=2) return new MockResponse().setResponseCode(503); return new MockResponse().setHeader("Content-Type","application/json").setBody(empty?"{\"info\":null,\"episodes\":[]}":fixture()); }
                 if(request.getPath().contains(".png")) return new MockResponse().setHeader("Content-Type","image/png").setBody(new okio.Buffer().write(artwork()));
                 return new MockResponse().setResponseCode(404);
             }
@@ -79,7 +79,7 @@ public class SeriesActivityTest {
         WatchProgress.save(context(),url,2820000,2820000,true); SeriesDetails detail=SeriesDetails.parse(new java.io.StringReader(fixture()),source()); assertEquals(201, Integer.parseInt(WatchProgress.next(context(),detail.allEpisodes()).channel().url().replaceFirst(".*[/]","").replace(".mp4","")));
     }
     @Test public void connectionFailureCanRetryAndEmptyProviderDataStaysReadable() throws Exception {
-        failFirst=true; empty=true; start(false); waitText("Spróbuj ponownie"); instrument().runOnMainSync(() -> find(root(),"Spróbuj ponownie").performClick()); waitText("Dostawca nie udostępnił odcinków tego serialu."); assertNotNull(find(root(),"Opis nie został udostępniony przez dostawcę.")); assertFalse(find(root(),"▶  Odtwórz").isEnabled()); assertEquals(2,attempts);
+        failFirst=true; empty=true; start(false); waitText("Spróbuj ponownie"); assertEquals("Transient failure must retry once before showing the retry action",2,attempts); instrument().runOnMainSync(() -> find(root(),"Spróbuj ponownie").performClick()); waitText("Dostawca nie udostępnił odcinków tego serialu."); assertNotNull(find(root(),"Opis nie został udostępniony przez dostawcę.")); assertFalse(find(root(),"▶  Odtwórz").isEnabled()); assertEquals(3,attempts);
     }
     @Test public void singleSeasonDoesNotOpenAPopupAndCacheSurvivesMemoryEviction() throws Exception {
         single=true; start(false); waitText("1. Rywale"); waitText("Sezon 1"); View label=find(root(),"Sezon 1"); assertFalse(label.isClickable()); assertNull(type(root(),Spinner.class)); screenshot("series-single-season.png");
