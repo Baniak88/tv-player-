@@ -34,7 +34,10 @@ public class TvSettingsTest {
         assertFalse(PlaybackSettings.weakInternet(context())); assertEquals(Integer.MAX_VALUE,PlaybackSettings.tracks(context(),weak).maxVideoBitrate);
     }
     private void text(String value) throws Exception {
-        AccessibilityNodeInfo root=instrument().getUiAutomation().getRootInActiveWindow(); AccessibilityNodeInfo input=findInput(root); assertNotNull("No XMLTV input",input);
+        // The dialog opens asynchronously; wait for its field instead of reading the active window once.
+        AccessibilityNodeInfo input=null; long until=android.os.SystemClock.elapsedRealtime()+5000;
+        while(input==null && android.os.SystemClock.elapsedRealtime()<until) { input=findInput(instrument().getUiAutomation().getRootInActiveWindow()); if(input==null) Thread.sleep(100); }
+        assertNotNull("No XMLTV input",input);
         android.os.Bundle args=new android.os.Bundle(); args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,value); assertTrue(input.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,args)); instrument().waitForIdleSync();
     }
     private AccessibilityNodeInfo findInput(AccessibilityNodeInfo node) { if(node==null) return null; if("android.widget.EditText".contentEquals(node.getClassName())) return node; for(int i=0;i<node.getChildCount();i++) { AccessibilityNodeInfo hit=findInput(node.getChild(i)); if(hit!=null) return hit; } return null; }
