@@ -328,7 +328,9 @@ public final class TvActivity extends Activity {
         LinearLayout split=new LinearLayout(this);
         rail=new ListView(this); rail.setId(View.generateViewId()); rail.setDivider(null); rail.setSelector(catalogCursor()); rail.setDrawSelectorOnTop(true); rail.setItemsCanFocus(false); rail.setPadding(0,0,dp(10),0);
         rail.setOnItemClickListener((parent,view,position,id) -> openRail(position));
-        rail.setFocusable(false); rail.setOnFocusChangeListener((view,focused) -> { if(!focused) view.setFocusable(false); });
+        // Netflix style: the category list slides in with Left on the first card and hides again when focus leaves it,
+        // so the shelves keep their full width and their remembered card.
+        rail.setFocusable(false); rail.setVisibility(View.GONE); rail.setOnFocusChangeListener((view,focused) -> { if(!focused) { view.setFocusable(false); view.setVisibility(View.GONE); } });
         rail.setOnKeyListener((view,key,event) -> {
             if(key!=KeyEvent.KEYCODE_DPAD_RIGHT) return false;
             if(event.getAction()==KeyEvent.ACTION_DOWN && event.getRepeatCount()==0 && shelves!=null) shelves.focusCurrent();
@@ -461,7 +463,7 @@ public final class TvActivity extends Activity {
             boolean focus=catalogReady && (firstFocus || anchor.contentFocus()); shelves.submit(data,anchor,focus); if(!focus && pendingLocation!=null) focusNavigation(); if(catalogReady) pendingLocation=null;
             if(emptyState!=null) emptyState.setVisibility(catalogReady && shown.isEmpty()?View.VISIBLE:View.GONE);
             heading.setText(title(section)+(onlyFavorites?" · Moja lista":"")+(group.isEmpty()?"":" · "+group));
-            status.setText(busy?"Wczytywanie biblioteki…":Ui.count(shown.size())+" pozycji · ←→ okładki · ↑↓ kategorie · OK szczegóły · Wstecz nawigacja"); return;
+            status.setText(busy?"Wczytywanie biblioteki…":Ui.count(shown.size())+" pozycji · ← na pierwszej okładce: lista kategorii · ↑↓ rzędy · OK szczegóły"); return;
         }
         if(list==null) return;
         if(rows!=null) rows.notifyDataSetChanged(); if(covers!=null) covers.notifyDataSetChanged();
@@ -601,7 +603,7 @@ public final class TvActivity extends Activity {
         // The category list is reached only on purpose: Left on the first card of a shelf. It never takes initial focus,
         // so returning from a category grid restores the previously selected card.
         if(code==KeyEvent.KEYCODE_DPAD_LEFT && rail!=null && shelves!=null && shelves.hasFocus() && shelves.index()==0) {
-            if(event.getAction()==KeyEvent.ACTION_DOWN) { rail.setFocusable(true); rail.requestFocus(); }
+            if(event.getAction()==KeyEvent.ACTION_DOWN) { rail.setVisibility(View.VISIBLE); rail.setFocusable(true); rail.requestFocus(); }
             return true;
         }
         if((!home || shelves!=null) && (code==KeyEvent.KEYCODE_MEDIA_PLAY || code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
