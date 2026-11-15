@@ -139,7 +139,7 @@ final class LivePreview {
     }
     private void release() {
         closeRecovery();
-        activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if(!television) activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if(player!=null) { video.setPlayer(null); if(listener!=null) player.removeListener(listener); player.release(); player=null; listener=null; }
         if(observing && channel!=null) { GuideRepository.get(activity).streamStopped(channel); observing=false; }
         notice.setVisibility(View.GONE);

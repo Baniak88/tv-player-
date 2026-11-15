@@ -97,6 +97,7 @@ public class TvStreamingNavigationTest {
         assertNotNull("Movie details missing",child); remote(KeyEvent.KEYCODE_BACK); waitSelected(selected);
         recreate(); waitSelected(selected);
         click("TV"); waitFor("TV tab missing",() -> { try { return field(home,"section").equals("tv") && (Boolean)field(home,"catalogReady") && !((List<?>)field(home,"shown")).isEmpty(); } catch(Exception e) { return false; } }); click("Filmy"); waitSelected(selected);
+        assertTrue("Closing the TV preview must retain the TV shell's screen-on policy",(home.getWindow().getAttributes().flags & WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)!=0);
         for(int i=0;i<21;i++) remote(KeyEvent.KEYCODE_DPAD_RIGHT); waitFor("More card missing",() -> { try { return shelves().index()==24; } catch(Exception e) { return false; } });
         remote(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Complete bouquet missing",() -> { try { return ((List<?>)field(home,"shown")).size()==30 && field(home,"shelves")==null; } catch(Exception e) { return false; } });
         remote(KeyEvent.KEYCODE_BACK); waitFor("Back lost the shelf more card",() -> { try { return shelves()!=null && shelves().hasFocus() && shelves().index()==24; } catch(Exception e) { return false; } }); assertFalse((Boolean)field(home,"home"));

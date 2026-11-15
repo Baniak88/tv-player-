@@ -62,10 +62,12 @@ public class TvCatalogUsabilityTest {
         home=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
         home.getPreferences(0).edit().remove("list-movie").remove("list-series").commit();
         waitFor("Home missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null); waitFor("Home has no focus",home::hasWindowFocus);
+        waitHomeShortcut();
         try { waitFor("Window/resources did not apply requested viewport "+viewportWidth+" at density 160",() -> {
             boolean[] ready={false}; instrument().runOnMainSync(() -> { android.util.DisplayMetrics metrics=home.getResources().getDisplayMetrics(); ready[0]=metrics.widthPixels==viewportWidth && metrics.densityDpi==160 && home.getWindow().getDecorView().getWidth()==viewportWidth; }); return ready[0];
         }); } catch(AssertionError failure) { android.util.DisplayMetrics metrics=home.getResources().getDisplayMetrics(); throw new AssertionError(failure.getMessage()+"; actual resources="+metrics.widthPixels+"x"+metrics.heightPixels+", density="+metrics.densityDpi+", window="+home.getWindow().getDecorView().getWidth()+"x"+home.getWindow().getDecorView().getHeight(),failure); }
     }
+    private void waitHomeShortcut() throws Exception { waitFor("Home shortcut is not ready",() -> { try { TvShelfView shelf=(TvShelfView)field(home,"shelves"); return home.hasWindowFocus() && (Boolean)field(home,"home") && shelf!=null && shelf.hasFocus() && shelf.selected()!=null && shelf.selected().url().equals("section:tv"); } catch(Exception e) { return false; } }); }
     private void screenshot(String name) {
         instrument().runOnMainSync(() -> { View root=home.getWindow().getDecorView(); Bitmap bitmap=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap)); try(FileOutputStream out=context().openFileOutput(name,0)) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } catch(Exception e) { throw new AssertionError(e); } finally { bitmap.recycle(); } });
     }
@@ -86,7 +88,7 @@ public class TvCatalogUsabilityTest {
             screenshot("tv096-live-"+width+".png");
             key(KeyEvent.KEYCODE_BACK); assertFalse(list.hasFocus()); assertNotNull(find(home.getWindow().getDecorView(),"UK| SKY CINEMA ACTION FHD 1")); key(KeyEvent.KEYCODE_BACK);
             assertNotNull(node("Nawigacja")); key(KeyEvent.KEYCODE_BACK); key(KeyEvent.KEYCODE_DPAD_UP); key(KeyEvent.KEYCODE_DPAD_UP); key(KeyEvent.KEYCODE_DPAD_LEFT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Home action missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null);
-            key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Real film missing",() -> find(home.getWindow().getDecorView(),"Ostatni rejs – wersja reżyserska (2024) · 1")!=null);
+            waitHomeShortcut(); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Real film missing",() -> { try { return home.hasWindowFocus() && !(Boolean)field(home,"home") && field(home,"section").equals("movie") && (Boolean)field(home,"catalogReady") && find(home.getWindow().getDecorView(),"Ostatni rejs – wersja reżyserska (2024) · 1")!=null; } catch(Exception e) { return false; } });
             TvShelfView shelves=(TvShelfView)field(home,"shelves"); assertNotNull("Movies must use category shelves",shelves); waitFor("Shelf has no remote focus",shelves::hasFocus);
             instrument().runOnMainSync(() -> { View hero=shelves.getLayoutManager().findViewByPosition(0); assertNotNull("Selected title banner must remain visible",hero); assertTrue("Selected title banner was clipped",hero.getTop()>=0); });
             assertNull(find(home.getWindow().getDecorView(),"UK| SKY CINEMA ACTION FHD 1")); screenshot("tv096-movies-"+width+".png");

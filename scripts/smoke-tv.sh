@@ -3,7 +3,7 @@ set -euo pipefail
 mkdir -p tv-smoke-output
 failures=0
 cleanup() {
-  adb logcat -d -v brief -s AndroidRuntime TestRunner SeriesRemote > tv-smoke-output/runtime.txt
+  adb logcat -d -v brief -s AndroidRuntime TestRunner SeriesRemote TvTestUi StreamingState > tv-smoke-output/runtime.txt
   tail -n 200 tv-smoke-output/runtime.txt
   for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup tv096-streaming-home tv096-shelves tv096-bouquet-return tv096-streaming-series tv096-streaming-seasons tv096-failure tv096-live-info tv096-live-960 tv096-live-1280 tv096-movies-960 tv096-movies-1280 tv096-movies-list-960 tv096-movies-list-1280 tv096-series-960 tv096-episodes-960; do
     adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png" || true
