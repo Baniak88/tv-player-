@@ -38,7 +38,7 @@ public final class TvActivity extends Activity {
     private LinearLayout page,body;
     private TextView status,heading,selectionInfo;
     private LinearLayout navigation;
-    private ListView bouquets,list;
+    private ListView bouquets,list,rail;
     private GridView posters;
     private BaseAdapter rows,covers;
     private TvShelfView shelves;
@@ -180,7 +180,7 @@ public final class TvActivity extends Activity {
             public void navigation() { focusNavigation(); }
         });
     }
-    private void clearCatalogViews() { if(livePreview!=null) { livePreview.destroy(); livePreview=null; } shelves=null; emptyState=null; list=null; posters=null; bouquets=null; rows=null; covers=null; selectionInfo=null; }
+    private void clearCatalogViews() { if(livePreview!=null) { livePreview.destroy(); livePreview=null; } shelves=null; emptyState=null; list=null; posters=null; bouquets=null; rail=null; rows=null; covers=null; selectionInfo=null; }
     private void openCard(Channel channel) { if(channel.url().startsWith("section:")) open(channel.url().substring(8)); else if(channel.url().equals("action:resume")) restoreLocation(readLocation(navigationStore().getString("last-browse",""))); else select(channel); }
     private void showHome() {
         busy=false; generation++;
@@ -281,7 +281,7 @@ public final class TvActivity extends Activity {
             if(event.getAction()==KeyEvent.ACTION_DOWN && event.getRepeatCount()==0) chooseGroup(bouquets.getSelectedItemPosition(),true);
             return true;
         });
-        int sidebar=section.equals("tv") || !seriesTitle.isEmpty()?(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density>=1100?220:200):0;
+        int sidebar=section.equals("tv") || !seriesTitle.isEmpty() || catalogGrid?(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density>=1100?220:200):0;
         if(sidebar==0) bouquets.setVisibility(View.GONE);
         split.addView(bouquets,new LinearLayout.LayoutParams(dp(sidebar),-1));
         FrameLayout catalog=new FrameLayout(this);
@@ -323,12 +323,38 @@ public final class TvActivity extends Activity {
     private void showStreamingCatalog() {
         clearCatalogViews(); addNavigation();
         LinearLayout filters=new LinearLayout(this); filters.setGravity(Gravity.CENTER_VERTICAL);
-        heading=text(title(section),22,Ui.TEXT); heading.setTypeface(null,Typeface.BOLD); filters.addView(heading,new LinearLayout.LayoutParams(0,dp(42),1));
-        Button categories=button("Kategorie",this::categories),favoritesButton=button("Moja lista",() -> { onlyFavorites=!onlyFavorites; filter(); });
-        categories.setTextSize(15); favoritesButton.setTextSize(15); filters.addView(categories,new LinearLayout.LayoutParams(dp(136),dp(38))); filters.addView(favoritesButton,new LinearLayout.LayoutParams(dp(136),dp(38))); body.addView(filters);
+        heading=text(title(section),22,Ui.TEXT); heading.setTypeface(null,Typeface.BOLD); filters.addView(heading,new LinearLayout.LayoutParams(0,dp(42),1)); body.addView(filters);
+        // Canal+ style: categories always visible on the left, Netflix style shelves on the right.
+        LinearLayout split=new LinearLayout(this);
+        rail=new ListView(this); rail.setId(View.generateViewId()); rail.setDivider(null); rail.setSelector(catalogCursor()); rail.setDrawSelectorOnTop(true); rail.setItemsCanFocus(false); rail.setPadding(0,0,dp(10),0);
+        rail.setOnItemClickListener((parent,view,position,id) -> openRail(position));
+        rail.setOnKeyListener((view,key,event) -> {
+            if(key!=KeyEvent.KEYCODE_DPAD_RIGHT) return false;
+            if(event.getAction()==KeyEvent.ACTION_DOWN && event.getRepeatCount()==0 && shelves!=null) shelves.focusCurrent();
+            return true;
+        });
+        split.addView(rail,new LinearLayout.LayoutParams(dp(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density>=1100?230:200),-1));
         FrameLayout content=new FrameLayout(this); shelves=createShelves(); content.addView(shelves,new FrameLayout.LayoutParams(-1,-1));
-        emptyState=text("Brak pozycji. Wybierz kategorię lub odśwież źródło.",19,Ui.MUTED); emptyState.setGravity(Gravity.CENTER); content.addView(emptyState,new FrameLayout.LayoutParams(-1,-1)); body.addView(content,new LinearLayout.LayoutParams(-1,0,1)); filter();
+        emptyState=text("Brak pozycji. Wybierz kategorię lub odśwież źródło.",19,Ui.MUTED); emptyState.setGravity(Gravity.CENTER); content.addView(emptyState,new FrameLayout.LayoutParams(-1,-1));
+        split.addView(content,new LinearLayout.LayoutParams(0,-1,1)); body.addView(split,new LinearLayout.LayoutParams(-1,0,1)); bindRail(); filter();
         for(int i=0;i<navigation.getChildCount();i++) navigation.getChildAt(i).setOnKeyListener((v,code,event) -> { if(code==KeyEvent.KEYCODE_DPAD_DOWN) { if(event.getAction()==KeyEvent.ACTION_DOWN) shelves.focusCurrent(); return true; } return false; });
+    }
+    /** Left category list for films and series: all, my list, then the provider's categories. */
+    private void bindRail() {
+        if(rail==null) return;
+        List<String> labels=new ArrayList<>(); labels.add("Wszystkie"); labels.add("★ Moja lista"); labels.addAll(groups);
+        rail.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,labels) {
+            @Override public View getView(int p,View reused,ViewGroup parent) {
+                TextView row=(TextView)super.getView(p,reused,parent); boolean active=p==0?!onlyFavorites:p==1 && onlyFavorites;
+                row.setLayoutParams(new AbsListView.LayoutParams(-1,-2)); row.setTextSize(16); row.setTextColor(active?Ui.TEXT:p==1?Ui.STAR:Ui.MUTED); row.setTypeface(null,active?Typeface.BOLD:Typeface.NORMAL);
+                row.setMinHeight(dp(48)); row.setMaxLines(2); row.setEllipsize(android.text.TextUtils.TruncateAt.END); row.setPadding(dp(12),dp(6),dp(10),dp(6)); row.setBackground(Ui.shape(TvActivity.this,active?Ui.SURFACE_HIGH:0,8,0)); return row;
+            }
+        });
+    }
+    private void openRail(int position) {
+        if(position==0) { if(onlyFavorites) { onlyFavorites=false; filter(); bindRail(); } if(shelves!=null) shelves.focusCurrent(); return; }
+        if(position==1) { onlyFavorites=!onlyFavorites; filter(); bindRail(); if(shelves!=null) shelves.focusCurrent(); return; }
+        String chosen=groups.get(position-2); openShelfGrid(new TvShelfCatalog.Shelf(chosen,chosen,Collections.emptyList(),0));
     }
     private boolean listMode() { return section.equals("tv") || !seriesTitle.isEmpty() || navigationStore().getString("view-"+section,"shelves").equals("list"); }
     private AbsListView contentView() { return listMode()?list:posters; }
@@ -415,7 +441,7 @@ public final class TvActivity extends Activity {
     private void rebuildGroups() {
         Map<String,Integer> counts=BouquetOrder.counts(items,getPreferences(MODE_PRIVATE).getString("sort-"+section,"provider")); groups=new ArrayList<>(counts.keySet());
         List<String> labels=new ArrayList<>(); labels.add(seriesTitle.isEmpty()?"Cała oferta":"Wszystkie odcinki"); labels.addAll(groups);
-        if(shelves!=null) { filter(); return; }
+        if(shelves!=null) { bindRail(); filter(); return; }
         rebinding=true;
         bouquets.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,labels) {
             @Override public View getView(int p,View reused,ViewGroup parent) {

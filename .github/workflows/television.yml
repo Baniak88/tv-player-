@@ -125,8 +125,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.7-preview.apk
-          gh release create v0.9.7-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.7 Preview" --notes "Dźwięk: programowy dekoder FFmpeg dla kanałów z dźwiękiem AC-3/E-AC-3 (Dolby), MP2 i DTS, które wcześniej grały bez dźwięku na Fire TV. Zawiera interfejs OKTV i poprawki z 0.9.6."
-          gh release upload v0.9.7-tv-preview OKTV-Player-TV-0.9.7-preview.apk bundle/OKTV-FireStick-Chromebook.zip
+          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.8-preview.apk
+          gh release create v0.9.8-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.8 Preview" --notes "Filmy i seriale: lista kategorii po lewej (Wszystkie, Moja lista, kategorie dostawcy), siatka kategorii z listą po lewej. Strona główna: kolorowe kafelki i większy podgląd wybranej pozycji. Zawiera dekoder dźwięku Dolby/MP2/DTS i grafitowy wygląd z 0.9.7."
+          gh release upload v0.9.8-tv-preview OKTV-Player-TV-0.9.8-preview.apk bundle/OKTV-FireStick-Chromebook.zip
 
 

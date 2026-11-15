@@ -36,7 +36,7 @@ final class TvShelfView extends RecyclerView {
     private int dp(int n) { return Ui.dp(getContext(),n); }
     private boolean home() { return !shelves.isEmpty() && !shelves.get(0).channels().isEmpty() && shelves.get(0).channels().get(0).kind().equals("shortcut"); }
     private boolean compact() { return getResources().getDisplayMetrics().heightPixels/getResources().getDisplayMetrics().density<650; }
-    private int heroHeight() { return dp(home()?76:compact()?96:124); }
+    private int heroHeight() { return dp(home()?(compact()?112:150):compact()?96:124); }
     private int artworkHeight() { return dp(compact()?144:180); }
     private int cardsHeight() { return dp(compact()?204:240); }
     private TextView text(String value,int size,int color) { return Ui.text(getContext(),value,size,color); }
@@ -83,9 +83,25 @@ final class TvShelfView extends RecyclerView {
     private void describe(Channel channel,TvShelfCatalog.Shelf row) {
         if(hero==null) return;
         hero.title.setText(channel==null?row.title():channel.name());
-        hero.subtitle.setText(channel==null?Ui.count(row.total())+" pozycji w kategorii":channel.kind().equals("shortcut")?"Twoje kanały, filmy i seriale w jednym miejscu":channel.kind().equals("series")?"Serial · "+channel.group():"Film · "+channel.group());
+        hero.subtitle.setText(channel==null?Ui.count(row.total())+" pozycji w kategorii":channel.kind().equals("shortcut")?shortcutLine(channel.url()):channel.kind().equals("series")?"Serial · "+channel.group():"Film · "+channel.group());
         hero.hint.setText(channel!=null && channel.kind().equals("shortcut")?"OK — otwórz":"OK — szczegóły     Menu — opcje");
         ImageLoader.get(getContext()).load(channel==null?"":channel.logo(),hero.image,dp(132),dp(180));
+    }
+    private static String shortcutLine(String url) {
+        switch(url) {
+            case "section:tv": return "Kanały na żywo z programem TV i podglądem";
+            case "section:movie": return "Filmy od Twojego dostawcy · kategorie i Moja lista";
+            case "section:series": return "Seriale, sezony i odcinki · kontynuuj oglądanie";
+            default: return "Wróć tam, gdzie skończyłeś";
+        }
+    }
+    /** Colourful Canal+/Netflix style tiles for the home shortcuts; white focus ring for the remote. */
+    private StateListDrawable shortcutBackground(String url) {
+        int[] colors=url.equals("section:tv")?new int[]{0xFFFF3D5E,0xFFB0186F}:url.equals("section:movie")?new int[]{0xFF6A5CFF,0xFF35279A}:url.equals("section:series")?new int[]{0xFF00B8D9,0xFF0B6E99}:new int[]{0xFF4A4E58,0xFF2A2D34};
+        StateListDrawable states=new StateListDrawable();
+        GradientDrawable focused=new GradientDrawable(GradientDrawable.Orientation.TL_BR,colors); focused.setCornerRadius(dp(12)); focused.setStroke(dp(4),0xFFFFFFFF);
+        GradientDrawable normal=new GradientDrawable(GradientDrawable.Orientation.TL_BR,colors); normal.setCornerRadius(dp(12));
+        states.addState(new int[]{android.R.attr.state_focused},focused); states.addState(new int[]{},normal); return states;
     }
     private final class Hero extends ViewHolder {
         TextView title,subtitle,hint; ImageView image;
@@ -127,7 +143,7 @@ final class TvShelfView extends RecyclerView {
             return type==0?new Hero(view):new Row(view);
         }
         @Override public void onBindViewHolder(ViewHolder holder,int position) {
-            if(holder instanceof Hero h) { hero=h; h.itemView.getLayoutParams().height=heroHeight(); h.subtitle.setVisibility(home()?View.GONE:View.VISIBLE); h.hint.setVisibility(home()?View.GONE:View.VISIBLE); if(!shelves.isEmpty()) { TvShelfCatalog.Shelf row=shelves.get(rowIndex(selectedShelf)); describe(row.channels().isEmpty()?null:row.channels().get(Math.min(selectedIndex,row.channels().size()-1)),row); } return; }
+            if(holder instanceof Hero h) { hero=h; h.itemView.getLayoutParams().height=heroHeight(); h.subtitle.setVisibility(View.VISIBLE); h.hint.setVisibility(View.VISIBLE); if(!shelves.isEmpty()) { TvShelfCatalog.Shelf row=shelves.get(rowIndex(selectedShelf)); describe(row.channels().isEmpty()?null:row.channels().get(Math.min(selectedIndex,row.channels().size()-1)),row); } return; }
             Row row=(Row)holder; TvShelfCatalog.Shelf shelf=shelves.get(position-1); row.title.setText(shelf.title()+"   ›");
             boolean shortcuts=!shelf.channels().isEmpty() && shelf.channels().get(0).kind().equals("shortcut"); row.cards.getLayoutParams().height=shortcuts?dp(132):cardsHeight();
             row.cards.setAdapter(new CardAdapter(shelf,position-1,shortcuts)); row.layout.scrollToPositionWithOffset(rowPositions.getOrDefault(shelf.key(),0),0);
@@ -141,6 +157,13 @@ final class TvShelfView extends RecyclerView {
         @Override public void onBindViewHolder(Card card,int position) {
             Channel channel=position<shelf.channels().size()?shelf.channels().get(position):null;
             card.view.getLayoutParams().width=dp(shortcuts?218:142); card.view.getChildAt(0).getLayoutParams().height=shortcuts?dp(72):artworkHeight();
+            if(shortcuts && channel!=null) {
+                card.view.setBackground(shortcutBackground(channel.url())); card.view.getChildAt(0).setBackgroundColor(0);
+                card.placeholder.setTextSize(34); card.placeholder.setTextColor(0xFFFFFFFF); card.title.setTextColor(0xFFFFFFFF); card.title.setTypeface(null,Typeface.BOLD);
+            } else {
+                card.view.setBackground(cardBackground()); card.view.getChildAt(0).setBackgroundColor(Ui.SURFACE_HIGH);
+                card.placeholder.setTextSize(22); card.placeholder.setTextColor(Ui.FAINT); card.title.setTextColor(Ui.TEXT); card.title.setTypeface(null,Typeface.NORMAL);
+            }
             String label=channel==null?"Pokaż wszystkie · "+Ui.count(shelf.total()):channel.name(); card.title.setText(label); card.placeholder.setText(channel==null?"→":shortcuts?channel.url().equals("section:tv")?"TV":channel.url().equals("section:movie")?"▶":channel.url().equals("section:series")?"▤":"↩":"▶");
             card.view.setContentDescription(channel==null?"Pokaż wszystkie: "+shelf.title():channel.name()); ImageLoader.get(getContext()).load(channel==null?"":channel.logo(),card.image,dp(132),dp(180));
             card.view.setOnClickListener(v -> { int current=card.getBindingAdapterPosition(); if(current==RecyclerView.NO_POSITION) return; if(current>=shelf.channels().size()) actions.more(shelf); else actions.open(shelf.channels().get(current)); });
