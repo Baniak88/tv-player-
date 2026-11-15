@@ -38,7 +38,7 @@ public class TvRecordingTest {
         try(MockWebServer server=new MockWebServer()) {
             server.enqueue(new MockResponse().setResponseCode(403)); server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)); server.start();
             start(target,server.url("/live.ts").toString()); assertNotNull(server.takeRequest(5,TimeUnit.SECONDS)); waitFor("Recording active after HTTP 403",() -> !RecordingService.active); assertEquals(0,target.length());
-            start(target,server.url("/live.ts").toString()); assertNotNull(server.takeRequest(5,TimeUnit.SECONDS)); assertTrue(RecordingService.active);
+            start(target,server.url("/live.ts").toString()); assertNotNull(server.takeRequest(5,TimeUnit.SECONDS)); waitFor("Recording not active while the provider is silent",() -> RecordingService.active);
             context().startService(new Intent(context(),RecordingService.class).setAction("STOP")); waitFor("Stop did not cancel recording",() -> !RecordingService.active);
         } finally { context().stopService(new Intent(context(),RecordingService.class)); target.delete(); }
     }

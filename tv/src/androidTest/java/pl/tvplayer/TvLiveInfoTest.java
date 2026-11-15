@@ -60,7 +60,7 @@ public class TvLiveInfoTest {
         infoKey(KeyEvent.KEYCODE_MEDIA_REWIND); check("Remote rewind failed",() -> Math.abs(current.getCurrentPosition()-5000)<500);
         assertTrue("Media seek keys stole focus",activity.hasWindowFocus());
     }
-    @Test public void pcmModeSelectsAndDecodesAacAndSurvivesPlayerRecreation() throws Exception {
+    @Test public void pcmModeDecodesDolbyDefaultTrackAndSurvivesPlayerRecreation() throws Exception {
         androidx.media3.common.audio.ChannelMixingAudioProcessor mixer=PlaybackAudio.mixer();
         mixer.configure(new androidx.media3.common.audio.AudioProcessor.AudioFormat(48000,6,C.ENCODING_PCM_16BIT)); mixer.flush();
         java.nio.ByteBuffer sample=java.nio.ByteBuffer.allocateDirect(12).order(java.nio.ByteOrder.nativeOrder());
@@ -71,9 +71,11 @@ public class TvLiveInfoTest {
         ExoPlayer current=player(); assertNotSame(before,current); assertTrue(PlaybackAudio.pcm(context()));
         check("PCM change lost paused position",() -> !current.getPlayWhenReady() && Math.abs(current.getCurrentPosition()-5000)<500);
         instrument().runOnMainSync(current::play);
-        check("PCM path did not decode AAC",() -> current.getAudioFormat()!=null && MimeTypes.AUDIO_AAC.equals(current.getAudioFormat().sampleMimeType) && current.getAudioDecoderCounters()!=null && current.getAudioDecoderCounters().renderedOutputBufferCount>0);
+        // The fixture's default track is Polish AC-3; with the bundled FFmpeg decoder it is now played in PCM mode
+        // instead of falling back to the English AAC track.
+        check("PCM path did not decode the default Polish AC-3 track",() -> current.getAudioFormat()!=null && MimeTypes.AUDIO_AC3.equals(current.getAudioFormat().sampleMimeType) && "pol".equals(current.getAudioFormat().language) && current.getAudioDecoderCounters()!=null && current.getAudioDecoderCounters().renderedOutputBufferCount>0);
         instrument().runOnMainSync(() -> assertEquals(2,current.getTrackSelectionParameters().maxAudioChannelCount));
-        close(activity); activity=null; start(false); ExoPlayer restored=player(); check("Saved PCM mode not applied",() -> restored.getAudioFormat()!=null && MimeTypes.AUDIO_AAC.equals(restored.getAudioFormat().sampleMimeType));
+        close(activity); activity=null; start(false); ExoPlayer restored=player(); check("Saved PCM mode not applied",() -> restored.getAudioFormat()!=null && MimeTypes.AUDIO_AC3.equals(restored.getAudioFormat().sampleMimeType));
     }
     private String clock(long time) { return java.time.format.DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.ofEpochSecond(time)); }
     @After public void cleanup() throws Exception { close(activity); PlaybackAudio.pcm(context(),false); if(server!=null) server.shutdown(); }
