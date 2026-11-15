@@ -14,7 +14,7 @@ final class TvTestUi {
     static Context context() { return instrument().getTargetContext(); }
     static void waitFor(String message,BooleanSupplier condition) throws Exception {
         long until=System.currentTimeMillis()+15000;
-        while(!condition.getAsBoolean() && System.currentTimeMillis()<until) Thread.sleep(250);
+        while(System.currentTimeMillis()<until) { if(condition.getAsBoolean()) return; Thread.sleep(250); }
         assertTrue(message,condition.getAsBoolean());
     }
     static View find(View root,String text) {
