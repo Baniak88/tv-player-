@@ -90,6 +90,15 @@ final class TvShelfView extends RecyclerView {
             if(card==null || card.itemView.getWidth()==0) {
                 // Offset scrolling to the very last card can leave it unlaid when the row is narrower than the screen;
                 // alternate with a plain "make visible" scroll, which always lays the target out.
+                int first=row.layout.findFirstVisibleItemPosition(),last=row.layout.findLastVisibleItemPosition();
+                if(first!=NO_POSITION && attempt<4) {
+                    // Scroll directly (no layout pass needed): the row has been seen to ignore scrollToPosition here.
+                    int step=dp(154); row.cards.scrollBy(target>last?step*(target-last+1):target<first?-step*(first-target+1):0,0);
+                    ViewHolder now=row.cards.findViewHolderForAdapterPosition(target);
+                    trace("scrollBy first="+first+" last="+last+" now="+(now==null?"null":now.itemView.getLeft()));
+                    if(now!=null && now.itemView.getWidth()>0 && now.itemView.requestFocus() && now.itemView.hasFocus()) { mounting=false; return; }
+                    mountFocus(rowIndex,index,null,request,attempt+1); return;
+                }
                 if(attempt>=3 && attempt%3==0) { // the row ignored the scroll: rebind it at the target
                     rowPositions.put(shelf.key(),Math.max(0,target-2)); row.cards.suppressLayout(false); adapter.notifyItemChanged(rowIndex+1);
                 } else if(attempt%2==0) row.cards.scrollToPosition(target); else row.layout.scrollToPositionWithOffset(Math.max(0,target-2),0);
