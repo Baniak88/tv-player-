@@ -87,7 +87,12 @@ final class TvShelfView extends RecyclerView {
             if(anchor!=null && attempt==0) row.layout.scrollToPositionWithOffset(anchor.categoryFirst(),anchor.categoryTop());
             ViewHolder card=row.cards.findViewHolderForAdapterPosition(target);
             trace("mountFocus attempt="+attempt+" row="+rowIndex+" target="+target+" cards="+row.cards.getWidth()+"x"+row.cards.getHeight()+" attached="+row.cards.isAttachedToWindow()+" children="+row.cards.getChildCount()+" items="+(row.cards.getAdapter()==null?-1:row.cards.getAdapter().getItemCount())+" vis="+row.layout.findFirstVisibleItemPosition()+"-"+row.layout.findLastVisibleItemPosition()+" req="+row.cards.isLayoutRequested()+"/"+isLayoutRequested()+" rowTop="+row.itemView.getTop()+" shown="+isShown()+" card="+(card==null?"null":card.itemView.getWidth()+"x"+card.itemView.getHeight()+" vis="+card.itemView.isShown()+" focusable="+card.itemView.isFocusable())+" focus="+findFocus());
-            if(card==null || card.itemView.getWidth()==0) { row.layout.scrollToPositionWithOffset(target,0); mountFocus(rowIndex,index,null,request,attempt+1); return; }
+            if(card==null || card.itemView.getWidth()==0) {
+                // Offset scrolling to the very last card can leave it unlaid when the row is narrower than the screen;
+                // alternate with a plain "make visible" scroll, which always lays the target out.
+                if(attempt%2==0) row.cards.scrollToPosition(target); else row.layout.scrollToPositionWithOffset(Math.max(0,target-2),0);
+                row.cards.requestLayout(); mountFocus(rowIndex,index,null,request,attempt+1); return;
+            }
             // A card that is not laid out yet can refuse focus; keep trying instead of leaving focus elsewhere.
             if(!card.itemView.requestFocus() || !card.itemView.hasFocus()) mountFocus(rowIndex,index,null,request,attempt+1); else mounting=false;
         },attempt==0?0:32);
