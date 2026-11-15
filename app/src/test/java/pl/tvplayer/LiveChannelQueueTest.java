@@ -1,0 +1,11 @@
+package pl.tvplayer;
+import org.junit.Test;
+import static org.junit.Assert.*;
+import java.util.*;
+public class LiveChannelQueueTest {
+    private Channel channel(String name,String group) { return new Channel(name,"https://example.com/"+name+".ts",group,"","tv"); }
+    @Test public void keepsProviderOrderAndWrapsInBothDirections() { Channel a=channel("A","Sport"),b=channel("B","Sport"),c=channel("C","Sport"); String token=LiveChannelQueue.remember(Arrays.asList(a,b,c),b.url()); LiveChannelQueue q=LiveChannelQueue.restore(token,b.url()); assertTrue(q.canNavigate()); assertEquals(c,q.move(1)); assertEquals(a,q.move(1)); assertEquals(c,q.move(-1)); }
+    @Test public void skipsSeparatorsDuplicatesAndVodEntries() { Channel a=channel("A","Sport"),b=channel("B","Sport"),header=channel("### Sport ###","Sport"),movie=new Channel("Film","https://example.com/movie.mp4","Kino","","movie"); String token=LiveChannelQueue.remember(Arrays.asList(a,header,a,movie,b),a.url()); LiveChannelQueue q=LiveChannelQueue.restore(token,a.url()); assertEquals(b,q.move(1)); assertEquals(a,q.move(1)); }
+    @Test public void reconstructsFavoritesSearchAndBouquetScope() { Channel a=channel("Sport A","Sport"),b=channel("Sport B","Sport"),c=channel("News","News"); List<Channel> rows=Arrays.asList(a,b,c); Set<String> favorites=new HashSet<>(Arrays.asList(a.url(),c.url())); LiveChannelQueue fav=LiveChannelQueue.rebuild(rows,favorites,"","",true,a.url()); assertEquals(c,fav.move(1)); LiveChannelQueue group=LiveChannelQueue.rebuild(rows,favorites,"Sport","SPORT",false,a.url()); assertEquals(b,group.move(1)); }
+    @Test public void singleOrMissingCurrentChannelCannotNavigate() { Channel a=channel("A","Sport"),b=channel("B","Sport"); LiveChannelQueue single=LiveChannelQueue.rebuild(Collections.singletonList(a),Collections.emptySet(),"","",false,a.url()); assertFalse(single.canNavigate()); assertNull(single.move(1)); assertNull(LiveChannelQueue.remember(Arrays.asList(a,b),"https://example.com/missing.ts")); LiveChannelQueue missing=LiveChannelQueue.rebuild(Arrays.asList(a,b),Collections.emptySet(),"","",false,"missing"); assertFalse(missing.canNavigate()); }
+}

@@ -1,0 +1,23 @@
+<resources>
+    <style name="BaseAppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">#FF3D5E</item>
+        <item name="android:colorControlActivated">#FF3D5E</item>
+        <item name="android:textColorHighlight">#7A2A3B</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#0A0D14</item>
+        <item name="android:navigationBarColor">#0A0D14</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#0A0D14</item>
+        <item name="android:alertDialogTheme">@style/AppDialog</item>
+    </style>
+    <!-- Neutral graphite dialogs instead of the default grey Material ones. -->
+    <style name="AppDialog" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:colorBackground">#141A27</item>
+        <item name="android:windowBackground">@drawable/dialog_background</item>
+        <item name="android:colorAccent">#FF3D5E</item>
+        <item name="android:textColorPrimary">#F3F5FA</item>
+        <item name="android:textColorSecondary">#9DA6BC</item>
+    </style>
+    <style name="AppTheme" parent="@style/BaseAppTheme" />
+</resources>

@@ -1,0 +1,124 @@
+name: Android APK
+on:
+  push:
+    branches: [main, feature/android-player]
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Test, lint and build
+        run: |
+          gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon || {
+            cat app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt 2>/dev/null || true
+            exit 1
+          }
+      - name: Verify APK signature and package
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OKTV-Player-1.1.6
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+
+  install-smoke:
+    permissions:
+      contents: write
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: OKTV-Player-1.1.6
+          path: apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install, launch and reinstall on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          disable-animations: true
+          ram-size: 2048M
+          heap-size: 512M
+          script: bash scripts/smoke-install.sh
+      - name: Save UI previews for visual review
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import base64, json, pathlib
+          for name in ['home-portrait','home-landscape','sport-bouquet','bouquets-grid','epg-channel-list','epg-program-dialog','epg-stream-list','epg-stream-dialog','series-details','series-season2','series-single-season','movie-details','tv-preview-portrait','tv-preview-landscape']:
+              path=pathlib.Path('smoke-output',name+'.png')
+              if not path.exists(): continue
+              data=path.read_bytes()
+              if not data.startswith(bytes([137,80,78,71,13,10,26,10])): continue
+              pathlib.Path('/tmp',name+'.json').write_text(json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}))
+          PY
+          for name in home-portrait home-landscape sport-bouquet bouquets-grid epg-channel-list epg-program-dialog epg-stream-list epg-stream-dialog series-details series-season2 series-single-season movie-details tv-preview-portrait tv-preview-landscape; do
+            if [ ! -f "/tmp/$name.json" ]; then continue; fi
+            ref=$(gh api "repos/$GH_REPO/git/blobs" --input "/tmp/$name.json" --jq '.sha')
+            echo "UI_PREVIEW $name $ref"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Android-install-report
+          path: smoke-output/
+
+  publish-apk:
+    needs: install-smoke
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: OKTV-Player-1.1.6
+          path: apk
+      - name: Publish directly installable APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          cp apk/debug/app-debug.apk OKTV-Player-1.1.6.apk
+          gh release view v1.1.6 >/dev/null 2>&1 || gh release create v1.1.6 --target "$SOURCE_SHA" --prerelease --title "OKTV Player 1.1.6" --notes "EPG: gdy odtwarzany jest inny kanał, aplikacja nie otwiera drugiego połączenia (dostawcy z limitem jednego połączenia zwracali HTTP 458), tylko podpowiada włączenie kanału lub ustawienie linku EPG. Czytelny opis błędu limitu połączeń. Zawiera polskie EPG jednym przyciskiem z 1.1.5."
+          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v1.1.6" -f sha="$SOURCE_SHA" -F force=false >/dev/null
+          gh release upload v1.1.6 OKTV-Player-1.1.6.apk --clobber
+
+
+
+
+

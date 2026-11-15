@@ -1,5 +1,9 @@
 # TV Player — Android
 
+Wersja TV: **OKTV Player TV 0.9.5-preview**. [Prosta instalacja z terminala Chromebooka na Fire Stick](CHROMEBOOK-FIRESTICK.md). [Pozostałe sposoby instalacji na TV](TV-INSTALL.md). [Wygląd interfejsu na bazie OKTV 1.1.6](OKTV-TV-0.9.3.md).
+
+[Zmiany katalogu TV 0.9.5](OKTV-TV-0.9.5.md). [Raport testów 0.9.5](TEST-TV-0.9.5.md). [Poprzedni raport testów 0.9.4](TEST-TV-0.9.4.md).
+
 Pierwsza wersja natywnego odtwarzacza IPTV po polsku na telefony z Androidem 8.0 lub nowszym.
 
 ## Funkcje
@@ -36,3 +40,7 @@ Dane źródła trafiają bezpośrednio do wskazanego dostawcy. Aplikacja nie ma 
 ## Walidacja
 
 Kod wymaga kompilacji i testu z rzeczywistym dostawcą na telefonie. Samo przygotowanie kodu nie potwierdza poprawnego odtwarzania. Workflow uruchamia testy parsera, Android Lint i kompilację przed udostępnieniem APK.
+
+## Wersja 0.1.1
+
+Usunięto limit importu 30 MB. M3U (URL i pliki), kanały i kategorie Xtream oraz zaszyfrowana biblioteka są przetwarzane strumieniowo. Nie ma stałego limitu rozmiaru źródła; liczba kanałów pozostaje ograniczona dostępną pamięcią telefonu. Testy regresji generują źródła M3U i Xtream większe niż 30 MB. Pobieranie ma limit czasu 5 minut.
