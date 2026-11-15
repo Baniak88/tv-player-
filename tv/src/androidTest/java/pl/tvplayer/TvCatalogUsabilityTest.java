@@ -47,15 +47,23 @@ public class TvCatalogUsabilityTest {
         paint.setColor(Color.WHITE); paint.setTextSize(landscape?34:24); canvas.drawText(landscape?"TV CINEMA":"NOCNA CISZA",16,bitmap.getHeight()*.7f,paint);
         ByteArrayOutputStream out=new ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.PNG,100,out); bitmap.recycle(); return out.toByteArray();
     }
-    private void shell(String command) throws Exception { try(android.os.ParcelFileDescriptor.AutoCloseInputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(instrument().getUiAutomation().executeShellCommand(command))) { byte[] buffer=new byte[512]; while(in.read(buffer)!=-1) {} } }
-    private void viewport(int width,int height) throws Exception { viewportWidth=width; shell("wm size "+width+"x"+height); shell("wm density 160"); }
+    private String shellOutput(String command) throws Exception { try(android.os.ParcelFileDescriptor.AutoCloseInputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(instrument().getUiAutomation().executeShellCommand(command)); ByteArrayOutputStream out=new ByteArrayOutputStream()) { byte[] buffer=new byte[512]; for(int n;(n=in.read(buffer))!=-1;) out.write(buffer,0,n); return out.toString("UTF-8"); } }
+    private void shell(String command) throws Exception { shellOutput(command); }
+    private void viewport(int width,int height) throws Exception {
+        viewportWidth=width;
+        // wm size uses the device's natural axes, not the activity's landscape axes.
+        java.util.regex.Matcher physical=java.util.regex.Pattern.compile("Physical size:\\s*(\\d+)x(\\d+)").matcher(shellOutput("wm size"));
+        assertTrue("Physical display dimensions unavailable",physical.find());
+        boolean portrait=Integer.parseInt(physical.group(1))<Integer.parseInt(physical.group(2));
+        shell("wm size "+(portrait?height+"x"+width:width+"x"+height)); shell("wm density 160");
+    }
     private void start() throws Exception {
         home=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
         home.getPreferences(0).edit().remove("list-movie").remove("list-series").commit();
         waitFor("Home missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null); waitFor("Home has no focus",home::hasWindowFocus);
-        waitFor("Window/resources did not apply requested viewport "+viewportWidth+" at density 160",() -> {
+        try { waitFor("Window/resources did not apply requested viewport "+viewportWidth+" at density 160",() -> {
             boolean[] ready={false}; instrument().runOnMainSync(() -> { android.util.DisplayMetrics metrics=home.getResources().getDisplayMetrics(); ready[0]=metrics.widthPixels==viewportWidth && metrics.densityDpi==160 && home.getWindow().getDecorView().getWidth()==viewportWidth; }); return ready[0];
-        });
+        }); } catch(AssertionError failure) { android.util.DisplayMetrics metrics=home.getResources().getDisplayMetrics(); throw new AssertionError(failure.getMessage()+"; actual resources="+metrics.widthPixels+"x"+metrics.heightPixels+", density="+metrics.densityDpi+", window="+home.getWindow().getDecorView().getWidth()+"x"+home.getWindow().getDecorView().getHeight(),failure); }
     }
     private void screenshot(String name) {
         instrument().runOnMainSync(() -> { View root=home.getWindow().getDecorView(); Bitmap bitmap=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap)); try(FileOutputStream out=context().openFileOutput(name,0)) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } catch(Exception e) { throw new AssertionError(e); } finally { bitmap.recycle(); } });
