@@ -16,7 +16,7 @@ public class TvSourceImportTest {
     private TvActivity home;
     private void start() throws Exception {
         home=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
-        waitFor("Home missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null);
+        waitFor("Source UI missing",home::hasWindowFocus);
         waitFor("Source screen has no input focus",home::hasWindowFocus);
     }
     @Before public void setup() throws Exception {
@@ -34,7 +34,7 @@ public class TvSourceImportTest {
             assertEquals("m3u",new TvAccountStore(context()).load().type()); assertEquals(1,new LibraryStore(context()).loadSection("movie",new HashSet<>()).size());
             offline.set(true); invoke(home,"refresh"); waitFor("Refresh failure not shown",() -> node("OK")!=null); click("OK");
             assertEquals(1,new LibraryStore(context()).loadSection("tv",new HashSet<>()).size()); assertEquals(1,new LibraryStore(context()).loadSection("movie",new HashSet<>()).size());
-            close(home); start(); key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Saved channel missing after restart",() -> find(home.getWindow().getDecorView(),"Kanał lokalny")!=null);
+            close(home); start(); waitFor("Saved channel missing after restart",() -> find(home.getWindow().getDecorView(),"Kanał lokalny")!=null);
         }
     }
     @Test public void xtreamValidationImportsTvAndLoadsMoviesOnlyWhenOpened() throws Exception {

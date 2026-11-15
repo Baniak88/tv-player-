@@ -26,6 +26,7 @@ final class LibraryStore {
     }
     private final Context context;
     private javax.crypto.SecretKey cachedKey;
+    private final BoundedStringPool metadata=new BoundedStringPool(8192);
     private final Map<String,byte[]> loadedFingerprints=new HashMap<>();
     LibraryStore(Context context) { this.context=context.getApplicationContext(); }
     private javax.crypto.SecretKey key() throws Exception {
@@ -96,7 +97,7 @@ final class LibraryStore {
                 default: reader.skipValue();
             }
         }
-        reader.endObject(); return new Channel(name,url,group,epg,kind,guide,days,timezone,order,logo,added);
+        reader.endObject(); return new Channel(name,url,metadata.canonical(group),epg,metadata.canonical(kind),metadata.canonical(guide),days,metadata.canonical(timezone),order,metadata.canonical(logo),added);
     }
     void save(List<Channel> channels,Set<String> favorites) throws Exception {
         synchronized(LOCK) {
@@ -205,6 +206,21 @@ final class LibraryStore {
             loadedFingerprints.put(section,fingerprint("catalog-"+current+"-"+section+".enc"));
             readFavorites(favorites); return result;
         }
+    }
+    /** Home previews never materialise an entire VOD/episode catalogue or make a network request. */
+    List<Channel> previewSection(String section,int limit) throws Exception {
+        if(!Arrays.asList("tv","movie","series").contains(section)) throw new IllegalArgumentException("Nieprawidłowa sekcja.");
+        List<Channel> result=new ArrayList<>(); limit=Math.max(0,Math.min(512,limit));
+        synchronized(LOCK) {
+            String current=generation(); if(current==null || !kindsCurrent() || limit==0) return result;
+            String name="catalog-"+current+"-"+section+".enc"; Cached cached=CACHE.get(name);
+            List<Channel> items=cached==null?null:cached.valid(new File(context.getFilesDir(),name));
+            if(items!=null) return new ArrayList<>(items.subList(0,Math.min(limit,items.size())));
+            try(JsonReader reader=new JsonReader(new InputStreamReader(new GZIPInputStream(new ByteArrayInputStream(decryptedRead(name))),StandardCharsets.UTF_8))) {
+                reader.beginArray(); while(result.size()<limit && reader.hasNext()) result.add(readChannel(reader));
+            }
+        }
+        return result;
     }
     /** Decrypts a section into the shared cache without holding the library lock, so screens never wait for it. */
     void warm(String section) {

@@ -29,6 +29,15 @@ final class ImageLoader {
         int kb=(int)Math.max(8192,Math.min(32768,Runtime.getRuntime().maxMemory()/1024/8)); memory=new LruCache<String,Bitmap>(kb) { @Override protected int sizeOf(String key,Bitmap bitmap) { return Math.max(1,bitmap.getByteCount()/1024); } };
     }
     private static int bucket(int pixels) { return Math.max(32,((Math.max(1,pixels)+31)/32)*32); }
+    /** Stop artwork for a covered activity while its player owns the connection. */
+    void pause(android.view.View root) {
+        if(root instanceof ImageView) release((ImageView)root,root.getTag(R_TAG));
+        if(root instanceof android.view.ViewGroup group) for(int i=0;i<group.getChildCount();i++) pause(group.getChildAt(i));
+    }
+    void resume(android.view.View root) {
+        if(root instanceof ImageView image && image.getDrawable()==null) { Object tag=image.getTag(R_BINDING); if(tag instanceof Binding binding) load(binding.url(),image,binding.width(),binding.height()); }
+        if(root instanceof android.view.ViewGroup group) for(int i=0;i<group.getChildCount();i++) resume(group.getChildAt(i));
+    }
     void load(String url,ImageView view,int width,int height) {
         boolean valid=url!=null && (url.startsWith("http://")||url.startsWith("https://")); boolean fit=view.getScaleType()==ImageView.ScaleType.FIT_CENTER || view.getScaleType()==ImageView.ScaleType.CENTER_INSIDE;
         int w=bucket(width),h=bucket(height); String key=valid?url+"@"+w+"x"+h+(fit?"/fit":"/crop"):""; Object previous=view.getTag(R_TAG);

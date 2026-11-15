@@ -266,6 +266,11 @@ public class NavigationTest {
                 new Channel("PL-VIP| TVN RAW",server.url("/stream1.ts").toString(),"Test EPG","tvn.pl","tv",feed,0,"UTC",0),
                 new Channel("PL-VIP| TVN 7 RAW",server.url("/stream2.ts").toString(),"Test EPG","tvn7.pl","tv",feed,0,"UTC",0));
             new LibraryStore(context).save(channels,Collections.emptySet());
+            java.util.concurrent.CountDownLatch guideReady=new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.atomic.AtomicReference<GuideRepository.Data> guideData=new java.util.concurrent.atomic.AtomicReference<>();
+            GuideRepository.get(context).request(channels.get(0),true,data -> { guideData.set(data); guideReady.countDown(); });
+            assertTrue("Explicit XMLTV request did not finish",guideReady.await(10,java.util.concurrent.TimeUnit.SECONDS));
+            assertFalse("XMLTV did not contain the current schedule",guideData.get().programs().isEmpty());
             activity=(MainActivity)getInstrumentation().startActivitySync(new Intent(context,MainActivity.class).putExtra("section","tv").putExtra("bouquet","Test EPG").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             View root=activity.getWindow().getDecorView();
             long deadline=System.currentTimeMillis()+12000;

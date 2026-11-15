@@ -30,6 +30,7 @@ public class TvMovieDetailsTest {
         java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.PNG,100,bytes); bitmap.recycle(); return bytes.toByteArray();
     }
     @Before public void setup() throws Exception {
+        TvTestUi.resetNavigation();
         new android.util.AtomicFile(new java.io.File(context().getFilesDir(),"tv-account.enc")).delete(); context().getSharedPreferences("watch-progress",0).edit().clear().commit();
         byte[] image=artwork(); server=new MockWebServer(); server.setDispatcher(new Dispatcher() { @Override public MockResponse dispatch(RecordedRequest request) {
             if(request.getPath().contains("player_api.php")) { apiCalls.incrementAndGet(); String art=server.url("/art.png").toString(); return new MockResponse().setHeader("Content-Type","application/json").setBody("{\"info\":{\"name\":\"PL - Północny szlak\",\"plot\":\"Podróż przez północne krajobrazy prowadzi do odkrycia rodzinnej tajemnicy.\",\"releasedate\":\"2024-03-18\",\"duration_secs\":7320,\"rating\":\"8.2\",\"genre\":\"Przygodowy · Dramat\",\"director\":\"Aleksander Kowalski\",\"cast\":\"Anna Nowak, Piotr Wiśniewski\",\"movie_image\":\""+art+"\",\"backdrop_path\":[\""+art+"\"]}}"); }
@@ -50,7 +51,7 @@ public class TvMovieDetailsTest {
         Channel source=source(); new LibraryStore(context()).save(Collections.singletonList(source),new HashSet<>(Collections.singleton("https://example.com/keep.ts")));
         library=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK)); waitText(library,"Co oglądamy?");
         TvTestUi.waitFor("Movie library has no input focus",library::hasWindowFocus); key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(library,source.name());
-        key(KeyEvent.KEYCODE_DPAD_CENTER); // The selected bouquet moves focus into the poster grid.
+        TvTestUi.waitFor("Movie shelf has no focus",() -> { try { return ((TvShelfView)TvTestUi.field(library,"shelves")).hasFocus(); } catch(Exception e) { return false; } });
         Instrumentation.ActivityMonitor details=instrument().addMonitor(MovieActivity.class.getName(),null,false); key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); movie=(MovieActivity)details.waitForActivityWithTimeout(7000); instrument().removeMonitor(details); assertNotNull("Movie did not open its details",movie);
         waitText(movie,"Aleksander Kowalski"); waitText(movie,"2024   ·   2 godz. 2 min   ·   ★ 8.2");
         long deadline=System.currentTimeMillis()+5000; while(!find(movie.getWindow().getDecorView(),"+  Moja lista").isEnabled() && System.currentTimeMillis()<deadline) Thread.sleep(80);

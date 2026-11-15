@@ -16,6 +16,7 @@ public final class M3uParser {
     public static List<Channel> parse(Reader source, String baseUrl) throws IOException {
         BufferedReader reader = source instanceof BufferedReader ? (BufferedReader) source : new BufferedReader(source);
         List<Channel> channels = new ArrayList<>();
+        BoundedStringPool metadata=new BoundedStringPool(8192);
         String name = "", group = "Bez kategorii", epg = "", logo = "", xmltv = "", kind="";
         String raw;
         while ((raw = reader.readLine()) != null) {
@@ -59,7 +60,7 @@ public final class M3uParser {
                     URI uri = baseUrl == null ? URI.create(line) : URI.create(baseUrl).resolve(line);
                     if ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) {
                         channels.add(new Channel(name.isEmpty() ? "Kanał " + (channels.size() + 1) : name,
-                                uri.toString(), group.isEmpty() ? "Bez kategorii" : group, epg,kind).withLogo(artwork(logo,baseUrl)).withGuideSource(xmltv));
+                                uri.toString(), group.isEmpty() ? "Bez kategorii" : metadata.canonical(group), epg,kind).withLogo(metadata.canonical(artwork(logo,baseUrl))).withGuideSource(xmltv));
                     }
                 } catch (IllegalArgumentException ignored) { }
                 name = ""; group = "Bez kategorii"; epg = ""; logo = ""; kind="";

@@ -92,10 +92,14 @@ public class LivePreviewTest {
         try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(context().getFilesDir(),name+".png"))) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } bitmap.recycle();
     }
     @Test public void bouquetOpensPreviewAndFullScreenReturnsTheSamePlayerWithoutAnotherConnection() throws Exception {
+        // XMLTV is fetched explicitly before playback; playback only reads its local cache.
+        CountDownLatch guideReady=new CountDownLatch(1); AtomicReference<GuideRepository.Data> guideData=new AtomicReference<>();
+        GuideRepository.get(context()).request(a,true,data -> { guideData.set(data); guideReady.countDown(); });
+        assertTrue("Provider XMLTV did not load",guideReady.await(10,TimeUnit.SECONDS)); assertFalse(guideData.get().programs().isEmpty()); assertEquals(1,guides.get());
         start(false); View root=main.getWindow().getDecorView(); assertNull(previewPlayer());
         Instrumentation.ActivityMonitor monitor=instrument().addMonitor(PlayerActivity.class.getName(),null,false);
         try {
-            clickItem(waitView(root,"Sport")); waitPlaying(this::previewPlayer); assertEquals(a.url(),preview().selectedUrl()); assertEquals(0,monitor.getHits()); assertEquals(1,streams.get());
+            clickItem(waitView(root,"Sport")); waitPlaying(this::previewPlayer); assertEquals(a.url(),preview().selectedUrl()); assertEquals(0,monitor.getHits()); assertEquals(1,streams.get()); assertEquals("Playback downloaded XMLTV again",1,guides.get());
             long until=SystemClock.elapsedRealtime()+5000; TextView schedule=(TextView)field(preview(),"schedule"); while(!schedule.getText().toString().contains("Program kanału A") && SystemClock.elapsedRealtime()<until) { Thread.sleep(80); instrument().waitForIdleSync(); } assertTrue(schedule.getText().toString().contains("Program kanału A"));
             screenshot("tv-preview-portrait"); ExoPlayer original=previewPlayer();
             View button=waitView(root,"Otwórz podgląd na pełnym ekranie"); instrument().runOnMainSync(button::performClick); full=(PlayerActivity)monitor.waitForActivityWithTimeout(7000); assertNotNull(full); waitPlaying(() -> (ExoPlayer)field(full,"player"));

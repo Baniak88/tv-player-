@@ -1,6 +1,6 @@
 # OKTV Player: instalacja z Chromebooka na Fire Stick
 
-Paczkę `OKTV-FireStick-Chromebook.zip` instalujesz bez kompilowania i bez logowania do GitHuba w terminalu. Zawiera APK **0.9.5-preview**, sumę SHA-256 oraz instalator. APK działa na **Fire OS 6 lub nowszym** i Android TV 7.1+. Nie działa na **Vega OS** ani starym Fire OS 5. Przed instalacją sprawdź model i system w ustawieniach Fire TV; sama nazwa „Fire Stick” nie oznacza zgodności.
+Paczkę `OKTV-FireStick-Chromebook.zip` instalujesz bez kompilowania i bez logowania do GitHuba w terminalu. Zawiera APK **0.9.6-preview**, sumę SHA-256 oraz instalator. APK działa na **Fire OS 6 lub nowszym** i Android TV 7.1+. Nie działa na **Vega OS** ani starym Fire OS 5. Przed instalacją sprawdź model i system w ustawieniach Fire TV; sama nazwa „Fire Stick” nie oznacza zgodności.
 
 ## 1. Przygotuj urządzenia
 
@@ -28,7 +28,7 @@ bash oktv-firestick/install-firestick.sh 192.168.1.50
 
 Skrypt sprawdza sumę APK, wersję systemu oraz wynik instalacji. Wysyła polecenia tylko do wskazanego IP, także gdy Chromebook ma inne urządzenie ADB. Aktualizuje pakiet `pl.tvplayer.television` przez `pm install -r`, zachowując ustawienia i bibliotekę przy zgodnym podpisie. Nie odinstalowuje aplikacji i nie wymusza obniżenia wersji. Paczka używa tego samego podpisu preview co poprzednie wydania tego projektu.
 
-Po instalacji otworzy się OKTV Player. Wybierz **Zmień źródło → Dodaj przez telefon**, zeskanuj QR telefonem w tej samej sieci i wpisz dane dostawcy. Kod jest jednorazowy, ekran parowania wygasa po pięciu minutach. Następnie możesz wyłączyć Debugowanie ADB.
+Po instalacji otworzy się OKTV Player. Wybierz **Opcje → Źródło → Dodaj przez telefon**, zeskanuj QR telefonem w tej samej sieci i wpisz dane dostawcy. Kod jest jednorazowy, ekran parowania wygasa po pięciu minutach. Następnie możesz wyłączyć Debugowanie ADB.
 
 ## Gdy instalacja się nie uda
 

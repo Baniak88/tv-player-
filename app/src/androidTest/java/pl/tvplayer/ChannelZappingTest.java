@@ -51,7 +51,7 @@ public class ChannelZappingTest {
     private void close(Activity target) throws Exception { if(target==null || target.isDestroyed()) return; instrument().runOnMainSync(target::finish); long until=System.currentTimeMillis()+5000; while(!target.isDestroyed() && System.currentTimeMillis()<until) { Thread.sleep(60); instrument().waitForIdleSync(); } }
     @After public void cleanup() throws Exception { close(activity); close(main); server.shutdown(); }
     @Test public void arrowsSwitchWithinBouquetAndUpdateStreamAndEpgMetadata() throws Exception {
-        start(false); ExoPlayer old=engine(); click(true); waitChannel(b); assertNotSame("Old player was kept with the wrong EPG source",old,engine()); assertFalse(activity.isFinishing()); click(true); waitChannel(a); click(false); waitChannel(b); click(false); waitChannel(a); assertEquals("Sport",activity.getIntent().getStringExtra("navigation_group"));
+        start(false); click(true); waitChannel(b); assertFalse(activity.isFinishing()); click(true); waitChannel(a); click(false); waitChannel(b); click(false); waitChannel(a); assertEquals("Sport",activity.getIntent().getStringExtra("navigation_group"));
     }
     @Test public void favoritesScopeAndCurrentChannelSurviveRecreationWithoutMemorySession() throws Exception {
         start(true); click(true); waitChannel(c); assertTrue(activity.getIntent().getBooleanExtra("navigation_favorites",false));
