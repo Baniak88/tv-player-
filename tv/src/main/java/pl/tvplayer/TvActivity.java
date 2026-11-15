@@ -509,7 +509,13 @@ public final class TvActivity extends Activity {
             if(index==0) sourceDialog(); else if(index==1) refresh(); else if(index==2) PlaybackSettings.choose(this,() -> {}); else if(index==3) EpgSettings.choose(this,() -> GuideRepository.get(this).invalidateFailures()); else info();
         }).setNegativeButton("Zamknij",null).show();
     }
-    private void info() { new AlertDialog.Builder(this).setTitle(Ui.APP_NAME+" "+BuildConfig.VERSION_NAME).setMessage("Telewizja na żywo, filmy i seriale z Twojego źródła IPTV.\nProgram TV (EPG) i archiwum zależą od dostawcy.\n\nOK: wybierz lub odtwórz\nStrzałki: nawigacja\nMenu / przytrzymanie OK: opcje pozycji\nPlay/Pause: sterowanie odtwarzaniem").setPositiveButton("OK",null).show(); }
+    private void info() { new AlertDialog.Builder(this).setTitle(Ui.APP_NAME+" "+BuildConfig.VERSION_NAME).setMessage("Telewizja na żywo, filmy i seriale z Twojego źródła IPTV.\nProgram TV (EPG) i archiwum zależą od dostawcy.\n\nOK: wybierz lub odtwórz\nStrzałki: nawigacja\nMenu / przytrzymanie OK: opcje pozycji\nPlay/Pause: sterowanie odtwarzaniem").setNeutralButton("Licencje audio",(dialog,which) -> audioLicenses()).setPositiveButton("OK",null).show(); }
+    private void audioLicenses() {
+        StringBuilder notice=new StringBuilder();
+        for(String name:new String[]{"NOTICE.txt","ANDROIDX-APACHE-2.0.txt","FFMPEG-LGPL-2.1.txt"}) try(java.io.InputStream input=getAssets().open("audio-licenses/"+name);java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream()) { byte[] bytes=new byte[4096]; for(int n;(n=input.read(bytes))!=-1;) out.write(bytes,0,n); notice.append(out.toString("UTF-8")).append("\n\n"); } catch(java.io.IOException ignored) { }
+        new AlertDialog.Builder(this).setTitle("Licencje dekoderów audio").setMessage(notice.toString()).setPositiveButton("OK",null).show();
+    }
+
     private void error(String message) { if(!isFinishing() && !isDestroyed()) new AlertDialog.Builder(this).setTitle(Ui.APP_NAME).setMessage(message).setPositiveButton("OK",null).show(); }
     private void sourceDialog() {
         if(busy || refreshing) return;

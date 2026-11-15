@@ -9,7 +9,7 @@ import androidx.media3.exoplayer.audio.*;
 /** A PCM path for televisions whose HDMI device advertises unusable encoded audio. */
 @androidx.annotation.OptIn(markerClass=androidx.media3.common.util.UnstableApi.class)
 final class PlaybackAudio {
-    static boolean pcm(Context context) { return context.getSharedPreferences("playback-audio",0).getBoolean("pcm",false); }
+    static boolean pcm(Context context) { return context.getSharedPreferences("playback-audio",0).getBoolean("pcm",true); }
     static void pcm(Context context,boolean enabled) { context.getSharedPreferences("playback-audio",0).edit().putBoolean("pcm",enabled).apply(); }
     static DefaultRenderersFactory renderers(Context context) {
         boolean pcm=pcm(context);
@@ -18,7 +18,7 @@ final class PlaybackAudio {
                 // Without Context, capabilities stay explicitly PCM instead of following an HDMI broadcast.
                 return pcm?new DefaultAudioSink.Builder().setAudioCapabilities(AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES).setAudioProcessors(new AudioProcessor[]{mixer()}).build():super.buildAudioSink(ctx,floatOutput,playbackParams);
             }
-        }.setEnableDecoderFallback(true);
+        }.setEnableDecoderFallback(true).setExtensionRendererMode(pcm?DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER:DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON);
     }
     static ChannelMixingAudioProcessor mixer() {
         ChannelMixingAudioProcessor mixer=new ChannelMixingAudioProcessor();

@@ -7,3 +7,6 @@ local.properties
 *.iml
 __pycache__/
 dist/
+.codec-cache/
+decoder-ffmpeg/src/main/jniLibs/
+tv/src/androidTest/assets/generated-audio/

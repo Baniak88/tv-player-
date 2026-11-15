@@ -1,0 +1,19 @@
+OKTV Player TV audio decoder notices
+
+AndroidX Media3 FFmpeg extension 1.5.1
+Copyright The Android Open Source Project. Apache License 2.0.
+https://github.com/androidx/media/tree/1.5.1/libraries/decoder_ffmpeg
+The audio Java/JNI sources are retained in decoder-ffmpeg/ in the OKTV source repository.
+The unused video renderer is omitted; one Javadoc reference to it was removed.
+
+FFmpeg 6.1.6, Copyright the FFmpeg developers
+LGPL version 2.1 or later. No GPL, nonfree or version-3-only components enabled.
+Audio decoders only; no FFmpeg network input or video rendering is used.
+Original corresponding source: https://ffmpeg.org/releases/ffmpeg-6.1.6.tar.xz
+SHA-256: d4fcb164028dd3beee5d92c0ac72e46aac6973c75ea12dc14de07bf8f407370a
+Build/relink instructions and flags: decoder-ffmpeg/README.md and scripts/build-audio-codecs.sh
+https://github.com/Baniak88/tv-player-
+The TV workflow also provides the original FFmpeg archive as an audio-codecs-source artifact.
+You may modify and rebuild the library and replace it in a rebuilt APK; the preview signing key is included in the source repository.
+
+Full Apache 2.0 and LGPL 2.1 license texts accompany this notice in audio-licenses/.

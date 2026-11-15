@@ -49,6 +49,7 @@ run_case 'pl.tvplayer.TvSourceImportTest' source-import 2
 run_case 'pl.tvplayer.TvCatalogUsabilityTest' catalog-usability 3
 run_case 'pl.tvplayer.TvLiveInfoTest' live-info-audio 2
 run_case 'pl.tvplayer.TvStreamingNavigationTest' streaming-navigation 6
+run_case 'pl.tvplayer.TvAudioCodecsTest' software-audio-codecs 7
 adb exec-out run-as pl.tvplayer.television cat files/tv096-live-info.png > tv-smoke-output/tv096-live-info.png || true
 for name in tv096-live-960 tv096-live-1280 tv096-movies-960 tv096-movies-1280 tv096-movies-list-960 tv096-movies-list-1280 tv096-series-960 tv096-episodes-960; do
   adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png" || true
@@ -57,4 +58,4 @@ for name in tv-home tv-movies tv-bouquet series-television movie-television tv-p
   adb exec-out run-as pl.tvplayer.television cat "files/$name.png" > "tv-smoke-output/$name.png" || true
 done
 if ((failures>0)); then echo "TV_NATIVE_FAILED_SUITES=$failures"; exit 1; fi
-echo "TV_NATIVE_CHECKS_PASSED=39"
+echo "TV_NATIVE_CHECKS_PASSED=46"

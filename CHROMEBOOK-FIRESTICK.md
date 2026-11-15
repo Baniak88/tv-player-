@@ -1,6 +1,6 @@
 # OKTV Player: instalacja z Chromebooka na Fire Stick
 
-Paczkę `OKTV-FireStick-Chromebook.zip` instalujesz bez kompilowania i bez logowania do GitHuba w terminalu. Zawiera APK **0.9.6-preview**, sumę SHA-256 oraz instalator. APK działa na **Fire OS 6 lub nowszym** i Android TV 7.1+. Nie działa na **Vega OS** ani starym Fire OS 5. Przed instalacją sprawdź model i system w ustawieniach Fire TV; sama nazwa „Fire Stick” nie oznacza zgodności.
+Paczkę `OKTV-FireStick-Chromebook.zip` instalujesz bez kompilowania i bez logowania do GitHuba w terminalu. Zawiera APK **0.9.7-preview**, sumę SHA-256 oraz instalator. APK działa na **Fire OS 6 lub nowszym** i Android TV 7.1+. Nie działa na **Vega OS** ani starym Fire OS 5. Przed instalacją sprawdź model i system w ustawieniach Fire TV; sama nazwa „Fire Stick” nie oznacza zgodności.
 
 ## 1. Przygotuj urządzenia
 

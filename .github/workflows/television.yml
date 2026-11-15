@@ -2,9 +2,9 @@ name: TV platforms
 on:
   push:
     branches: [main, 'feature/tv-*', 'fix/**']
-    paths: ['tv/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'app/src/test/**', 'app/build.gradle', 'scripts/smoke-tv.sh', 'scripts/*firestick*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', '.github/workflows/television.yml']
+    paths: ['tv/**', 'decoder-ffmpeg/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'app/src/test/**', 'app/build.gradle', 'scripts/smoke-tv.sh', 'scripts/*audio*', 'scripts/*firestick*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', '.github/workflows/television.yml']
   pull_request:
-    paths: ['tv/**', 'samsung/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'settings.gradle', 'scripts/*tv*', 'scripts/*samsung*', 'scripts/*firestick*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', '.github/workflows/television.yml']
+    paths: ['tv/**', 'decoder-ffmpeg/**', 'samsung/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'settings.gradle', 'scripts/*tv*', 'scripts/*audio*', 'scripts/*samsung*', 'scripts/*firestick*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', '.github/workflows/television.yml']
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -23,6 +23,29 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.9'}
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: actions/cache@v4
+        id: audio-codecs
+        with:
+          path: |
+            decoder-ffmpeg/src/main/jniLibs
+            .codec-cache/ffmpeg-6.1.6.tar.xz
+          key: audio-lgpl-${{ runner.os }}-${{ hashFiles('scripts/build-audio-codecs.sh', 'decoder-ffmpeg/src/main/jni/ffmpeg_jni.cc') }}
+      - name: Build audio-only FFmpeg decoders
+        if: steps.audio-codecs.outputs.cache-hit != 'true'
+        run: |
+          sdkmanager 'ndk;26.1.10909125'
+          bash scripts/build-audio-codecs.sh
+      - uses: actions/cache/save@v4
+        if: steps.audio-codecs.outputs.cache-hit != 'true'
+        with:
+          path: |
+            decoder-ffmpeg/src/main/jniLibs
+            .codec-cache/ffmpeg-6.1.6.tar.xz
+          key: audio-lgpl-${{ runner.os }}-${{ hashFiles('scripts/build-audio-codecs.sh', 'decoder-ffmpeg/src/main/jni/ffmpeg_jni.cc') }}
+      - name: Generate audio regression samples
+        run: |
+          if ! command -v ffmpeg >/dev/null; then sudo apt-get update && sudo apt-get install -y ffmpeg; fi
+          bash scripts/make-audio-fixtures.sh
       - run: gradle :app:testDebugUnitTest :app:lintDebug :tv:lintDebug :tv:assembleDebug :tv:assembleDebugAndroidTest --no-daemon
       - name: Check signature and launcher
         run: |
@@ -35,6 +58,17 @@ jobs:
           python3 scripts/package-firestick.py
       - uses: actions/upload-artifact@v4
         with: {name: television-chromebook, path: dist/OKTV-FireStick-Chromebook.zip}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audio-codecs-source
+          path: |
+            .codec-cache/ffmpeg-6.1.6.tar.xz
+            decoder-ffmpeg/README.md
+            decoder-ffmpeg/build.gradle
+            decoder-ffmpeg/consumer-rules.pro
+            decoder-ffmpeg/src/main/
+            scripts/build-audio-codecs.sh
+          include-hidden-files: true
       - uses: actions/upload-artifact@v4
         with:
           name: television-apk
@@ -125,8 +159,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.6-preview.apk
-          gh release create v0.9.6-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.6 Preview" --notes "Interfejs OKTV na TV, poprawki archiwum i obsługi nagrywania oraz paczka instalacyjna dla terminala Linux na Chromebooku. APK na Fire OS 6+ i Android TV 7.1+. Nie jest zgodny z Vega OS. Instrukcja Chromebooka znajduje się w paczce ZIP. Pakiet Samsung pozostaje dostępny osobno w wydaniu v0.9.0-tv-preview."
-          gh release upload v0.9.6-tv-preview OKTV-Player-TV-0.9.6-preview.apk bundle/OKTV-FireStick-Chromebook.zip
+          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.7-preview.apk
+          gh release create v0.9.7-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.7 Preview" --notes "Interfejs OKTV na TV, poprawki archiwum i obsługi nagrywania oraz paczka instalacyjna dla terminala Linux na Chromebooku. APK na Fire OS 6+ i Android TV 7.1+. Nie jest zgodny z Vega OS. Instrukcja Chromebooka znajduje się w paczce ZIP. Pakiet Samsung pozostaje dostępny osobno w wydaniu v0.9.0-tv-preview."
+          gh release upload v0.9.7-tv-preview OKTV-Player-TV-0.9.7-preview.apk bundle/OKTV-FireStick-Chromebook.zip
 
 
