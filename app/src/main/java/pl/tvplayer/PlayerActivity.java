@@ -184,7 +184,7 @@ public class PlayerActivity extends Activity {
         infoHandler.removeCallbacks(hideInfo);
     }
     private void showLiveInfo() {
-        if(liveInfo==null || !resumed || isFinishing()) return;
+        if(liveInfo==null || !resumed || isFinishing() || enteringPip || isInPictureInPictureMode()) return;
         setLiveInfoVisible(true); liveInfo.update();
         if(player!=null) liveInfo.audio(PlaybackAudio.description(player.getCurrentTracks()));
         GuideRepository.get(this).request(liveChannel(),false,data -> { if(resumed && !isDestroyed() && liveInfo!=null) liveInfo.guide(data); });
@@ -312,7 +312,8 @@ public class PlayerActivity extends Activity {
         } catch(IllegalStateException | IllegalArgumentException e) { enteringPip=false; updateFullscreen(); Toast.makeText(this,"Nie można włączyć PiP. Sprawdź ustawienia aplikacji.",Toast.LENGTH_LONG).show(); }
     }
     @Override public void onPictureInPictureModeChanged(boolean inPip,Configuration config) {
-        super.onPictureInPictureModeChanged(inPip,config); toolbar.setVisibility(inPip?View.GONE:View.VISIBLE); view.setUseController(!inPip);
+        super.onPictureInPictureModeChanged(inPip,config); toolbar.setVisibility(inPip?View.GONE:View.VISIBLE); view.setUseController(!inPip && liveInfo==null);
+        if(liveInfo!=null) setLiveInfoVisible(false);
         enteringPip=false; if(inPip && rotation!=null) rotation.disable();
         if(!inPip) { updateFullscreen(); revealLiveControls(); }
     }
