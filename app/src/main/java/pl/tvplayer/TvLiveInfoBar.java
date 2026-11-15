@@ -25,7 +25,7 @@ final class TvLiveInfoBar extends LinearLayout {
         setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0xCC07090C,0xF207090C,0xFA07090C}));
         LinearLayout main=new LinearLayout(context); main.setGravity(Gravity.CENTER_VERTICAL); addView(main,new LayoutParams(-1,-2));
         FrameLayout box=new FrameLayout(context); box.setBackground(Ui.shape(context,0xE61B1F25,12,0x33FFFFFF)); box.setPadding(dp(8),dp(8),dp(8),dp(8));
-        logoText=text("",15,0xFFF3F6FA); logoText.setGravity(Gravity.CENTER); logoText.setMaxLines(2); logoText.setTypeface(null,Typeface.BOLD); box.addView(logoText,new FrameLayout.LayoutParams(-1,-1));
+        logoText=text("",14,0xFFF3F6FA); logoText.setGravity(Gravity.CENTER); logoText.setMaxLines(3); logoText.setEllipsize(android.text.TextUtils.TruncateAt.END); logoText.setLineSpacing(0,1.1f); logoText.setTypeface(null,Typeface.BOLD); box.addView(logoText,new FrameLayout.LayoutParams(-1,-1));
         logo=new ImageView(context); logo.setScaleType(ImageView.ScaleType.FIT_CENTER); box.addView(logo,new FrameLayout.LayoutParams(-1,-1));
         main.addView(box,new LayoutParams(dp(112),dp(80)));
         View divider=new View(context); divider.setBackgroundColor(0x33FFFFFF); LayoutParams line=new LayoutParams(dp(1),dp(80)); line.leftMargin=dp(18); line.rightMargin=dp(18); main.addView(divider,line);
@@ -55,7 +55,7 @@ final class TvLiveInfoBar extends LinearLayout {
     void channel(String name) {
         String value=name==null?"":name; channel.setText(value);
         String shortName=value.replaceAll("(?i)\\b(fhd|uhd|hd|sd|4k|hevc|pl|raw)\\b|[|:\\[\\]]"," ").trim().replaceAll("\\s+"," ");
-        logoText.setText(shortName.length()>14?shortName.substring(0,14):shortName);
+        logoText.setText(shortName);
     }
     void logo(String url) {
         ImageLoader.get(getContext()).load(url==null?"":url,logo,dp(96),dp(64));

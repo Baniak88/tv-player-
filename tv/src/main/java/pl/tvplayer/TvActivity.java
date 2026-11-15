@@ -97,7 +97,8 @@ public final class TvActivity extends Activity {
     }
     private String title(String kind) { return kind.equals("tv")?"Telewizja na żywo":kind.equals("movie")?"Filmy":"Seriale"; }
     @Override public void onCreate(Bundle state) {
-        super.onCreate(state); getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON|WindowManager.LayoutParams.FLAG_SECURE);
+        super.onCreate(state); getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((was,now) -> TvShelfView.trace("focus "+focusName(was)+" -> "+focusName(now)));
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON|WindowManager.LayoutParams.FLAG_SECURE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         TvBrowseState location=readLocation(state==null?navigationStore().getString("location",""):state.getString("location",""));
         if(location!=null) applyLocation(location);
@@ -170,7 +171,8 @@ public final class TvActivity extends Activity {
         }
         body.addView(navigation);
     }
-    private void focusNavigation() { if(navigation!=null) navigation.getChildAt(home?0:section.equals("tv")?1:section.equals("movie")?2:3).requestFocus(); }
+    private static String focusName(View view) { return view==null?"null":view.getClass().getSimpleName()+(view.getContentDescription()!=null?"/"+view.getContentDescription():view instanceof TextView?"/"+((TextView)view).getText():""); }
+    private void focusNavigation() { StackTraceElement[] from=new Throwable().getStackTrace(); TvShelfView.trace("focusNavigation from "+(from.length>1?from[1].getMethodName()+":"+from[1].getLineNumber():"?")+(from.length>2?" < "+from[2].getMethodName()+":"+from[2].getLineNumber():"")); if(navigation!=null) navigation.getChildAt(home?0:section.equals("tv")?1:section.equals("movie")?2:3).requestFocus(); }
     private TvShelfView createShelves() {
         return new TvShelfView(this,new TvShelfView.Actions() {
             public void selected(Channel channel,String row,int index) { if(channel!=null) describe(channel); }

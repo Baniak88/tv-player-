@@ -142,7 +142,7 @@ public class TvStreamingNavigationTest {
     @After public void cleanup() throws Exception { refreshGate.countDown(); close(child); close(home); if(server!=null) server.shutdown(); landscape(1280,720); }
     private String focusReport() {
         String[] out={""}; instrument().runOnMainSync(() -> { try { TvShelfView view=(TvShelfView)field(home,"shelves"); View focus=home.getCurrentFocus();
-            out[0]="shelves="+(view==null?"null":"hasFocus="+view.hasFocus()+",index="+view.index()+",shelf="+view.shelf()+",width="+view.getWidth())+", focus="+(focus==null?"null":focus.getClass().getSimpleName()+"/"+focus.getContentDescription())+", section="+field(home,"section")+", catalogReady="+field(home,"catalogReady");
+            out[0]="shelves="+(view==null?"null":"hasFocus="+view.hasFocus()+",index="+view.index()+",shelf="+view.shelf()+",width="+view.getWidth())+", focus="+(focus==null?"null":focus.getClass().getSimpleName()+"/"+focus.getContentDescription())+", section="+field(home,"section")+", catalogReady="+field(home,"catalogReady")+"\nTRACE:\n"+String.join("\n",new ArrayList<>(TvShelfView.TRACE));
         } catch(Exception e) { out[0]=e.toString(); } }); return out[0];
     }
 }

@@ -182,7 +182,8 @@ public class PlayerActivity extends Activity {
     }
     private void setLiveInfoVisible(boolean visible) {
         if(liveInfo==null) return;
-        liveInfo.setVisibility(visible?View.VISIBLE:View.GONE); toolbar.setVisibility(visible?View.VISIBLE:View.GONE);
+        // The receiver-style infobar carries the channel name and key hints; the touch toolbar (whose buttons a remote cannot reach) stays hidden.
+        liveInfo.setVisibility(visible?View.VISIBLE:View.GONE); toolbar.setVisibility(View.GONE);
         infoHandler.removeCallbacks(hideInfo);
     }
     private void showLiveInfo() {
