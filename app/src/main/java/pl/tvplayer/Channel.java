@@ -55,6 +55,12 @@ public record Channel(String name, String url, String group, String epgId, Strin
             return new Channel(c.name,c.url,c.group,c.epgId,"tv",c.guideUrl,c.archiveDays,c.timezone,c.bouquetOrder,c.logo,c.added);
         return c;
     }
+    private static final java.util.regex.Pattern SEPARATOR=java.util.regex.Pattern.compile("^\\s*[#=*~_\\-•]{3,}.*|.*[#=*~_\\-•]{3,}\\s*$");
+    /** Provider lists use fake entries such as "##### PL SPORT #####" as section dividers; they are not channels. */
+    boolean separator() { return kind.equals("tv") && SEPARATOR.matcher(name).matches(); }
+    static java.util.List<Channel> withoutSeparators(java.util.List<Channel> items) {
+        java.util.List<Channel> result=new java.util.ArrayList<>(items.size()); for(Channel c:items) if(!c.separator()) result.add(c); return result;
+    }
     public String section() { return kind.equals("episode") ? "series" : kind; }
     /**
      * Classifies an M3U entry. The stream address decides first; channel names are never used for

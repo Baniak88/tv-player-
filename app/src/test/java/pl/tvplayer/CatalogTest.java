@@ -78,4 +78,12 @@ public class CatalogTest {
             HttpUrl.get("https://example.com/"),"u","p",Collections.emptyMap(),"series");
         assertEquals(1730000500L,series.get(0).added());
     }
+    @Test public void providerSeparatorsAreNotChannels() {
+        assertTrue(new Channel("##### PL OGÓLNOTEMATYCZNE #####","http://h/u/p/1.ts","PL","","tv").separator());
+        assertTrue(new Channel("----- SPORT -----","http://h/u/p/2.ts","PL","","tv").separator());
+        assertFalse(new Channel("PL| TVP 1 FHD","http://h/u/p/3.ts","PL","","tv").separator());
+        assertFalse(new Channel("Canal+ Sport 2","http://h/u/p/4.ts","PL","","tv").separator());
+        assertFalse(new Channel("#####","https://e.com/movie/u/p/5.mkv","Kino","","movie").separator());
+        assertEquals(1,Channel.withoutSeparators(java.util.Arrays.asList(new Channel("=== INFO ===","http://h/u/p/6.ts","PL","","tv"),new Channel("TVN","http://h/u/p/7.ts","PL","","tv"))).size());
+    }
 }

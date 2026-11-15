@@ -17,7 +17,7 @@ final class TvShelfView extends RecyclerView {
         void options(Channel channel);
         void navigation();
     }
-    static final int BLUE=0xFF00A8E1;
+    static final int BLUE=Ui.ACCENT;
     private final Actions actions;
     private final LinearLayoutManager vertical;
     private List<TvShelfCatalog.Shelf> shelves=Collections.emptyList();
@@ -41,8 +41,8 @@ final class TvShelfView extends RecyclerView {
     private int cardsHeight() { return dp(compact()?204:240); }
     private TextView text(String value,int size,int color) { return Ui.text(getContext(),value,size,color); }
     private StateListDrawable cardBackground() {
-        StateListDrawable states=new StateListDrawable(); GradientDrawable focused=Ui.shape(getContext(),0xFF172B3D,8,0); focused.setStroke(dp(3),0xFFFFFFFF);
-        states.addState(new int[]{android.R.attr.state_focused},focused); states.addState(new int[]{},Ui.shape(getContext(),0xFF111D2A,8,0)); return states;
+        StateListDrawable states=new StateListDrawable(); GradientDrawable focused=Ui.shape(getContext(),Ui.SURFACE_HIGH,8,0); focused.setStroke(dp(3),Ui.ACCENT);
+        states.addState(new int[]{android.R.attr.state_focused},focused); states.addState(new int[]{},Ui.shape(getContext(),Ui.SURFACE,8,0)); return states;
     }
     void submit(List<TvShelfCatalog.Shelf> rows,TvBrowseState anchor,boolean focus) {
         shelves=rows; if(anchor!=null) { selectedShelf=anchor.shelfKey(); selectedIndex=anchor.shelfIndex(); }
@@ -91,12 +91,12 @@ final class TvShelfView extends RecyclerView {
         TextView title,subtitle,hint; ImageView image;
         Hero(LinearLayout view) {
             super(view); view.setGravity(Gravity.CENTER_VERTICAL); view.setPadding(dp(12),dp(8),dp(16),dp(12));
-            view.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{0xFF152C42,0xFF0B1420}));
+            view.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{0xFF2A1A20,Ui.BG}));
             LinearLayout copy=new LinearLayout(getContext()); copy.setOrientation(LinearLayout.VERTICAL);
             TextView eyebrow=text("Z TWOJEJ BIBLIOTEKI",12,BLUE); eyebrow.setLetterSpacing(.12f); copy.addView(eyebrow);
             title=text("Wybierz coś na dziś",compact()?22:28,Ui.TEXT); title.setTypeface(null,Typeface.BOLD); title.setMaxLines(compact()?1:2); title.setEllipsize(android.text.TextUtils.TruncateAt.END); copy.addView(title);
             subtitle=text("Filmy i seriale od Twojego dostawcy",15,Ui.MUTED); subtitle.setSingleLine(true); copy.addView(subtitle);
-            hint=text("OK — wybierz",13,0xFFBAC8D6); hint.setPadding(0,dp(8),0,0); copy.addView(hint); view.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+            hint=text("OK — wybierz",13,Ui.MUTED); hint.setPadding(0,dp(8),0,0); copy.addView(hint); view.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
             image=new ImageView(getContext()); image.setScaleType(ImageView.ScaleType.FIT_CENTER); view.addView(image,new LinearLayout.LayoutParams(dp(154),-1));
         }
     }
@@ -113,7 +113,7 @@ final class TvShelfView extends RecyclerView {
         LinearLayout view; ImageView image; TextView title,placeholder;
         Card(LinearLayout view) {
             super(view); this.view=view; view.setOrientation(LinearLayout.VERTICAL); view.setPadding(dp(5),dp(5),dp(5),dp(5)); view.setBackground(cardBackground()); view.setFocusable(true); view.setFocusableInTouchMode(true); view.setDescendantFocusability(FOCUS_BLOCK_DESCENDANTS);
-            FrameLayout art=new FrameLayout(getContext()); art.setBackgroundColor(0xFF192A3A); placeholder=text("",22,0xFF6B8095); placeholder.setGravity(Gravity.CENTER); art.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
+            FrameLayout art=new FrameLayout(getContext()); art.setBackgroundColor(Ui.SURFACE_HIGH); placeholder=text("",22,Ui.FAINT); placeholder.setGravity(Gravity.CENTER); art.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
             image=new ImageView(getContext()); image.setScaleType(ImageView.ScaleType.FIT_CENTER); art.addView(image,new FrameLayout.LayoutParams(-1,-1)); view.addView(art,new LinearLayout.LayoutParams(-1,artworkHeight()));
             title=text("",16,Ui.TEXT); title.setMaxLines(2); title.setEllipsize(android.text.TextUtils.TruncateAt.END); title.setPadding(dp(3),dp(5),dp(3),0); view.addView(title,new LinearLayout.LayoutParams(-1,dp(45)));
             RecyclerView.LayoutParams size=new RecyclerView.LayoutParams(dp(142),-1); size.rightMargin=dp(12); view.setLayoutParams(size);

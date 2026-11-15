@@ -14,8 +14,9 @@ import android.widget.TextView;
 /** OKTV palette: deep navy surfaces, one vivid coral-red accent and a cyan highlight for progress. */
 final class Ui {
     static final String APP_NAME = "OKTV Player", BRAND = "OKTV";
-    static final int BG = 0xFF0A0D14, SURFACE = 0xFF141A27, SURFACE_HIGH = 0xFF1C2335, BORDER = 0xFF2A3350,
-        TEXT = 0xFFF3F5FA, MUTED = 0xFF9DA6BC, FAINT = 0xFF646D84, ON_ACCENT = 0xFFFFFFFF, ACCENT = 0xFFFF3D5E,
+    // Neutral charcoal rather than navy: on backlit LED TVs dark blue glows as a bright blue sheet.
+    static final int BG = 0xFF0B0C0F, SURFACE = 0xFF17191E, SURFACE_HIGH = 0xFF22252C, BORDER = 0xFF33363F,
+        TEXT = 0xFFF4F5F7, MUTED = 0xFFA4A8B2, FAINT = 0xFF6C707A, ON_ACCENT = 0xFFFFFFFF, ACCENT = 0xFFFF3D5E,
         HIGHLIGHT = 0xFF35D0FF, STAR = 0xFFFFC53D, DANGER = 0xFFFF6B6B;
     private Ui() { }
 

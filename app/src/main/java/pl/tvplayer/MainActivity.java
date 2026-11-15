@@ -234,7 +234,7 @@ public class MainActivity extends Activity {
         worker.execute(() -> {
             try {
                 Set<String> savedFavorites=new HashSet<>();
-                List<Channel> loaded=store.loadSection(requested,savedFavorites);
+                List<Channel> loaded=Channel.withoutSeparators(store.loadSection(requested,savedFavorites));
                 String[] normalized=searchKeysFor(loaded);
                 runOnUiThread(() -> {
                     if(isDestroyed()) return;
@@ -733,7 +733,7 @@ public class MainActivity extends Activity {
                     sectionIndex.clear(); searchKeys.clear();
                     Map<String,List<Channel>> parts=new HashMap<>();
                     for(Channel c:result) parts.computeIfAbsent(c.section(),key -> new ArrayList<>()).add(c);
-                    for(Map.Entry<String,List<Channel>> part:parts.entrySet()) putSection(part.getKey(),part.getValue());
+                    for(Map.Entry<String,List<Channel>> part:parts.entrySet()) putSection(part.getKey(),Channel.withoutSeparators(part.getValue()));
                     loadedSections.addAll(Arrays.asList("tv","movie","series"));
                     Set<String> urls = new HashSet<>(); for (Channel c : channels) urls.add(c.url()); favorites.retainAll(urls);
                     busy = false;
