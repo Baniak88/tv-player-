@@ -27,7 +27,7 @@ final class TvShelfView extends RecyclerView {
     private boolean mounting;
     /** Last focus-restore steps, read by instrumentation tests when a restore fails. */
     static final java.util.ArrayDeque<String> TRACE=new java.util.ArrayDeque<>();
-    static void trace(String line) { synchronized(TRACE) { TRACE.addLast(android.os.SystemClock.uptimeMillis()%100000+" "+line); while(TRACE.size()>40) TRACE.removeFirst(); } }
+    static void trace(String line) { synchronized(TRACE) { TRACE.addLast(android.os.SystemClock.uptimeMillis()%100000+" "+line); while(TRACE.size()>160) TRACE.removeFirst(); } }
     private Channel selectedChannel;
     private Hero hero;
     private final ShelfAdapter adapter=new ShelfAdapter();
@@ -86,7 +86,7 @@ final class TvShelfView extends RecyclerView {
             if(target<0) { mounting=false; return; }
             if(anchor!=null && attempt==0) row.layout.scrollToPositionWithOffset(anchor.categoryFirst(),anchor.categoryTop());
             ViewHolder card=row.cards.findViewHolderForAdapterPosition(target);
-            trace("mountFocus attempt="+attempt+" row="+rowIndex+" target="+target+" card="+(card==null?"null":card.itemView.getWidth()+"x"+card.itemView.getHeight()+" vis="+card.itemView.isShown()+" focusable="+card.itemView.isFocusable())+" focus="+findFocus());
+            trace("mountFocus attempt="+attempt+" row="+rowIndex+" target="+target+" cards="+row.cards.getWidth()+"x"+row.cards.getHeight()+" attached="+row.cards.isAttachedToWindow()+" children="+row.cards.getChildCount()+" items="+(row.cards.getAdapter()==null?-1:row.cards.getAdapter().getItemCount())+" vis="+row.layout.findFirstVisibleItemPosition()+"-"+row.layout.findLastVisibleItemPosition()+" req="+row.cards.isLayoutRequested()+"/"+isLayoutRequested()+" rowTop="+row.itemView.getTop()+" shown="+isShown()+" card="+(card==null?"null":card.itemView.getWidth()+"x"+card.itemView.getHeight()+" vis="+card.itemView.isShown()+" focusable="+card.itemView.isFocusable())+" focus="+findFocus());
             if(card==null || card.itemView.getWidth()==0) { row.layout.scrollToPositionWithOffset(target,0); mountFocus(rowIndex,index,null,request,attempt+1); return; }
             // A card that is not laid out yet can refuse focus; keep trying instead of leaving focus elsewhere.
             if(!card.itemView.requestFocus() || !card.itemView.hasFocus()) mountFocus(rowIndex,index,null,request,attempt+1); else mounting=false;
