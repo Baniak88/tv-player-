@@ -328,6 +328,7 @@ public final class TvActivity extends Activity {
         LinearLayout split=new LinearLayout(this);
         rail=new ListView(this); rail.setId(View.generateViewId()); rail.setDivider(null); rail.setSelector(catalogCursor()); rail.setDrawSelectorOnTop(true); rail.setItemsCanFocus(false); rail.setPadding(0,0,dp(10),0);
         rail.setOnItemClickListener((parent,view,position,id) -> openRail(position));
+        rail.setFocusable(false); rail.setOnFocusChangeListener((view,focused) -> { if(!focused) view.setFocusable(false); });
         rail.setOnKeyListener((view,key,event) -> {
             if(key!=KeyEvent.KEYCODE_DPAD_RIGHT) return false;
             if(event.getAction()==KeyEvent.ACTION_DOWN && event.getRepeatCount()==0 && shelves!=null) shelves.focusCurrent();
@@ -597,6 +598,12 @@ public final class TvActivity extends Activity {
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         int code=event.getKeyCode();
+        // The category list is reached only on purpose: Left on the first card of a shelf. It never takes initial focus,
+        // so returning from a category grid restores the previously selected card.
+        if(code==KeyEvent.KEYCODE_DPAD_LEFT && rail!=null && shelves!=null && shelves.hasFocus() && shelves.index()==0) {
+            if(event.getAction()==KeyEvent.ACTION_DOWN) { rail.setFocusable(true); rail.requestFocus(); }
+            return true;
+        }
         if((!home || shelves!=null) && (code==KeyEvent.KEYCODE_MEDIA_PLAY || code==KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
             if(event.getAction()==KeyEvent.ACTION_UP && !event.isCanceled()) { Channel selected=home?shelves.selected():selected(); if(selected!=null) openCard(selected); }
             return true;
