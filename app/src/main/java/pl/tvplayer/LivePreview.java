@@ -61,9 +61,9 @@ final class LivePreview {
         pause=Ui.button(activity,"Ⅱ"); pause.setId(View.generateViewId()); pause.setContentDescription("Wstrzymaj podgląd"); pause.setTextSize(18); Ui.ghost(pause,Ui.TEXT); controls.addView(pause,new LinearLayout.LayoutParams(dp(48),dp(48)));
         pause.setOnClickListener(v -> { if(player==null) { start(); return; } if(player.getPlayerError()!=null) { recovery.retryNow(); } else if(player.getPlayWhenReady()) player.pause(); else player.play(); });
         title=Ui.text(activity,"Podgląd",television?16:14,Ui.TEXT); title.setMaxLines(television?2:1); title.setEllipsize(TextUtils.TruncateAt.END); title.setTypeface(null,android.graphics.Typeface.BOLD); controls.addView(title,new LinearLayout.LayoutParams(0,-2,1));
-        Button internet=Ui.button(activity,"⚙"); internet.setContentDescription("Ustawienia słabszego internetu"); Ui.ghost(internet,Ui.MUTED); controls.addView(internet,new LinearLayout.LayoutParams(dp(48),dp(48)));
+        Button internet=Ui.button(activity,television?"Bufor":"⚙"); internet.setTextSize(television?12:16); internet.setContentDescription("Ustawienia słabszego internetu"); Ui.ghost(internet,Ui.MUTED); controls.addView(internet,new LinearLayout.LayoutParams(dp(television?60:48),dp(48)));
         internet.setOnClickListener(v -> PlaybackSettings.choose(activity,() -> { release(); start(); selectionChanged.run(); }));
-        full=Ui.button(activity,"⤢"); full.setTextSize(23); full.setContentDescription("Otwórz podgląd na pełnym ekranie"); Ui.ghost(full,Ui.TEXT); controls.addView(full,new LinearLayout.LayoutParams(dp(48),dp(48)));
+        full=Ui.button(activity,television?"Ekran":"⤢"); full.setTextSize(television?13:23); full.setContentDescription("Otwórz podgląd na pełnym ekranie"); Ui.ghost(full,Ui.TEXT); controls.addView(full,new LinearLayout.LayoutParams(dp(television?80:48),dp(48)));
         full.setOnClickListener(v -> { if(channel!=null) fullscreen.accept(channel); });
         panel.addView(controls,new LinearLayout.LayoutParams(-1,dp(48)));
         schedule=Ui.text(activity,"",television?14:12,Ui.MUTED); schedule.setMaxLines(television?4:wide?2:1); schedule.setEllipsize(TextUtils.TruncateAt.END); schedule.setPadding(dp(12),0,dp(12),dp(8));

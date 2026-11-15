@@ -85,9 +85,10 @@ public class TvCatalogUsabilityTest {
             instrument().runOnMainSync(() -> { int full=0; for(int i=0;i<list.getChildCount();i++) if(list.getChildAt(i).getBottom()<=list.getHeight()) full++; assertTrue("Too few readable live rows",full>=5); });
             screenshot("tv096-live-"+width+".png");
             key(KeyEvent.KEYCODE_BACK); assertFalse(list.hasFocus()); assertNotNull(find(home.getWindow().getDecorView(),"UK| SKY CINEMA ACTION FHD 1")); key(KeyEvent.KEYCODE_BACK);
-            assertNotNull(node("Nawigacja")); key(KeyEvent.KEYCODE_BACK); key(KeyEvent.KEYCODE_DPAD_UP); key(KeyEvent.KEYCODE_DPAD_LEFT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Home action missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null);
+            assertNotNull(node("Nawigacja")); key(KeyEvent.KEYCODE_BACK); key(KeyEvent.KEYCODE_DPAD_UP); key(KeyEvent.KEYCODE_DPAD_UP); key(KeyEvent.KEYCODE_DPAD_LEFT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Home action missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null);
             key(KeyEvent.KEYCODE_DPAD_RIGHT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("Real film missing",() -> find(home.getWindow().getDecorView(),"Ostatni rejs – wersja reżyserska (2024) · 1")!=null);
             TvShelfView shelves=(TvShelfView)field(home,"shelves"); assertNotNull("Movies must use category shelves",shelves); waitFor("Shelf has no remote focus",shelves::hasFocus);
+            instrument().runOnMainSync(() -> { View hero=shelves.getLayoutManager().findViewByPosition(0); assertNotNull("Selected title banner must remain visible",hero); assertTrue("Selected title banner was clipped",hero.getTop()>=0); });
             assertNull(find(home.getWindow().getDecorView(),"UK| SKY CINEMA ACTION FHD 1")); screenshot("tv096-movies-"+width+".png");
             click("Opcje"); click("Widok"); click("Siatka plakatów");
             grid=(GridView)field(home,"posters"); assertEquals(width==960?5:6,grid.getNumColumns());

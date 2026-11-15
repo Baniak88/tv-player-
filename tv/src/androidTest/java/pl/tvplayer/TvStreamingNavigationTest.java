@@ -29,7 +29,10 @@ public class TvStreamingNavigationTest {
         byte[] stream; try(InputStream in=instrument().getContext().getAssets().open("live-controls.ts"); ByteArrayOutputStream out=new ByteArrayOutputStream()) { byte[] bytes=new byte[8192]; for(int n;(n=in.read(bytes))!=-1;) out.write(bytes,0,n); stream=out.toByteArray(); }
         List<byte[]> images=new ArrayList<>(); for(int i=0;i<8;i++) images.add(poster(i));
         server=new MockWebServer(); server.setDispatcher(new Dispatcher() { @Override public MockResponse dispatch(RecordedRequest request) {
+            if(request.getPath().startsWith("/get.php")) return new MockResponse().setBody(refreshedPlaylist);
             if(request.getPath().startsWith("/refresh.m3u")) { try { refreshGate.await(45,java.util.concurrent.TimeUnit.SECONDS); } catch(InterruptedException e) { Thread.currentThread().interrupt(); } return new MockResponse().setBody(refreshedPlaylist); }
+            if("get_live_categories".equals(request.getRequestUrl().queryParameter("action"))) return new MockResponse().setBody("[{\"category_id\":\"1\",\"category_name\":\"Sport\"},{\"category_id\":\"2\",\"category_name\":\"Informacje\"},{\"category_id\":\"3\",\"category_name\":\"UK | MOVIES\"}]");
+            if("get_live_streams".equals(request.getRequestUrl().queryParameter("action"))) return new MockResponse().setBody("[{\"stream_id\":501,\"name\":\"UK Sky Cinema\",\"category_id\":\"3\"}]");
             if(request.getPath().startsWith("/art/")) { int index=Integer.parseInt(request.getPath().substring(5).split("\\.")[0]); return new MockResponse().setHeader("Content-Type","image/png").setHeader("Cache-Control","public,max-age=86400").setBody(new okio.Buffer().write(images.get(index%8))); }
             if(request.getPath().contains("player_api.php")) { metadata.incrementAndGet(); return new MockResponse().setHeader("Content-Type","application/json").setBody("{\"info\":{\"name\":\"Film testowy\",\"plot\":\"Opis filmu z biblioteki dostawcy.\"},\"epg_listings\":[]}"); }
             if(request.getPath().endsWith(".ts")) return new MockResponse().setHeader("Content-Type","video/mp2t").setBody(new okio.Buffer().write(stream));
@@ -119,6 +122,17 @@ public class TvStreamingNavigationTest {
         click("Seriale"); waitSelected("Nocna cisza"); assertTrue("Refresh should still be waiting for the provider",(Boolean)field(home,"refreshing"));
         refreshGate.countDown(); waitFor("Refresh did not finish",() -> { try { return !(Boolean)field(home,"refreshing") && (Boolean)field(home,"catalogReady"); } catch(Exception e) { return false; } });
         waitSelected("Nocna cisza"); assertEquals("series",field(home,"section")); assertFalse((Boolean)field(home,"home"));
+    }
+    @Test public void panelCompletesTheMissingUkMoviesBouquetAndCategorySearchFindsIt() throws Exception {
+        new TvAccountStore(context()).save(new TvAccountStore.Account("m3u",server.url("/get.php?username=demo&password=secret&type=m3u_plus").toString(),"",""));
+        start(true); remote(KeyEvent.KEYCODE_DPAD_CENTER); waitFor("TV not ready",() -> { try { return field(home,"section").equals("tv") && (Boolean)field(home,"catalogReady"); } catch(Exception e) { return false; } });
+        remote(KeyEvent.KEYCODE_DPAD_DOWN); assertEquals("Sport",field(home,"group"));
+        click("Opcje"); click("Odśwież źródło");
+        waitFor("Panel did not restore the missing bouquet",() -> { try { return ((List<?>)field(home,"groups")).contains("UK | MOVIES"); } catch(Exception e) { return false; } });
+        assertEquals("Sport",field(home,"group"));
+        click("Opcje"); click("Kategorie"); input(0,"UK Movies"); click("UK | MOVIES");
+        waitFor("Recovered live channel missing",() -> { try { List<?> shown=(List<?>)field(home,"shown"); return shown.size()==1 && ((Channel)shown.get(0)).name().equals("UK Sky Cinema") && ((Channel)shown.get(0)).kind().equals("tv"); } catch(Exception e) { return false; } });
+        assertFalse(new LibraryStore(context()).loadSection("movie",new HashSet<>()).stream().anyMatch(channel -> channel.name().equals("UK Sky Cinema")));
     }
     private int images(View view) { int count=view instanceof ImageView && ((ImageView)view).getDrawable()!=null?1:0; if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++) count+=images(group.getChildAt(i)); return count; }
     @After public void cleanup() throws Exception { refreshGate.countDown(); close(child); close(home); if(server!=null) server.shutdown(); landscape(1280,720); }

@@ -34,7 +34,15 @@ final class TvTestUi {
         for(AccessibilityNodeInfo found:root.findAccessibilityNodeInfosByText(text)) {
             if(result==null && found.getText()!=null && text.equalsIgnoreCase(found.getText().toString())) result=found; else found.recycle();
         }
+        // API 25's text query can return an outdated result after replacing a catalogue subtree.
+        if(result==null && root.refresh()) result=exactNode(root,text);
         root.recycle(); return result;
+    }
+    private static AccessibilityNodeInfo exactNode(AccessibilityNodeInfo root,String text) {
+        if(!root.refresh()) return null;
+        if(root.getText()!=null && text.equalsIgnoreCase(root.getText().toString())) return AccessibilityNodeInfo.obtain(root);
+        for(int i=0;i<root.getChildCount();i++) { AccessibilityNodeInfo child=root.getChild(i); if(child==null) continue; AccessibilityNodeInfo found=exactNode(child,text); child.recycle(); if(found!=null) return found; }
+        return null;
     }
     static void click(String text) throws Exception {
         waitFor("Missing option: "+text,() -> node(text)!=null);
