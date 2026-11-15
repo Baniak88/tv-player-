@@ -619,6 +619,7 @@ public final class TvActivity extends Activity {
     }
     @Override public void onBackPressed() {
         if(busy) { status.setText("Trwa pobieranie biblioteki…"); return; }
+        if(rail!=null && rail.hasFocus() && shelves!=null) { shelves.focusCurrent(); return; } // Back closes the category list
         if(!home && parentLocation!=null) { restoreLocation(parentLocation); return; }
         if(livePreview!=null && livePreview.panel.hasFocus()) { list.requestFocus(); return; }
         if(!home && list!=null && contentView().hasFocus() && bouquets.getVisibility()==View.VISIBLE) { bouquets.setSelection(group.isEmpty()?0:Math.max(0,groups.indexOf(group)+1)); bouquets.requestFocus(); return; }
