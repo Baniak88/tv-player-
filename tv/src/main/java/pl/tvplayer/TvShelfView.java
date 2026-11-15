@@ -24,6 +24,7 @@ final class TvShelfView extends RecyclerView {
     private final Map<String,Integer> rowPositions=new HashMap<>();
     private String selectedShelf="";
     private int selectedIndex,focusGeneration;
+    private boolean mounting;
     private Channel selectedChannel;
     private Hero hero;
     private final ShelfAdapter adapter=new ShelfAdapter();
@@ -48,11 +49,13 @@ final class TvShelfView extends RecyclerView {
         states.addState(new int[]{android.R.attr.state_focused},focused); states.addState(new int[]{},Ui.shape(getContext(),Ui.SURFACE,8,0)); return states;
     }
     void submit(List<TvShelfCatalog.Shelf> rows,TvBrowseState anchor,boolean focus) {
+        // Rebinding replaces every card; if a card held (or was about to receive) focus, give it back afterwards.
+        boolean keep=hasFocus() || mounting;
         shelves=rows; if(anchor!=null) { selectedShelf=anchor.shelfKey(); selectedIndex=anchor.shelfIndex(); }
         if(shelves.stream().noneMatch(row -> row.key().equals(selectedShelf))) { selectedShelf=shelves.isEmpty()?"":shelves.get(0).key(); selectedIndex=0; }
         adapter.notifyDataSetChanged();
         if(anchor!=null) vertical.scrollToPositionWithOffset(anchor.firstVisible(),anchor.top());
-        if(focus && !shelves.isEmpty()) focus(selectedShelf,selectedIndex,anchor);
+        if((focus || keep) && !shelves.isEmpty()) focus(selectedShelf,selectedIndex,anchor);
     }
     Channel selected() { return selectedChannel; }
     String shelf() { return selectedShelf; }
@@ -66,22 +69,23 @@ final class TvShelfView extends RecyclerView {
     void focusCurrent() { if(!shelves.isEmpty()) focus(selectedShelf,selectedIndex,null); }
     private void focus(String key,int index,TvBrowseState anchor) {
         if(shelves.isEmpty()) return;
-        int row=rowIndex(key),request=++focusGeneration;
+        int row=rowIndex(key),request=++focusGeneration; mounting=true;
         if(anchor==null) vertical.scrollToPositionWithOffset(row+1,row==0?heroHeight():0);
         mountFocus(row,index,anchor,request,0);
     }
     private void mountFocus(int rowIndex,int index,TvBrowseState anchor,int request,int attempt) {
         postDelayed(() -> {
-            if(request!=focusGeneration || !isAttachedToWindow() || attempt>60) return;
+            if(request!=focusGeneration) return;
+            if(!isAttachedToWindow() || attempt>60) { mounting=false; return; }
             ViewHolder holder=findViewHolderForAdapterPosition(rowIndex+1);
             if(!(holder instanceof Row row)) { vertical.scrollToPositionWithOffset(rowIndex+1,rowIndex==0?heroHeight():0); mountFocus(rowIndex,index,anchor,request,attempt+1); return; }
             TvShelfCatalog.Shelf shelf=shelves.get(rowIndex); int target=Math.min(index,shelf.channels().size()+(shelf.more()?1:0)-1);
-            if(target<0) return;
+            if(target<0) { mounting=false; return; }
             if(anchor!=null && attempt==0) row.layout.scrollToPositionWithOffset(anchor.categoryFirst(),anchor.categoryTop());
             ViewHolder card=row.cards.findViewHolderForAdapterPosition(target);
             if(card==null || card.itemView.getWidth()==0) { row.layout.scrollToPositionWithOffset(target,0); mountFocus(rowIndex,index,null,request,attempt+1); return; }
             // A card that is not laid out yet can refuse focus; keep trying instead of leaving focus elsewhere.
-            if(!card.itemView.requestFocus() || !card.itemView.hasFocus()) mountFocus(rowIndex,index,null,request,attempt+1);
+            if(!card.itemView.requestFocus() || !card.itemView.hasFocus()) mountFocus(rowIndex,index,null,request,attempt+1); else mounting=false;
         },attempt==0?0:32);
     }
     private void describe(Channel channel,TvShelfCatalog.Shelf row) {
