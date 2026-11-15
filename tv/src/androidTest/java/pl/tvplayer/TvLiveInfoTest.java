@@ -73,7 +73,9 @@ public class TvLiveInfoTest {
         instrument().runOnMainSync(current::play);
         // The fixture's default track is Polish AC-3; with the bundled FFmpeg decoder it is now played in PCM mode
         // instead of falling back to the English AAC track.
-        check("PCM path did not decode the default Polish AC-3 track",() -> current.getAudioFormat()!=null && MimeTypes.AUDIO_AC3.equals(current.getAudioFormat().sampleMimeType) && "pol".equals(current.getAudioFormat().language) && current.getAudioDecoderCounters()!=null && current.getAudioDecoderCounters().renderedOutputBufferCount>0);
+        // Media3 normalises the Matroska "pol" tag to "pl".
+        try { check("PCM path did not decode the default Polish AC-3 track",() -> current.getAudioFormat()!=null && MimeTypes.AUDIO_AC3.equals(current.getAudioFormat().sampleMimeType) && current.getAudioFormat().language!=null && current.getAudioFormat().language.startsWith("pl") && current.getAudioDecoderCounters()!=null && current.getAudioDecoderCounters().renderedOutputBufferCount>0); }
+        catch(AssertionError e) { String[] state={""}; instrument().runOnMainSync(() -> state[0]=String.valueOf(current.getAudioFormat())+" counters="+(current.getAudioDecoderCounters()==null?"none":current.getAudioDecoderCounters().renderedOutputBufferCount)); throw new AssertionError(e.getMessage()+" · "+state[0]); }
         instrument().runOnMainSync(() -> assertEquals(2,current.getTrackSelectionParameters().maxAudioChannelCount));
         close(activity); activity=null; start(false); ExoPlayer restored=player(); check("Saved PCM mode not applied",() -> restored.getAudioFormat()!=null && MimeTypes.AUDIO_AC3.equals(restored.getAudioFormat().sampleMimeType));
     }
