@@ -21,6 +21,7 @@ public class TvCatalogUsabilityTest {
     private Activity player;
     private final List<Channel> fixture=new ArrayList<>();
     private String liveUrl;
+    private int viewportWidth;
     @Before public void setup() throws Exception {
         systemReady(); server=new MockWebServer();
         byte[] poster=image(false),logo=image(true);
@@ -47,8 +48,15 @@ public class TvCatalogUsabilityTest {
         ByteArrayOutputStream out=new ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.PNG,100,out); bitmap.recycle(); return out.toByteArray();
     }
     private void shell(String command) throws Exception { try(android.os.ParcelFileDescriptor.AutoCloseInputStream in=new android.os.ParcelFileDescriptor.AutoCloseInputStream(instrument().getUiAutomation().executeShellCommand(command))) { byte[] buffer=new byte[512]; while(in.read(buffer)!=-1) {} } }
-    private void viewport(int width,int height) throws Exception { shell("wm size "+width+"x"+height); shell("wm density 160"); Thread.sleep(300); }
-    private void start() throws Exception { home=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK)); home.getPreferences(0).edit().remove("list-movie").remove("list-series").commit(); waitFor("Home missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null); waitFor("Home has no focus",home::hasWindowFocus); }
+    private void viewport(int width,int height) throws Exception { viewportWidth=width; shell("wm size "+width+"x"+height); shell("wm density 160"); }
+    private void start() throws Exception {
+        home=(TvActivity)instrument().startActivitySync(new Intent(context(),TvActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
+        home.getPreferences(0).edit().remove("list-movie").remove("list-series").commit();
+        waitFor("Home missing",() -> find(home.getWindow().getDecorView(),"Co oglądamy?")!=null); waitFor("Home has no focus",home::hasWindowFocus);
+        waitFor("Window/resources did not apply requested viewport "+viewportWidth+" at density 160",() -> {
+            boolean[] ready={false}; instrument().runOnMainSync(() -> { android.util.DisplayMetrics metrics=home.getResources().getDisplayMetrics(); ready[0]=metrics.widthPixels==viewportWidth && metrics.densityDpi==160 && home.getWindow().getDecorView().getWidth()==viewportWidth; }); return ready[0];
+        });
+    }
     private void screenshot(String name) {
         instrument().runOnMainSync(() -> { View root=home.getWindow().getDecorView(); Bitmap bitmap=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap)); try(FileOutputStream out=context().openFileOutput(name,0)) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } catch(Exception e) { throw new AssertionError(e); } finally { bitmap.recycle(); } });
     }
