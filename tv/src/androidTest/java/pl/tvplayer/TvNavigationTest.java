@@ -40,7 +40,7 @@ public class TvNavigationTest {
             assertEquals("Telewizja na żywo",activity.getCurrentFocus().getContentDescription().toString()); screenshot(activity,"tv-home.png");
             key(KeyEvent.KEYCODE_DPAD_RIGHT); assertEquals("Filmy",activity.getCurrentFocus().getContentDescription().toString());
             key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(activity.getWindow().getDecorView(),"Test Film"); assertNull(find(activity.getWindow().getDecorView(),"Sport 1")); screenshot(activity,"tv-movies.png");
-            key(KeyEvent.KEYCODE_BACK); waitAccessible("Nawigacja"); key(KeyEvent.KEYCODE_BACK); assertNull(find(activity.getWindow().getDecorView(),"Co oglądamy?")); TvTestUi.click("Główna"); waitText(activity.getWindow().getDecorView(),"Co oglądamy?");
+            key(KeyEvent.KEYCODE_BACK); waitAccessible("Nawigacja"); key(KeyEvent.KEYCODE_BACK); assertNull(find(activity.getWindow().getDecorView(),"Co oglądamy?")); key(KeyEvent.KEYCODE_DPAD_UP); key(KeyEvent.KEYCODE_DPAD_LEFT); key(KeyEvent.KEYCODE_DPAD_LEFT); key(KeyEvent.KEYCODE_DPAD_CENTER); waitText(activity.getWindow().getDecorView(),"Co oglądamy?");
         } finally { instrument().runOnMainSync(activity::finish); instrument().waitForIdleSync(); Thread.sleep(300); }
     }
     @Test public void oktvHomeReachesManagementAndAboutWithRemote() throws Exception {

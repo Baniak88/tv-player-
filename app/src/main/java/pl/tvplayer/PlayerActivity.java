@@ -189,7 +189,8 @@ public class PlayerActivity extends Activity {
         if(liveInfo==null || !resumed || isFinishing() || enteringPip || isInPictureInPictureMode()) return;
         setLiveInfoVisible(true); liveInfo.update();
         if(player!=null) liveInfo.audio(PlaybackAudio.description(player.getCurrentTracks()));
-        GuideRepository.get(this).request(liveChannel(),false,data -> { if(resumed && !isDestroyed() && liveInfo!=null) liveInfo.guide(data); });
+        String requestedUrl=url;
+        GuideRepository.get(this).request(liveChannel(),false,data -> { if(resumed && !isDestroyed() && liveInfo!=null && requestedUrl.equals(url)) liveInfo.guide(data); });
         infoHandler.postDelayed(hideInfo,6500);
     }
     @Override public void onBackPressed() { if(liveInfo!=null && liveInfo.getVisibility()==View.VISIBLE) { setLiveInfoVisible(false); return; } super.onBackPressed(); }

@@ -20,6 +20,8 @@ public class TvStreamingNavigationTest {
     private TvActivity home;
     private Activity child;
     private MockWebServer server;
+    private final java.util.concurrent.CountDownLatch refreshGate=new java.util.concurrent.CountDownLatch(1);
+    private volatile String refreshedPlaylist="";
     private final AtomicInteger metadata=new AtomicInteger();
     @Before public void setup() throws Exception {
         systemReady(); landscape(1280,720);
@@ -27,6 +29,7 @@ public class TvStreamingNavigationTest {
         byte[] stream; try(InputStream in=instrument().getContext().getAssets().open("live-controls.ts"); ByteArrayOutputStream out=new ByteArrayOutputStream()) { byte[] bytes=new byte[8192]; for(int n;(n=in.read(bytes))!=-1;) out.write(bytes,0,n); stream=out.toByteArray(); }
         List<byte[]> images=new ArrayList<>(); for(int i=0;i<8;i++) images.add(poster(i));
         server=new MockWebServer(); server.setDispatcher(new Dispatcher() { @Override public MockResponse dispatch(RecordedRequest request) {
+            if(request.getPath().startsWith("/refresh.m3u")) { try { refreshGate.await(45,java.util.concurrent.TimeUnit.SECONDS); } catch(InterruptedException e) { Thread.currentThread().interrupt(); } return new MockResponse().setBody(refreshedPlaylist); }
             if(request.getPath().startsWith("/art/")) { int index=Integer.parseInt(request.getPath().substring(5).split("\\.")[0]); return new MockResponse().setHeader("Content-Type","image/png").setHeader("Cache-Control","public,max-age=86400").setBody(new okio.Buffer().write(images.get(index%8))); }
             if(request.getPath().contains("player_api.php")) { metadata.incrementAndGet(); return new MockResponse().setHeader("Content-Type","application/json").setBody("{\"info\":{\"name\":\"Film testowy\",\"plot\":\"Opis filmu z biblioteki dostawcy.\"},\"epg_listings\":[]}"); }
             if(request.getPath().endsWith(".ts")) return new MockResponse().setHeader("Content-Type","video/mp2t").setBody(new okio.Buffer().write(stream));
@@ -38,6 +41,7 @@ public class TvStreamingNavigationTest {
         for(int g=0;g<2;g++) for(int i=0;i<30;i++) channels.add(new Channel(titles[i%8]+" · "+(g*30+i+1),server.url("/movie/demo/secret/"+(g*30+i)+".mp4").toString(),g==0?"Kino na wieczór":"Przygoda","","movie").withOrder(g).withLogo(server.url("/art/"+(i%8)+".png").toString()));
         for(int title=0;title<4;title++) for(int season=1;season<=2;season++) for(int episode=1;episode<=2;episode++) channels.add(new Channel(new String[]{"Nocna cisza","Północny szlak","Za zakrętem","Ostatni ślad"}[title]+" S0"+season+" E0"+episode,server.url("/series/demo/secret/"+title+"-"+season+"-"+episode+".mp4").toString(),"Polskie seriale","","episode").withLogo(server.url("/art/"+(title+2)+".png").toString()));
         new LibraryStore(context()).save(channels,Collections.emptySet());
+        StringBuilder playlist=new StringBuilder("#EXTM3U\n"); for(Channel channel:channels) playlist.append("#EXTINF:-1 group-title=\"").append(channel.group()).append("\" tvg-logo=\"").append(channel.logo()).append("\" type=\"").append(channel.kind()).append("\",").append(channel.name()).append('\n').append(channel.url()).append('\n'); refreshedPlaylist=playlist.toString();
     }
     private byte[] poster(int index) {
         Bitmap bitmap=Bitmap.createBitmap(280,420,Bitmap.Config.ARGB_8888); Canvas canvas=new Canvas(bitmap); Paint paint=new Paint(3);
@@ -107,6 +111,15 @@ public class TvStreamingNavigationTest {
         assertEquals(0,metadata.get()); waitFor("Home thumbnail did not load",() -> images(home.getWindow().getDecorView())>0); capture("tv096-streaming-home.png");
         remote(KeyEvent.KEYCODE_DPAD_DOWN); waitSelected("Północny szlak · 1"); assertEquals(0,metadata.get());
     }
+    @Test public void slowSourceRefreshKeepsTabsUsableAndPreservesTheCurrentSection() throws Exception {
+        new TvAccountStore(context()).save(new TvAccountStore.Account("m3u",server.url("/refresh.m3u").toString(),"",""));
+        start(true); remote(KeyEvent.KEYCODE_DPAD_RIGHT); remote(KeyEvent.KEYCODE_DPAD_CENTER); waitSelected("Północny szlak · 1");
+        click("Opcje"); click("Odśwież źródło"); assertTrue((Boolean)field(home,"refreshing"));
+        click("TV"); waitFor("TV blocked by refresh",() -> { try { return field(home,"section").equals("tv") && (Boolean)field(home,"catalogReady"); } catch(Exception e) { return false; } });
+        click("Seriale"); waitSelected("Nocna cisza"); assertTrue("Refresh should still be waiting for the provider",(Boolean)field(home,"refreshing"));
+        refreshGate.countDown(); waitFor("Refresh did not finish",() -> { try { return !(Boolean)field(home,"refreshing") && (Boolean)field(home,"catalogReady"); } catch(Exception e) { return false; } });
+        waitSelected("Nocna cisza"); assertEquals("series",field(home,"section")); assertFalse((Boolean)field(home,"home"));
+    }
     private int images(View view) { int count=view instanceof ImageView && ((ImageView)view).getDrawable()!=null?1:0; if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++) count+=images(group.getChildAt(i)); return count; }
-    @After public void cleanup() throws Exception { close(child); close(home); if(server!=null) server.shutdown(); landscape(1280,720); }
+    @After public void cleanup() throws Exception { refreshGate.countDown(); close(child); close(home); if(server!=null) server.shutdown(); landscape(1280,720); }
 }

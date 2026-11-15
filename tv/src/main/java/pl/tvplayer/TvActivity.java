@@ -245,6 +245,7 @@ public final class TvActivity extends Activity {
                     });
                     try {
                         loaded=source.xtreamSection(account.server(),account.user(),account.password(),kind,this::progress);
+                        if(isDestroyed() || epoch!=sourceEpoch) return;
                         LibraryStore store=new LibraryStore(this); store.updateSection(kind,loaded);
                         getPreferences(MODE_PRIVATE).edit().putBoolean("loaded-"+kind,true).apply();
                     } catch(Exception failure) {
