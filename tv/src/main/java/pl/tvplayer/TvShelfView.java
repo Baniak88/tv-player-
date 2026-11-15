@@ -86,16 +86,22 @@ final class TvShelfView extends RecyclerView {
             if(target<0) { mounting=false; return; }
             if(anchor!=null && attempt==0) row.layout.scrollToPositionWithOffset(anchor.categoryFirst(),anchor.categoryTop());
             ViewHolder card=row.cards.findViewHolderForAdapterPosition(target);
-            trace("mountFocus attempt="+attempt+" row="+rowIndex+" target="+target+" cards="+row.cards.getWidth()+"x"+row.cards.getHeight()+" attached="+row.cards.isAttachedToWindow()+" children="+row.cards.getChildCount()+" items="+(row.cards.getAdapter()==null?-1:row.cards.getAdapter().getItemCount())+" vis="+row.layout.findFirstVisibleItemPosition()+"-"+row.layout.findLastVisibleItemPosition()+" req="+row.cards.isLayoutRequested()+"/"+isLayoutRequested()+" rowTop="+row.itemView.getTop()+" shown="+isShown()+" card="+(card==null?"null":card.itemView.getWidth()+"x"+card.itemView.getHeight()+" vis="+card.itemView.isShown()+" focusable="+card.itemView.isFocusable())+" focus="+findFocus());
+            trace("mountFocus attempt="+attempt+" row="+rowIndex+" target="+target+" cards="+row.cards.getWidth()+"x"+row.cards.getHeight()+" attached="+row.cards.isAttachedToWindow()+" children="+row.cards.getChildCount()+" items="+(row.cards.getAdapter()==null?-1:row.cards.getAdapter().getItemCount())+" vis="+row.layout.findFirstVisibleItemPosition()+"-"+row.layout.findLastVisibleItemPosition()+" req="+row.cards.isLayoutRequested()+"/"+isLayoutRequested()+" rowTop="+row.itemView.getTop()+" suppressed="+row.cards.isLayoutSuppressed()+" computing="+row.cards.isComputingLayout()+" pending="+row.cards.hasPendingAdapterUpdates()+" kids="+childPositions(row.cards)+" shown="+isShown()+" card="+(card==null?"null":card.itemView.getWidth()+"x"+card.itemView.getHeight()+" vis="+card.itemView.isShown()+" focusable="+card.itemView.isFocusable())+" focus="+findFocus());
             if(card==null || card.itemView.getWidth()==0) {
                 // Offset scrolling to the very last card can leave it unlaid when the row is narrower than the screen;
                 // alternate with a plain "make visible" scroll, which always lays the target out.
-                if(attempt%2==0) row.cards.scrollToPosition(target); else row.layout.scrollToPositionWithOffset(Math.max(0,target-2),0);
+                if(attempt>=3 && attempt%3==0) { // the row ignored the scroll: rebind it at the target
+                    rowPositions.put(shelf.key(),Math.max(0,target-2)); row.cards.suppressLayout(false); adapter.notifyItemChanged(rowIndex+1);
+                } else if(attempt%2==0) row.cards.scrollToPosition(target); else row.layout.scrollToPositionWithOffset(Math.max(0,target-2),0);
                 row.cards.requestLayout(); mountFocus(rowIndex,index,null,request,attempt+1); return;
             }
             // A card that is not laid out yet can refuse focus; keep trying instead of leaving focus elsewhere.
             if(!card.itemView.requestFocus() || !card.itemView.hasFocus()) mountFocus(rowIndex,index,null,request,attempt+1); else mounting=false;
         },attempt==0?0:32);
+    }
+    private static String childPositions(RecyclerView view) {
+        StringBuilder out=new StringBuilder(); for(int i=0;i<view.getChildCount();i++) { View child=view.getChildAt(i); ViewHolder holder=view.getChildViewHolder(child); out.append(holder.getLayoutPosition()).append(holder.getBindingAdapterPosition()==NO_POSITION?"!":"").append('@').append(child.getLeft()).append(child.getVisibility()==VISIBLE?"":"h").append(','); }
+        return out.toString();
     }
     private void describe(Channel channel,TvShelfCatalog.Shelf row) {
         if(hero==null) return;
