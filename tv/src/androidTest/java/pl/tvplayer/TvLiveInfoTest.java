@@ -23,6 +23,8 @@ public class TvLiveInfoTest {
     private MockWebServer server;
     private ExoPlayer player() throws Exception { return (ExoPlayer)field(activity,"player"); }
     private void check(String message,BooleanSupplier condition) throws Exception { waitFor(message,() -> { boolean[] ok={false}; instrument().runOnMainSync(() -> ok[0]=condition.getAsBoolean()); return ok[0]; }); }
+    // Inject through Android's input dispatcher without launching a slow shell process between timed-overlay checks.
+    private void infoKey(int code) { instrument().sendKeyDownUpSync(code); instrument().waitForIdleSync(); }
     @Before public void setup() throws Exception {
         systemReady(); PlaybackAudio.pcm(context(),false); server=new MockWebServer();
         byte[] bytes;
@@ -41,15 +43,17 @@ public class TvLiveInfoTest {
         Channel channel=new Channel("Kanał demonstracyjny",server.url("/audio.mkv").toString(),"","","tv");
         GuideRepository.get(context()).acceptStream(channel,Arrays.asList(new Guide.Program("Wieczorny seans","",now-300,now+1500,""),new Guide.Program("Następna audycja","",now+1500,now+3000,"")));
         start(true); TvLiveInfoBar bar=(TvLiveInfoBar)field(activity,"liveInfo"); assertNotNull(bar);
-        key(KeyEvent.KEYCODE_INFO); waitFor("Current programme missing",() -> find(activity.getWindow().getDecorView(),"Teraz  "+clock(now-300)+"–"+clock(now+1500)+"  Wieczorny seans")!=null);
+        infoKey(KeyEvent.KEYCODE_INFO); waitFor("Current programme missing",() -> find(activity.getWindow().getDecorView(),"Teraz  "+clock(now-300)+"–"+clock(now+1500)+"  Wieczorny seans")!=null);
         assertNotNull(find(activity.getWindow().getDecorView(),"Następnie  "+clock(now+1500)+"  Następna audycja"));
         instrument().runOnMainSync(() -> { android.widget.ProgressBar progress=(android.widget.ProgressBar)bar.getChildAt(2); assertTrue(progress.getProgress()>100 && progress.getProgress()<300); });
         instrument().runOnMainSync(() -> { View root=activity.getWindow().getDecorView(); Bitmap bitmap=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap)); try(FileOutputStream out=context().openFileOutput("tv095-live-info.png",0)) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } catch(IOException e) { throw new AssertionError(e); } finally { bitmap.recycle(); } });
         // Rendering/compressing the screenshot on TCG can outlast the normal auto-hide timer.
-        key(KeyEvent.KEYCODE_INFO); assertEquals(View.VISIBLE,bar.getVisibility());
-        key(KeyEvent.KEYCODE_DPAD_CENTER); assertEquals(View.GONE,bar.getVisibility()); key(KeyEvent.KEYCODE_INFO); assertEquals(View.VISIBLE,bar.getVisibility());
-        key(KeyEvent.KEYCODE_BACK); assertFalse(activity.isFinishing()); assertEquals(View.GONE,bar.getVisibility());
-        key(KeyEvent.KEYCODE_DPAD_CENTER); instrument().runOnMainSync(() -> bar.guide(new GuideRepository.Data(Collections.emptyList(),"",""))); assertNotNull(find(activity.getWindow().getDecorView(),"Brak bieżącego EPG od dostawcy"));
+        infoKey(KeyEvent.KEYCODE_INFO); assertEquals(View.VISIBLE,bar.getVisibility());
+        infoKey(KeyEvent.KEYCODE_DPAD_CENTER); assertEquals(View.GONE,bar.getVisibility());
+        instrument().runOnMainSync(() -> activity.onWindowFocusChanged(true)); assertEquals("Window focus must not reopen a dismissed overlay",View.GONE,bar.getVisibility());
+        infoKey(KeyEvent.KEYCODE_INFO); assertEquals(View.VISIBLE,bar.getVisibility());
+        infoKey(KeyEvent.KEYCODE_BACK); assertFalse(activity.isFinishing()); assertEquals(View.GONE,bar.getVisibility());
+        infoKey(KeyEvent.KEYCODE_DPAD_CENTER); instrument().runOnMainSync(() -> bar.guide(new GuideRepository.Data(Collections.emptyList(),"",""))); assertNotNull(find(activity.getWindow().getDecorView(),"Brak bieżącego EPG od dostawcy"));
     }
     @Test public void pcmModeSelectsAndDecodesAacAndSurvivesPlayerRecreation() throws Exception {
         androidx.media3.common.audio.ChannelMixingAudioProcessor mixer=PlaybackAudio.mixer();
