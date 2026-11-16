@@ -17,10 +17,11 @@ public final class BouquetOrder {
         LinkedHashMap<String,Integer> result=new LinkedHashMap<>(); for(String name:names) result.put(name,count.get(name)); return result;
     }
     static List<Channel> applyRanks(List<Channel> items,Map<String,String> categories) {
+        // Names are compared without case/diacritics/punctuation, so "UK| MOVIES" in the M3U matches "UK | Movies" in the panel.
         Map<String,Integer> ranks=new LinkedHashMap<>(); int rank=0;
-        for(String name:categories.values()) { if(!ranks.containsKey(name)) ranks.put(name,rank); rank++; }
+        for(String name:categories.values()) { String key=TitleSearch.normalize(name); if(!ranks.containsKey(key)) ranks.put(key,rank); rank++; }
         List<Channel> result=new ArrayList<>(items.size());
-        for(Channel c:items) result.add(c.withOrder(ranks.getOrDefault(c.group(),Integer.MAX_VALUE)));
+        for(Channel c:items) result.add(c.withOrder(ranks.getOrDefault(TitleSearch.normalize(c.group()),Integer.MAX_VALUE)));
         return result;
     }
 }

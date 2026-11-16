@@ -90,6 +90,29 @@ public final class SourceClient {
         List<Channel> authoritative=request(guideClient,api(panel,user,pass,"get_live_streams"),reader -> readStreams(reader,panel,user,pass,categories),remaining);
         return missingGroups(current,authoritative);
     }
+    /**
+     * Live channels of a panel-generated M3U, completed with categories the playlist left out and ranked in the panel's
+     * category order (as the provider arranges its bouquets). Empty when the saved order and content are already right.
+     */
+    List<Channel> liveInProviderOrder(String url,List<Channel> current) throws IOException {
+        HttpUrl playlist=validate(url); String user=playlist.queryParameter("username"),pass=playlist.queryParameter("password");
+        if(user==null || pass==null || user.isEmpty() || pass.isEmpty() || playlist.pathSize()==0 || !playlist.pathSegments().get(playlist.pathSize()-1).equalsIgnoreCase("get.php")) return Collections.emptyList();
+        HttpUrl panel=playlist.newBuilder().query(null).fragment(null).removePathSegment(playlist.pathSize()-1).build();
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(18);
+        Map<String,String> categories=request(guideClient,api(panel,user,pass,"get_live_categories"),SourceClient::readCategories,deadline-System.nanoTime());
+        if(categories.isEmpty()) return Collections.emptyList();
+        Set<String> known=new HashSet<>(); for(Channel channel:current) known.add(TitleSearch.normalize(channel.group()));
+        List<Channel> all=new ArrayList<>(current);
+        if(!categories.values().stream().allMatch(name -> known.contains(TitleSearch.normalize(name)))) {
+            long remaining=deadline-System.nanoTime(); if(remaining<=0) throw new java.net.SocketTimeoutException("Upłynął czas uzupełniania kategorii TV.");
+            List<Channel> authoritative=request(guideClient,api(panel,user,pass,"get_live_streams"),reader -> readStreams(reader,panel,user,pass,categories),remaining);
+            all.addAll(missingGroups(current,authoritative));
+        }
+        List<Channel> ranked=BouquetOrder.applyRanks(all,categories);
+        boolean changed=ranked.size()!=current.size();
+        for(int i=0;!changed && i<current.size();i++) changed=ranked.get(i).bouquetOrder()!=current.get(i).bouquetOrder();
+        return changed?ranked:Collections.emptyList();
+    }
     static List<Channel> missingGroups(List<Channel> current,List<Channel> authoritative) {
         Set<String> known=new HashSet<>(),urls=new HashSet<>(); for(Channel channel:current) { known.add(TitleSearch.normalize(channel.group())); urls.add(channel.url()); }
         List<Channel> result=new ArrayList<>(); for(Channel channel:authoritative) if(channel.kind().equals("tv") && !known.contains(TitleSearch.normalize(channel.group())) && urls.add(channel.url())) result.add(channel);

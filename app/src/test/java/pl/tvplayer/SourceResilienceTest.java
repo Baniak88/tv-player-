@@ -18,6 +18,16 @@ public class SourceResilienceTest {
             assertTrue(server.takeRequest().getPath().contains("action=get_live_categories")); assertTrue(server.takeRequest().getPath().contains("action=get_live_streams")); assertEquals(2,server.getRequestCount());
         }
     }
+    @Test public void recoveredBouquetsFollowTheProviderCategoryOrder() throws Exception {
+        try(MockWebServer server=new MockWebServer()) {
+            server.enqueue(new MockResponse().setBody("[{\"category_id\":\"1\",\"category_name\":\"Sport\"},{\"category_id\":\"2\",\"category_name\":\"UK | Movies\"},{\"category_id\":\"3\",\"category_name\":\"Dzieci\"}]"));
+            server.enqueue(new MockResponse().setBody("[{\"stream_id\":2,\"name\":\"Sky Cinema\",\"category_id\":\"2\"}]"));
+            List<Channel> current=List.of(new Channel("Sport 1",server.url("/live/u/p/1.ts").toString(),"Sport","","tv"),new Channel("Bajki",server.url("/live/u/p/3.ts").toString(),"Dzieci","","tv"));
+            List<Channel> result=new SourceClient().liveInProviderOrder(server.url("/get.php?username=u&password=p&type=m3u_plus").toString(),current);
+            assertEquals(3,result.size());
+            assertEquals(List.of("Sport","UK | Movies","Dzieci"),new java.util.ArrayList<>(BouquetOrder.counts(result,"provider").keySet()));
+        }
+    }
     @Test public void completeM3uSkipsTheLargeLiveStreamsDownload() throws Exception {
         try(MockWebServer server=new MockWebServer()) {
             server.enqueue(new MockResponse().setBody("[{\"category_id\":\"1\",\"category_name\":\"UK | Movies\"}]"));

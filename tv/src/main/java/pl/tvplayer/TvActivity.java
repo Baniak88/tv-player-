@@ -654,9 +654,9 @@ public final class TvActivity extends Activity {
     private void completeLiveGroups(TvAccountStore.Account expected,int epoch) {
         try {
             LibraryStore store=new LibraryStore(this); List<Channel> current=store.loadSection("tv",new HashSet<>());
-            List<Channel> missing=source.missingM3uLiveChannels(expected.server(),current);
-            if(missing.isEmpty() || epoch!=sourceEpoch || isDestroyed()) return;
-            List<Channel> complete=new ArrayList<>(current); complete.addAll(missing); store.updateSection("tv",complete);
+            List<Channel> complete=source.liveInProviderOrder(expected.server(),current);
+            if(complete.isEmpty() || epoch!=sourceEpoch || isDestroyed()) return;
+            store.updateSection("tv",complete);
             runOnUiThread(() -> { if(isDestroyed() || epoch!=sourceEpoch || !expected.equals(account)) return; catalogs.remove("tv"); preparedCatalogs.remove("tv"); if(foreground && !home && section.equals("tv")) { TvBrowseState before=location(); restoreLocation(before); status.setText("Uzupełniono brakujące bukiety TV z panelu dostawcy."); } });
         } catch(Exception ignored) { /* A valid M3U remains usable when the optional panel is unavailable. */ }
     }
