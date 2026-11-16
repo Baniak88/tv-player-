@@ -223,9 +223,8 @@ public final class TvActivity extends Activity {
     }
     /** A tiny poster scaled up full screen reads as a soft blur behind the home tiles (no RenderEffect on Fire OS 7). */
     private void showBackdrop() {
-        if(backdrop==null) return; String art="";
-        if(home) for(TvShelfCatalog.Shelf row:homePreview) { for(Channel item:row.channels()) if(!item.logo().isEmpty()) { art=item.logo(); break; } if(!art.isEmpty()) break; }
-        backdrop.setVisibility(art.isEmpty()?View.GONE:View.VISIBLE); ImageLoader.get(this).load(art,backdrop,dp(18),dp(27));
+        // Home uses the same calm dark background as every other screen; a poster backdrop looked too bright on LED TVs.
+        if(backdrop!=null) backdrop.setVisibility(View.GONE);
     }
     private void loadHomePreviews() {
         final int request=++homeRequest;
