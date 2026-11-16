@@ -44,7 +44,7 @@ public final class MovieActivity extends Activity {
         scroll=new ScrollView(this); scroll.setBackgroundColor(Ui.BG); scroll.setFillViewport(true); scroll.setClipToPadding(false);
         
         content=column(); scroll.addView(content,new ScrollView.LayoutParams(-1,-2));
-        FrameLayout page=new FrameLayout(this); page.setBackgroundColor(Ui.BG); page.setOnApplyWindowInsetsListener((v,insets) -> { v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets(); }); scroll.setPadding(0,0,0,dp(20)); page.addView(scroll,new FrameLayout.LayoutParams(-1,-1)); page.addView(Ui.detailBar(this,"Filmy",this::finish),new FrameLayout.LayoutParams(-1,dp(52),Gravity.TOP)); setContentView(page); Ui.localize(page); if(television) DisplaySettings.pad(findViewById(android.R.id.content),0,0,0,0); render(); load();
+        FrameLayout page=new FrameLayout(this); page.setBackgroundColor(Ui.BG); page.setOnApplyWindowInsetsListener((v,insets) -> { v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets(); }); scroll.setPadding(0,0,0,dp(20)); page.addView(scroll,new FrameLayout.LayoutParams(-1,-1)); if(!television) page.addView(Ui.detailBar(this,"Filmy",this::finish),new FrameLayout.LayoutParams(-1,dp(52),Gravity.TOP)); /* on TV the remote's Back key is enough and the bar covered the title */ setContentView(page); Ui.localize(page); if(television) DisplaySettings.pad(findViewById(android.R.id.content),0,0,0,0); render(); load();
     }
     private void load() {
         worker.execute(() -> {
@@ -80,27 +80,27 @@ public final class MovieActivity extends Activity {
         updateProgress(); scroll.post(() -> scroll.scrollTo(0,y));
     }
     private Button tvButton(String label,boolean primary) {
-        Button button=Ui.button(this,label); button.setTextSize(18); Ui.televisionButton(button,primary); return button;
+        Button button=Ui.button(this,label); button.setTextSize(15); button.setMinHeight(dp(42)); button.setMinimumHeight(dp(42)); button.setPadding(dp(18),0,dp(18),0); Ui.televisionButton(button,primary); return button;
     }
     private void renderTelevision() {
         View previous=getCurrentFocus(); Object focused=previous==null?null:previous.getTag();
         int y=Math.max(restoredScroll,scroll.getScrollY()); restoredScroll=0; content.removeAllViews();
         // Symmetric details page: dimmed backdrop, poster on the left, and one readable column with title, facts, synopsis, people and actions.
-        int width=getResources().getDisplayMetrics().widthPixels,heroHeight=getResources().getDisplayMetrics().heightPixels-dp(72),side=dp(64),posterWidth=Math.min(dp(250),width/4);
+        int width=getResources().getDisplayMetrics().widthPixels,heroHeight=getResources().getDisplayMetrics().heightPixels-dp(20),side=dp(48),posterWidth=Math.min(dp(250),width/4);
         // The page grows with long synopses instead of pushing the title off screen; it is never shorter than the screen.
         FrameLayout hero=new FrameLayout(this); televisionHero=hero; hero.setBackgroundColor(Ui.BG); hero.setMinimumHeight(heroHeight); content.addView(hero,new LinearLayout.LayoutParams(-1,-2));
         ImageView artwork=new ImageView(this); artwork.setScaleType(ImageView.ScaleType.CENTER_CROP); artwork.setAlpha(details.backdrop().isEmpty()?.18f:.35f); hero.addView(artwork,new FrameLayout.LayoutParams(-1,-1));
         ImageLoader.get(this).load(details.backdrop().isEmpty()?details.cover():details.backdrop(),artwork,width,heroHeight);
         View shade=new View(this); shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{0xF20B0C0F,0xCC0B0C0F,0x990B0C0F})); hero.addView(shade,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout layout=new LinearLayout(this); layout.setGravity(Gravity.CENTER_VERTICAL); layout.setPadding(side,dp(36),side,dp(36)); hero.addView(layout,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER_VERTICAL));
+        LinearLayout layout=new LinearLayout(this); layout.setGravity(Gravity.CENTER_VERTICAL); layout.setPadding(side,dp(40),side,dp(40)); hero.addView(layout,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER_VERTICAL));
         FrameLayout poster=new FrameLayout(this); poster.setBackground(Ui.shape(this,Ui.TV_CARD,12,Ui.TV_LINE)); poster.setClipToOutline(true);
         TextView posterName=text(details.title(),16,Ui.MUTED); posterName.setGravity(Gravity.CENTER); posterName.setPadding(dp(12),dp(12),dp(12),dp(12)); poster.addView(posterName,new FrameLayout.LayoutParams(-1,-1));
         ImageView cover=new ImageView(this); cover.setScaleType(ImageView.ScaleType.CENTER_CROP); poster.addView(cover,new FrameLayout.LayoutParams(-1,-1));
         String coverUrl=!details.cover().isEmpty()?details.cover():source.logo(); ImageLoader.get(this).load(coverUrl,cover,posterWidth,posterWidth*3/2);
         layout.addView(poster,new LinearLayout.LayoutParams(posterWidth,posterWidth*3/2));
         LinearLayout copy=column(); televisionCopy=copy; televisionCopyWidth=width-side*2-posterWidth-dp(40); copy.setPadding(dp(40),0,0,0); layout.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
-        TextView title=text(details.title(),30,Ui.TEXT); title.setTypeface(null,Typeface.BOLD); title.setMaxLines(2); title.setEllipsize(TextUtils.TruncateAt.END); copy.addView(title);
-        List<String> meta=new ArrayList<>(); if(!details.year().isEmpty()) meta.add(details.year()); if(details.durationSeconds()>0) meta.add(duration(details.durationSeconds())); if(!details.rating().isEmpty() && !details.rating().equals("0")) meta.add("★ "+rating(details.rating()));
+        TextView title=text(details.title(),28,Ui.TEXT); title.setTypeface(null,Typeface.BOLD); title.setMaxLines(2); title.setEllipsize(TextUtils.TruncateAt.END); copy.addView(title);
+        long length=filmLength(); List<String> meta=new ArrayList<>(); if(!details.year().isEmpty()) meta.add(details.year()); if(length>0) meta.add(duration(length)); if(!details.rating().isEmpty() && !details.rating().equals("0")) meta.add("★ "+rating(details.rating()));
         TextView metadata=text(TextUtils.join("   ·   ",meta),17,Ui.TV_GOLD); metadata.setPadding(0,dp(10),0,0); copy.addView(metadata);
         if(!details.genre().isEmpty()) { TextView genre=text(details.genre(),15,Ui.MUTED); genre.setPadding(0,dp(6),0,0); copy.addView(genre); }
         if(loading) { TextView wait=text("Pobieranie opisu…",15,Ui.MUTED); wait.setPadding(0,dp(16),0,0); copy.addView(wait); }
@@ -115,8 +115,8 @@ public final class MovieActivity extends Activity {
         LinearLayout actions=new LinearLayout(this); actions.setPadding(0,dp(16),0,0);
         play=tvButton("▶  Odtwórz",true); play.setTag("movie-play"); play.setContentDescription("Odtwórz film"); play.setOnClickListener(v -> playback(false));
         star=tvButton("+  Moja lista",false); star.setTag("movie-star"); star.setOnClickListener(v -> favorite());
-        LinearLayout.LayoutParams playSize=new LinearLayout.LayoutParams(dp(240),dp(52)); playSize.rightMargin=dp(12); actions.addView(play,playSize); actions.addView(star,new LinearLayout.LayoutParams(dp(200),dp(52))); copy.addView(actions);
-        restart=tvButton("Od początku",false); restart.setTag("movie-restart"); restart.setOnClickListener(v -> playback(true)); LinearLayout.LayoutParams restartSize=new LinearLayout.LayoutParams(-2,dp(48)); restartSize.topMargin=dp(10); copy.addView(restart,restartSize);
+        LinearLayout.LayoutParams playSize=new LinearLayout.LayoutParams(dp(196),dp(44)); playSize.rightMargin=dp(12); actions.addView(play,playSize); actions.addView(star,new LinearLayout.LayoutParams(dp(176),dp(44))); copy.addView(actions);
+        restart=tvButton("Od początku",false); restart.setTag("movie-restart"); restart.setOnClickListener(v -> playback(true)); LinearLayout.LayoutParams restartSize=new LinearLayout.LayoutParams(dp(196),dp(40)); restartSize.topMargin=dp(10); copy.addView(restart,restartSize);
         play.setId(View.generateViewId()); star.setId(View.generateViewId()); restart.setId(View.generateViewId());
         play.setNextFocusRightId(star.getId()); star.setNextFocusLeftId(play.getId()); restart.setNextFocusUpId(play.getId());
         updateProgress(); if(restart.getVisibility()==View.VISIBLE) { play.setNextFocusDownId(restart.getId()); star.setNextFocusDownId(restart.getId()); }
@@ -133,6 +133,11 @@ public final class MovieActivity extends Activity {
     private void detail(LinearLayout parent,String label,String value) { if(value.isEmpty()) return; TextView name=text(label,13,Ui.MUTED); name.setPadding(0,dp(22),0,dp(5)); parent.addView(name); TextView body=text(value,15,Ui.TEXT); body.setLineSpacing(dp(3),1); parent.addView(body); }
     /** "6.182" → "6.2"; non-numeric ratings are shown as given. */
     static String rating(String value) { try { double number=Double.parseDouble(value.replace(',','.')); return String.format(java.util.Locale.ROOT,number==Math.rint(number)?"%.0f":"%.1f",number); } catch(NumberFormatException e) { return value; } }
+    /** Length in seconds: the player's measured duration wins; provider values under 10 minutes are treated as unknown. */
+    private long filmLength() {
+        WatchProgress.Entry entry=WatchProgress.read(this,source.url()); if(entry.duration()>=600000) return entry.duration()/1000;
+        return details.durationSeconds()>=600?details.durationSeconds():0;
+    }
     private static String duration(long seconds) { long minutes=Math.max(1,(seconds+59)/60); return minutes>=60?(minutes/60)+" godz. "+(minutes%60==0?"":minutes%60+" min"):minutes+" min"; }
     private WatchProgress.Entry position() {
         WatchProgress.Entry entry=WatchProgress.read(this,source.url()); if(entry.updated()>0) return entry;

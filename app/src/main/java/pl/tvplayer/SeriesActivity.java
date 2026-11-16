@@ -41,7 +41,7 @@ public final class SeriesActivity extends Activity {
     private LinearLayout column() { LinearLayout layout=new LinearLayout(this); layout.setOrientation(LinearLayout.VERTICAL); return layout; }
     private TextView text(String value,int size,int color) { return Ui.text(this,value,size,color); }
     private Button button(String label) {
-        Button button=Ui.button(this,label); button.setTextSize(television?18:16); button.setFocusable(true); button.setFocusableInTouchMode(television);
+        Button button=Ui.button(this,label); button.setTextSize(television?15:16); if(television) { button.setMinHeight(dp(42)); button.setMinimumHeight(dp(42)); button.setPadding(dp(18),0,dp(18),0); } button.setFocusable(true); button.setFocusableInTouchMode(television);
         if(television) Ui.televisionButton(button,false);
         return button;
     }
@@ -105,13 +105,13 @@ public final class SeriesActivity extends Activity {
         ImageLoader.get(this).load(details.backdrop().isEmpty()?details.cover():details.backdrop(),artwork,getResources().getDisplayMetrics().widthPixels,heroHeight);
         View scrim=new View(this); scrim.setBackground(new GradientDrawable(television?GradientDrawable.Orientation.LEFT_RIGHT:GradientDrawable.Orientation.TOP_BOTTOM,television?new int[]{0xF20B0C0F,0xCC0B0C0F,0x990B0C0F}:new int[]{0x220E0F11,0x110E0F11,Ui.BG})); hero.addView(scrim,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout copy=column(); copy.setPadding(television?dp(36):dp(18),0,dp(television?0:18),dp(television?0:18));
-        TextView name=text(details.title(),television?30:26,Ui.TEXT); name.setTypeface(null,Typeface.BOLD); name.setMaxLines(television?2:3); copy.addView(name);
+        TextView name=text(details.title(),television?28:26,Ui.TEXT); name.setTypeface(null,Typeface.BOLD); name.setMaxLines(television?2:3); copy.addView(name);
         List<String> meta=new ArrayList<>(); if(!details.year().isEmpty()) meta.add(details.year()); if(!details.rating().isEmpty()&&!details.rating().equals("0")) meta.add("★ "+MovieActivity.rating(details.rating())); if(!details.seasons().isEmpty()) meta.add(details.seasons().size()==1?"1 sezon":details.seasons().size()+((details.seasons().size()%10>=2 && details.seasons().size()%10<=4 && (details.seasons().size()%100<12 || details.seasons().size()%100>14))?" sezony":" sezonów"));
         if(!meta.isEmpty()) { TextView info=text(android.text.TextUtils.join("   ·   ",meta),television?17:14,television?Ui.TV_GOLD:Ui.MUTED); info.setPadding(0,dp(10),0,dp(4)); copy.addView(info); }
         LinearLayout actions=new LinearLayout(this); actions.setPadding(0,dp(14),0,dp(10));
         play=button("▶  Odtwórz"); if(!television) Ui.primary(play); else Ui.televisionButton(play,true); play.setContentDescription("Odtwórz serial"); play.setOnClickListener(v -> { if(next!=null) play(next); });
-        LinearLayout.LayoutParams primary=new LinearLayout.LayoutParams(0,dp(52),1); primary.rightMargin=dp(10); actions.addView(play,primary);
-        star=button("+  Moja lista"); star.setTextSize(television?17:14); star.setOnClickListener(v -> toggleFavorite()); actions.addView(star,new LinearLayout.LayoutParams(dp(television?154:126),dp(52))); copy.addView(actions);
+        LinearLayout.LayoutParams primary=television?new LinearLayout.LayoutParams(dp(196),dp(44)):new LinearLayout.LayoutParams(0,dp(52),1); primary.rightMargin=dp(television?12:10); actions.addView(play,primary);
+        star=button("+  Moja lista"); star.setTextSize(television?15:14); star.setOnClickListener(v -> toggleFavorite()); actions.addView(star,new LinearLayout.LayoutParams(dp(television?176:126),dp(television?44:52))); copy.addView(actions);
         playHint=text("",television?15:13,Ui.MUTED); copy.addView(playHint);
         TextView synopsis=text(details.overview().isEmpty()?"Opis nie został udostępniony przez dostawcę.":details.overview(),television?18:15,Ui.TEXT); synopsis.setMaxLines(television?4:4); synopsis.setEllipsize(TextUtils.TruncateAt.END); synopsis.setLineSpacing(dp(3),1); synopsis.setPadding(0,dp(14),0,0); copy.addView(synopsis);
         if(!details.overview().isEmpty()) { synopsis.setContentDescription("Opis serialu. Wybierz, aby przeczytać całość."); synopsis.setOnClickListener(v -> new Ui.Dialog(this).setTitle(details.title()).setMessage(details.overview()).setPositiveButton("Zamknij",null).show()); }
@@ -119,14 +119,14 @@ public final class SeriesActivity extends Activity {
         if(television) {
             // Same symmetric layout as film details: poster on the left, one readable column on the right, both vertically centred.
             int posterWidth=Math.min(dp(210),getResources().getDisplayMetrics().widthPixels/5);
-            LinearLayout layout=new LinearLayout(this); layout.setGravity(Gravity.CENTER_VERTICAL); layout.setPadding(dp(48),dp(64),dp(48),dp(20));
+            LinearLayout layout=new LinearLayout(this); layout.setGravity(Gravity.CENTER_VERTICAL); layout.setPadding(dp(48),dp(40),dp(48),dp(24));
             FrameLayout poster=new FrameLayout(this); poster.setBackground(Ui.shape(this,Ui.TV_CARD,12,Ui.TV_LINE)); poster.setClipToOutline(true);
             ImageView cover=new ImageView(this); cover.setScaleType(ImageView.ScaleType.CENTER_CROP); poster.addView(cover,new FrameLayout.LayoutParams(-1,-1)); ImageLoader.get(this).load(details.cover().isEmpty()?source.logo():details.cover(),cover,posterWidth,posterWidth*3/2);
             layout.addView(poster,new LinearLayout.LayoutParams(posterWidth,posterWidth*3/2)); layout.addView(copy,new LinearLayout.LayoutParams(0,-2,1)); hero.addView(layout,new FrameLayout.LayoutParams(-1,-1));
         }
         if(television || !details.cover().isEmpty() || !details.backdrop().isEmpty()) header.addView(hero,new LinearLayout.LayoutParams(-1,heroHeight)); if(!television) header.addView(copy);
-        Button back=back(); if(!television) back.setVisibility(View.GONE); FrameLayout.LayoutParams backSize=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT); backSize.leftMargin=dp(television?26:14); backSize.topMargin=dp(12); hero.addView(back,backSize);
-        TextView brand=text(Ui.BRAND,12,Ui.ACCENT); if(!television) brand.setVisibility(View.GONE); brand.setTypeface(null,Typeface.BOLD); FrameLayout.LayoutParams brandSize=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT); brandSize.rightMargin=dp(18); brandSize.topMargin=dp(26); hero.addView(brand,brandSize);
+        Button back=back(); back.setVisibility(View.GONE); /* Back key on TV, system back on phones */ FrameLayout.LayoutParams backSize=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT); backSize.leftMargin=dp(television?26:14); backSize.topMargin=dp(12); hero.addView(back,backSize);
+        TextView brand=text(Ui.BRAND,12,Ui.ACCENT); brand.setVisibility(View.GONE); brand.setTypeface(null,Typeface.BOLD); FrameLayout.LayoutParams brandSize=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT); brandSize.rightMargin=dp(18); brandSize.topMargin=dp(26); hero.addView(brand,brandSize);
         LinearLayout seasonBar=new LinearLayout(this); seasonBar.setPadding(dp(television?32:18),dp(16),dp(television?32:18),dp(8)); seasonBar.setGravity(Gravity.CENTER_VERTICAL);
         TextView label=text("Odcinki",television?24:20,Ui.TEXT); label.setTypeface(null,Typeface.BOLD); seasonBar.addView(label,new LinearLayout.LayoutParams(0,-2,1));
         seasonButton=null;

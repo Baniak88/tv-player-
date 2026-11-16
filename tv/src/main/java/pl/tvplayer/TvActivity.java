@@ -184,11 +184,11 @@ public final class TvActivity extends Activity {
         String[] labels={"Główna","TV","Filmy","Seriale","Szukaj","Opcje"};
         for(int i=0;i<labels.length;i++) {
             final int index=i; Button tab=button(labels[i],() -> { if(index==0) showHome(); else if(index<=3) open(new String[]{"tv","movie","series"}[index-1]); else if(index==4) { if(home) open("movie"); search(); } else if(home) homeOptions(); else catalogOptions(); });
-            tab.setId(View.generateViewId()); tab.setTextSize(17); tab.setSingleLine(true); tab.setPadding(dp(16),0,dp(16),0);
+            tab.setId(View.generateViewId()); tab.setTextSize(15); tab.setSingleLine(true); tab.setPadding(dp(14),0,dp(14),0); tab.setMinHeight(0); tab.setMinimumHeight(0);
             boolean active=home?i==0:i==1 && section.equals("tv") || i==2 && section.equals("movie") || i==3 && section.equals("series");
             android.graphics.drawable.StateListDrawable background=new android.graphics.drawable.StateListDrawable(); background.addState(new int[]{android.R.attr.state_focused},Ui.shape(this,Ui.TEXT,20,0)); background.addState(new int[]{},Ui.shape(this,0,20,0)); tab.setBackground(background);
             tab.setTextColor(new ColorStateList(new int[][]{new int[]{android.R.attr.state_focused},new int[]{}},new int[]{TV_BG,active?Ui.TEXT:Ui.MUTED})); tab.setTypeface(null,active?Typeface.BOLD:Typeface.NORMAL);
-            LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-2,dp(42)); size.rightMargin=dp(12); navigation.addView(tab,size);
+            LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-2,dp(36)); size.rightMargin=dp(8); navigation.addView(tab,size);
         }
         body.addView(navigation);
     }
