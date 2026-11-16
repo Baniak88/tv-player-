@@ -108,7 +108,7 @@ public final class TvActivity extends Activity {
         return words.length>1?(first.substring(0,1)+words[1].substring(0,1)).toUpperCase(Locale.ROOT):first.substring(0,Math.min(2,first.length())).toUpperCase(Locale.ROOT);
     }
     private String title(String kind) { return kind.equals("tv")?"Telewizja na żywo":kind.equals("movie")?"Filmy":"Seriale"; }
-    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(DisplaySettings.wrap(base)); }
+    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(base); android.content.res.Configuration scale=DisplaySettings.override(base); if(scale!=null) applyOverrideConfiguration(scale); }
     @Override public void onCreate(Bundle state) {
         DisplaySettings.apply(this); super.onCreate(state); getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((was,now) -> TvShelfView.trace("focus "+focusName(was)+" -> "+focusName(now)));
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON|WindowManager.LayoutParams.FLAG_SECURE);

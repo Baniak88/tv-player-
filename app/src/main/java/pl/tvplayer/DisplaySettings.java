@@ -35,11 +35,14 @@ final class DisplaySettings {
         Ui.english = english(context);
     }
 
-    /** Base context with the chosen text scale; used from attachBaseContext. */
-    static Context wrap(Context base) {
-        float scale = SCALES[size(base)]; if (scale == 1f) return base;
-        Configuration config = new Configuration(base.getResources().getConfiguration()); config.fontScale = config.fontScale * scale;
-        return base.createConfigurationContext(config);
+    /**
+     * Text-scale override for TV screens, applied with applyOverrideConfiguration so only fontScale changes and the rest of
+     * the configuration (orientation, size) keeps following the device. Null on phones and when nothing changes.
+     */
+    static Configuration override(Context base) {
+        if (!Ui.television(base)) return null;
+        float scale = SCALES[size(base)]; if (scale == 1f) return null;
+        Configuration config = new Configuration(); config.fontScale = base.getResources().getConfiguration().fontScale * scale; return config;
     }
 
     /** Extra overscan padding (fraction of the screen) added around a TV page. */

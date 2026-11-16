@@ -33,7 +33,7 @@ public final class MovieActivity extends Activity {
     private int dp(int n) { return Ui.dp(this,n); }
     private LinearLayout column() { LinearLayout v=new LinearLayout(this); v.setOrientation(LinearLayout.VERTICAL); return v; }
     private TextView text(String s,int size,int color) { return Ui.text(this,s,size,color); }
-    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(DisplaySettings.wrap(base)); }
+    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(base); android.content.res.Configuration scale=DisplaySettings.override(base); if(scale!=null) applyOverrideConfiguration(scale); }
     @Override public void onCreate(Bundle state) {
         DisplaySettings.apply(this);
         super.onCreate(state); repository=new MovieRepository(this); String url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }

@@ -45,7 +45,7 @@ public final class SeriesActivity extends Activity {
         if(television) Ui.televisionButton(button,false);
         return button;
     }
-    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(DisplaySettings.wrap(base)); }
+    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(base); android.content.res.Configuration scale=DisplaySettings.override(base); if(scale!=null) applyOverrideConfiguration(scale); }
     @Override public void onCreate(Bundle state) {
         DisplaySettings.apply(this);
         super.onCreate(state); String url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }

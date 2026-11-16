@@ -46,7 +46,7 @@ public class PlayerActivity extends Activity {
         b.setBackground(Ui.touch(this,0x52000000,22,0x40FFFFFF));
         return b;
     }
-    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(DisplaySettings.wrap(base)); }
+    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(base); android.content.res.Configuration scale=DisplaySettings.override(base); if(scale!=null) applyOverrideConfiguration(scale); }
     @Override public void onCreate(Bundle state) {
         DisplaySettings.apply(this);
         super.onCreate(state);
