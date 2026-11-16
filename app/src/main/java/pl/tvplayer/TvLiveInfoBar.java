@@ -21,7 +21,7 @@ final class TvLiveInfoBar extends LinearLayout {
     private final ProgressBar progress;
     private GuideRepository.Data data;
     TvLiveInfoBar(Context context) {
-        super(context); setOrientation(VERTICAL); setPadding(dp(32),dp(56),dp(32),dp(18));
+        super(context); setOrientation(VERTICAL); setPadding(dp(48),dp(56),dp(48),dp(28));
         setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0xCC07090C,0xF207090C,0xFA07090C}));
         LinearLayout main=new LinearLayout(context); main.setGravity(Gravity.CENTER_VERTICAL); addView(main,new LayoutParams(-1,-2));
         FrameLayout box=new FrameLayout(context); box.setBackground(Ui.shape(context,0xE61B1F25,12,0x33FFFFFF)); box.setPadding(dp(8),dp(8),dp(8),dp(8));

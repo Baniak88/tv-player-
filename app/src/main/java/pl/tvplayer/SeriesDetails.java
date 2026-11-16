@@ -33,7 +33,11 @@ public record SeriesDetails(String title,String overview,String cover,String bac
     static long duration(JsonObject info) {
         try { long seconds=Long.parseLong(value(info,"duration_secs")); if(seconds>0) return seconds; } catch(NumberFormatException ignored) {}
         String[] parts=value(info,"duration").split(":"); long result=0;
-        try { if(parts.length>=2 && parts.length<=3) { for(String part:parts) result=result*60+Integer.parseInt(part); return Math.max(0,result); } } catch(NumberFormatException ignored) {}
+        try {
+            // Providers write films as "01:42" (hours:minutes) and episodes as "45:30" (minutes:seconds); a small first part means hours.
+            if(parts.length==2) { int first=Integer.parseInt(parts[0].trim()),second=Integer.parseInt(parts[1].trim()); return first<=5?first*3600L+second*60L:first*60L+second; }
+            if(parts.length==3) { for(String part:parts) result=result*60+Integer.parseInt(part.trim()); return Math.max(0,result); }
+        } catch(NumberFormatException ignored) {}
         return 0;
     }
     static SeriesDetails parse(Reader reader,Channel source) throws IOException {

@@ -80,7 +80,14 @@ public class PlayerActivity extends Activity {
         full=action("↙"); full.setContentDescription("Włącz lub wyłącz pełny ekran"); top.addView(full,new LinearLayout.LayoutParams(dp(46),dp(44)));
         full.setOnClickListener(v -> { fullscreen=!fullscreen; updateFullscreen(); });
         root.addView(top,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
-        if(television) full.setVisibility(View.GONE);
+        if(television) {
+            full.setVisibility(View.GONE);
+            // TVs crop ~5% of each edge (overscan): keep the title bar and the playback controls inside the safe area.
+            top.setPadding(dp(48),dp(28),dp(48),dp(18));
+            View controller=view.findViewById(androidx.media3.ui.R.id.exo_controller);
+            if(controller!=null) controller.setPadding(dp(48),dp(24),dp(48),dp(28));
+            if(progressBar instanceof androidx.media3.ui.DefaultTimeBar) { androidx.media3.ui.DefaultTimeBar timeBar=(androidx.media3.ui.DefaultTimeBar)progressBar; timeBar.setPlayedColor(Ui.TV_GOLD); timeBar.setScrubberColor(Ui.TV_GOLD); }
+        }
         if(television && !onDemand) {
             view.setUseController(false); back.setFocusable(false); settings.setFocusable(false);
             liveInfo=new TvLiveInfoBar(this); liveInfo.channel(getIntent().getStringExtra("name")); liveInfo.logo(getIntent().getStringExtra("logo"));

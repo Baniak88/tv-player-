@@ -19,4 +19,10 @@ public class MovieDetailsTest {
         Channel source=source("https://example.com/movie/u/p/1.mp4"); MovieDetails d=MovieDetails.parse(new StringReader("{\"info\":null,\"movie_data\":{\"name\":\"PL - Nazwa od dostawcy\"}}"),source); assertEquals("Nazwa od dostawcy",d.title()); assertEquals("",d.overview()); assertEquals(0,d.durationSeconds()); assertEquals(source.logo(),d.cover());
         try { MovieDetails.parse(new StringReader("[]"),source); fail("Invalid response accepted"); } catch(IOException expected) {}
     }
+    @Test public void shortDurationIsHoursAndMinutesAndRatingIsRounded() throws Exception {
+        MovieDetails film=MovieDetails.parse(new StringReader("{\"info\":{\"name\":\"Film\",\"duration\":\"01:42\",\"rating\":\"6.182\"}}"),source("https://example.com/movie/u/p/2.mp4"));
+        assertEquals(6120,film.durationSeconds()); assertEquals("6.2",MovieActivity.rating(film.rating())); assertEquals("8",MovieActivity.rating("8.0"));
+        MovieDetails episode=MovieDetails.parse(new StringReader("{\"info\":{\"name\":\"Odcinek\",\"duration\":\"45:30\"}}"),source("https://example.com/movie/u/p/3.mp4"));
+        assertEquals(2730,episode.durationSeconds());
+    }
 }
