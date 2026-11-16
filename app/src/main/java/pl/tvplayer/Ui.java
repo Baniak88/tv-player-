@@ -10,6 +10,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.widget.Button;
 import android.widget.TextView;
+import android.view.View;
 
 /** OKTV palette: deep navy surfaces, one vivid coral-red accent and a cyan highlight for progress. */
 final class Ui {
@@ -19,8 +20,50 @@ final class Ui {
         TEXT = 0xFFF4F5F7, MUTED = 0xFFA4A8B2, FAINT = 0xFF6C707A, ON_ACCENT = 0xFFFFFFFF, ACCENT = 0xFFFF3D5E,
         HIGHLIGHT = 0xFF35D0FF, STAR = 0xFFFFC53D, DANGER = 0xFFFF6B6B;
     /** Minimal TV palette (receiver-skin style): graphite cards, one teal selection and a warm amber accent. */
-    static final int TV_CARD = 0xFF161A1F, TV_SELECT = 0xFF1E4C52, TV_GOLD = 0xFFF2B441, TV_LINE = 0xFF262B31;
+    static final int TV_CARD = 0xFF161A1F, TV_LINE = 0xFF262B31;
+    /** Selection and accent colours of the chosen theme (see DisplaySettings). */
+    static int TV_SELECT = 0xFF1E4C52, TV_GOLD = 0xFFF2B441;
+    /** English interface (DisplaySettings); Polish is the default and the source language. */
+    static volatile boolean english;
+    private static final int R_SOURCE = 0x7f0a0ff0, R_SHOWN = 0x7f0a0ff1;
     private Ui() { }
+
+    static String tr(String text) { return english ? Translations.english(text) : text; }
+
+    /** Translates every label in a window and keeps doing so as screens change; a no-op in Polish. */
+    static void localize(View root) {
+        if (!english || root == null) return;
+        translateTree(root);
+        root.getViewTreeObserver().addOnGlobalLayoutListener(() -> translateTree(root));
+    }
+    private static void translateTree(View view) {
+        if (view instanceof android.widget.EditText) return;
+        if (view instanceof TextView) {
+            TextView label = (TextView) view; CharSequence current = label.getText();
+            if (current != null && current.length() > 0) {
+                String text = current.toString();
+                if (!text.equals(label.getTag(R_SHOWN))) { String translated = Translations.english(text); label.setTag(R_SOURCE, text); label.setTag(R_SHOWN, translated); if (!translated.equals(text)) label.setText(translated); }
+            }
+            CharSequence description = view.getContentDescription();
+            if (description != null) { String translated = Translations.english(description.toString()); if (!translated.contentEquals(description)) view.setContentDescription(translated); }
+        }
+        if (view instanceof android.view.ViewGroup) { android.view.ViewGroup group = (android.view.ViewGroup) view; for (int i = 0; i < group.getChildCount(); i++) translateTree(group.getChildAt(i)); }
+    }
+
+    /** AlertDialog builder that translates its texts and list rows when English is chosen. */
+    static final class Dialog extends android.app.AlertDialog.Builder {
+        Dialog(Context context) { super(context); }
+        Dialog(Context context, int theme) { super(context, theme); }
+        @Override public Dialog setTitle(CharSequence title) { super.setTitle(title == null ? null : tr(title.toString())); return this; }
+        @Override public Dialog setMessage(CharSequence message) { super.setMessage(message == null ? null : tr(message.toString())); return this; }
+        @Override public Dialog setItems(CharSequence[] items, android.content.DialogInterface.OnClickListener listener) { super.setItems(translated(items), listener); return this; }
+        @Override public Dialog setSingleChoiceItems(CharSequence[] items, int checked, android.content.DialogInterface.OnClickListener listener) { super.setSingleChoiceItems(translated(items), checked, listener); return this; }
+        @Override public Dialog setPositiveButton(CharSequence text, android.content.DialogInterface.OnClickListener listener) { super.setPositiveButton(text == null ? null : tr(text.toString()), listener); return this; }
+        @Override public Dialog setNegativeButton(CharSequence text, android.content.DialogInterface.OnClickListener listener) { super.setNegativeButton(text == null ? null : tr(text.toString()), listener); return this; }
+        @Override public Dialog setNeutralButton(CharSequence text, android.content.DialogInterface.OnClickListener listener) { super.setNeutralButton(text == null ? null : tr(text.toString()), listener); return this; }
+        @Override public android.app.AlertDialog create() { android.app.AlertDialog dialog = super.create(); if (english) dialog.setOnShowListener(d -> { if (dialog.getWindow() != null) localize(dialog.getWindow().getDecorView()); }); return dialog; }
+        private static CharSequence[] translated(CharSequence[] items) { if (!english || items == null) return items; CharSequence[] copy = new CharSequence[items.length]; for (int i = 0; i < items.length; i++) copy[i] = items[i] == null ? null : Translations.english(items[i].toString()); return copy; }
+    }
 
     static int dp(Context c, float n) { return Math.round(n * c.getResources().getDisplayMetrics().density); }
 

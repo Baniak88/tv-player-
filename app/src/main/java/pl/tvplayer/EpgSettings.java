@@ -34,7 +34,7 @@ final class EpgSettings {
         LinearLayout.LayoutParams presetSize = new LinearLayout.LayoutParams(-1, Ui.dp(activity, 48)); presetSize.topMargin = Ui.dp(activity, 10); body.addView(preset, presetSize);
         TextView note = new TextView(activity); note.setTextSize(12); note.setTextColor(Ui.FAINT); note.setPadding(0, Ui.dp(activity, 8), 0, 0);
         note.setText("Publiczne źródło nie jest powiązane z Twoim dostawcą. Pierwsze pobranie może potrwać do minuty."); body.addView(note);
-        AlertDialog dialog = new AlertDialog.Builder(activity).setTitle("Program TV (EPG)").setView(body)
+        AlertDialog dialog = new Ui.Dialog(activity).setTitle("Program TV (EPG)").setView(body)
             .setPositiveButton("Zapisz", null).setNegativeButton("Anuluj", null)
             .setNeutralButton(current == null ? "Wklej" : "Usuń", null).create();
         dialog.setOnShowListener(d -> {

@@ -99,7 +99,7 @@ final class PlaybackAdjustments {
         slider(body,"☀","Jasność",Math.round(brightness()*100),100,true,value -> brightness(value/100f),() -> Math.round(brightness()*100));
         TextView hint=new TextView(activity); hint.setTextColor(Ui.MUTED); hint.setTextSize(13); hint.setLineSpacing(0,1.15f);
         hint.setText("Wskazówka: przesuń palcem w górę lub w dół po obrazie — po lewej stronie jasność, po prawej głośność."); hint.setPadding(0,dp(14),0,0); body.addView(hint);
-        new AlertDialog.Builder(activity).setTitle("Obraz i dźwięk").setView(body).setPositiveButton("Gotowe",null).setNeutralButton("Jasność telefonu",(d,w) -> {
+        new Ui.Dialog(activity).setTitle("Obraz i dźwięk").setView(body).setPositiveButton("Gotowe",null).setNeutralButton("Jasność telefonu",(d,w) -> {
             WindowManager.LayoutParams attrs=activity.getWindow().getAttributes(); attrs.screenBrightness=WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE; activity.getWindow().setAttributes(attrs);
         }).show();
     }

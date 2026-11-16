@@ -46,7 +46,9 @@ public class PlayerActivity extends Activity {
         b.setBackground(Ui.touch(this,0x52000000,22,0x40FFFFFF));
         return b;
     }
+    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(DisplaySettings.wrap(base)); }
     @Override public void onCreate(Bundle state) {
+        DisplaySettings.apply(this);
         super.onCreate(state);
         if(state!=null && state.getBundle("live_channel")!=null) getIntent().replaceExtras(state.getBundle("live_channel"));
         url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }
@@ -83,14 +85,14 @@ public class PlayerActivity extends Activity {
         if(television) {
             full.setVisibility(View.GONE);
             // TVs crop ~5% of each edge (overscan): keep the title bar and the playback controls inside the safe area.
-            top.setPadding(dp(48),dp(28),dp(48),dp(18));
+            DisplaySettings.pad(top,dp(48),dp(28),dp(48),dp(18));
             View controller=view.findViewById(androidx.media3.ui.R.id.exo_controller);
-            if(controller!=null) controller.setPadding(dp(48),dp(24),dp(48),dp(28));
+            if(controller!=null) DisplaySettings.pad(controller,dp(48),dp(24),dp(48),dp(28));
             if(progressBar instanceof androidx.media3.ui.DefaultTimeBar) { androidx.media3.ui.DefaultTimeBar timeBar=(androidx.media3.ui.DefaultTimeBar)progressBar; timeBar.setPlayedColor(Ui.TV_GOLD); timeBar.setScrubberColor(Ui.TV_GOLD); }
         }
         if(television && !onDemand) {
             view.setUseController(false); back.setFocusable(false); settings.setFocusable(false);
-            liveInfo=new TvLiveInfoBar(this); liveInfo.channel(getIntent().getStringExtra("name")); liveInfo.logo(getIntent().getStringExtra("logo"));
+            liveInfo=new TvLiveInfoBar(this); liveInfo.channel(getIntent().getStringExtra("name")); liveInfo.logo(getIntent().getStringExtra("logo")); DisplaySettings.pad(liveInfo,dp(48),dp(56),dp(48),dp(28));
             liveInfo.guide(null); liveInfo.audio("Audio: oczekiwanie na ścieżkę");
             root.addView(liveInfo,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
         }
@@ -118,7 +120,7 @@ public class PlayerActivity extends Activity {
             }
         };
         if(!television) adjustments=new PlaybackAdjustments(this,root,state);
-        setContentView(root); updateFullscreen();
+        setContentView(root); updateFullscreen(); Ui.localize(root);
         if(!onDemand) loadChannelQueue();
         // The system may drop the fullscreen flags (focus change, dialogs, rotation); restore them.
         getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(visibility -> {
@@ -221,7 +223,7 @@ public class PlayerActivity extends Activity {
         if(adjustments!=null) labels.add("Głośność i jasność");
         labels.add("Połączenie internetowe");
         if(television) labels.add("Zgodność dźwięku");
-        AlertDialog options=new AlertDialog.Builder(this,television?android.R.style.Theme_Material_Dialog_Alert:0).setTitle(television?null:"Opcje odtwarzania").setAdapter(optionRows(labels),(d,i) -> {
+        AlertDialog options=new Ui.Dialog(this,television?android.R.style.Theme_Material_Dialog_Alert:0).setTitle(television?null:"Opcje odtwarzania").setAdapter(optionRows(labels),(d,i) -> {
             if(labels.get(i).equals("Zgodność dźwięku")) { chooseAudioOutput(); return; }
             if(labels.get(i).equals("Połączenie internetowe")) { PlaybackSettings.choose(this,() -> {
                 boolean playing=player!=null && player.getPlayWhenReady();
@@ -258,7 +260,7 @@ public class PlayerActivity extends Activity {
     }
     private void chooseAudioOutput() {
         boolean previous=PlaybackAudio.pcm(this);
-        new AlertDialog.Builder(this).setTitle("Zgodność dźwięku")
+        new Ui.Dialog(this).setTitle("Zgodność dźwięku")
             .setSingleChoiceItems(new String[]{"Automatycznie · HDMI / Dolby","Stereo PCM · gdy brak dźwięku"},previous?1:0,(dialog,index) -> {
                 dialog.dismiss(); if(previous==(index==1)) return;
                 PlaybackAudio.pcm(this,index==1);
@@ -341,8 +343,8 @@ public class PlayerActivity extends Activity {
         if(path==null || !path.endsWith(".ts")) { Toast.makeText(this,"Nagrywanie tej wersji obsługuje bezpośrednie kanały MPEG-TS.",Toast.LENGTH_LONG).show(); return; }
         if(android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)
             requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},73);
-        new AlertDialog.Builder(this).setTitle("Czas nagrania").setMessage("Nagranie otwiera dodatkowe połączenie do dostawcy. Wybierz czas i plik.")
-            .setPositiveButton("Dalej",(dialog,which) -> new AlertDialog.Builder(this).setTitle("Maksymalny czas")
+        new Ui.Dialog(this).setTitle("Czas nagrania").setMessage("Nagranie otwiera dodatkowe połączenie do dostawcy. Wybierz czas i plik.")
+            .setPositiveButton("Dalej",(dialog,which) -> new Ui.Dialog(this).setTitle("Maksymalny czas")
                 .setItems(new String[]{"30 minut","60 minut","120 minut"},(d,index) -> {
                     recordingMinutes=new int[]{30,60,120}[index];
                     if(!requestRecordingFile(this,RECORD_FILE)) Toast.makeText(this,"System nie udostępnia wyboru pliku. Nagrywanie wymaga systemowego menedżera dokumentów.",Toast.LENGTH_LONG).show();
@@ -477,7 +479,7 @@ public class PlayerActivity extends Activity {
             }
         }
         if(labels.size()==1) { Toast.makeText(this,"Źródło nie udostępnia dodatkowych ścieżek.",Toast.LENGTH_LONG).show(); return; }
-        new AlertDialog.Builder(this).setTitle(type==C.TRACK_TYPE_TEXT?"Napisy":"Audio").setItems(labels.toArray(new String[0]),(d,i) -> { if(player!=null) actions.get(i).run(); }).show();
+        new Ui.Dialog(this).setTitle(type==C.TRACK_TYPE_TEXT?"Napisy":"Audio").setItems(labels.toArray(new String[0]),(d,i) -> { if(player!=null) actions.get(i).run(); }).show();
     }
     private void saveWatchProgress() {
         if(player!=null && onDemand) { long at=player.getCurrentPosition(),duration=player.getDuration(); WatchProgress.save(this,url,at,duration,player.getPlaybackState()==Player.STATE_ENDED || (duration>0 && at>=duration-2000)); }

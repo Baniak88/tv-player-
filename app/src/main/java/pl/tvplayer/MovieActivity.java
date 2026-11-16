@@ -33,7 +33,9 @@ public final class MovieActivity extends Activity {
     private int dp(int n) { return Ui.dp(this,n); }
     private LinearLayout column() { LinearLayout v=new LinearLayout(this); v.setOrientation(LinearLayout.VERTICAL); return v; }
     private TextView text(String s,int size,int color) { return Ui.text(this,s,size,color); }
+    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(DisplaySettings.wrap(base)); }
     @Override public void onCreate(Bundle state) {
+        DisplaySettings.apply(this);
         super.onCreate(state); repository=new MovieRepository(this); String url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }
         television=getIntent().getBooleanExtra("television",false) || (getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_TYPE_MASK)==android.content.res.Configuration.UI_MODE_TYPE_TELEVISION;
         if(television) { setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE); getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN); }
@@ -42,7 +44,7 @@ public final class MovieActivity extends Activity {
         scroll=new ScrollView(this); scroll.setBackgroundColor(Ui.BG); scroll.setFillViewport(true); scroll.setClipToPadding(false);
         
         content=column(); scroll.addView(content,new ScrollView.LayoutParams(-1,-2));
-        FrameLayout page=new FrameLayout(this); page.setBackgroundColor(Ui.BG); page.setOnApplyWindowInsetsListener((v,insets) -> { v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets(); }); scroll.setPadding(0,0,0,dp(20)); page.addView(scroll,new FrameLayout.LayoutParams(-1,-1)); page.addView(Ui.detailBar(this,"Filmy",this::finish),new FrameLayout.LayoutParams(-1,dp(52),Gravity.TOP)); setContentView(page); render(); load();
+        FrameLayout page=new FrameLayout(this); page.setBackgroundColor(Ui.BG); page.setOnApplyWindowInsetsListener((v,insets) -> { v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets(); }); scroll.setPadding(0,0,0,dp(20)); page.addView(scroll,new FrameLayout.LayoutParams(-1,-1)); page.addView(Ui.detailBar(this,"Filmy",this::finish),new FrameLayout.LayoutParams(-1,dp(52),Gravity.TOP)); setContentView(page); Ui.localize(page); if(television) DisplaySettings.pad(findViewById(android.R.id.content),0,0,0,0); render(); load();
     }
     private void load() {
         worker.execute(() -> {

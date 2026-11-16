@@ -45,7 +45,9 @@ public final class SeriesActivity extends Activity {
         if(television) Ui.televisionButton(button,false);
         return button;
     }
+    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(DisplaySettings.wrap(base)); }
     @Override public void onCreate(Bundle state) {
+        DisplaySettings.apply(this);
         super.onCreate(state); String url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }
         television=getIntent().getBooleanExtra("television",false)||(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_TYPE_MASK)==android.content.res.Configuration.UI_MODE_TYPE_TELEVISION;
         if(television) { setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE); getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN); }
@@ -60,7 +62,7 @@ public final class SeriesActivity extends Activity {
             public View getView(int p,View reused,ViewGroup parent) { return episodeRow(episodes.get(p),reused); }
         };
         list.setAdapter(adapter); list.setOnItemClickListener((parent,v,index,id) -> { int row=index-list.getHeaderViewsCount(); if(row>=0&&row<episodes.size()) play(episodes.get(row)); });
-        if(television) setContentView(list);
+        if(television) { setContentView(list); Ui.localize(list); DisplaySettings.pad(findViewById(android.R.id.content),0,0,0,0); }
         else {
             FrameLayout page=new FrameLayout(this); page.setBackgroundColor(Ui.BG);
             page.setOnApplyWindowInsetsListener((v,insets) -> { v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets(); });
@@ -112,7 +114,7 @@ public final class SeriesActivity extends Activity {
         star=button("+  Moja lista"); star.setTextSize(television?17:14); star.setOnClickListener(v -> toggleFavorite()); actions.addView(star,new LinearLayout.LayoutParams(dp(television?154:126),dp(52))); copy.addView(actions);
         playHint=text("",television?15:13,Ui.MUTED); copy.addView(playHint);
         TextView synopsis=text(details.overview().isEmpty()?"Opis nie został udostępniony przez dostawcę.":details.overview(),television?18:15,Ui.TEXT); synopsis.setMaxLines(television?4:4); synopsis.setEllipsize(TextUtils.TruncateAt.END); synopsis.setLineSpacing(dp(3),1); synopsis.setPadding(0,dp(14),0,0); copy.addView(synopsis);
-        if(!details.overview().isEmpty()) { synopsis.setContentDescription("Opis serialu. Wybierz, aby przeczytać całość."); synopsis.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle(details.title()).setMessage(details.overview()).setPositiveButton("Zamknij",null).show()); }
+        if(!details.overview().isEmpty()) { synopsis.setContentDescription("Opis serialu. Wybierz, aby przeczytać całość."); synopsis.setOnClickListener(v -> new Ui.Dialog(this).setTitle(details.title()).setMessage(details.overview()).setPositiveButton("Zamknij",null).show()); }
         if(!details.genre().isEmpty()) { TextView genre=text(details.genre(),television?15:13,Ui.MUTED); genre.setPadding(0,dp(12),0,0); copy.addView(genre); }
         if(television) {
             // Same symmetric layout as film details: poster on the left, one readable column on the right, both vertically centred.
@@ -135,7 +137,7 @@ public final class SeriesActivity extends Activity {
                     TextView only=text(details.seasons().get(0).title(),16,Ui.MUTED); only.setGravity(Gravity.CENTER); only.setPadding(dp(14),0,dp(14),0); only.setBackground(Ui.shape(this,Ui.SURFACE,10,Ui.BORDER)); only.setContentDescription(only.getText()+", jedyny sezon"); seasonBar.addView(only,new LinearLayout.LayoutParams(dp(148),dp(48)));
                 } else {
                     seasonButton=button(details.seasons().get(selectedSeason).title()+"  ▾"); seasonButton.setTextColor(Ui.TEXT); seasonButton.setBackground(Ui.touch(this,Ui.SURFACE_HIGH,10,Ui.BORDER)); seasonButton.setContentDescription("Wybierz sezon"); seasonBar.addView(seasonButton,new LinearLayout.LayoutParams(dp(164),dp(48)));
-                    seasonButton.setOnClickListener(v -> { String[] names=new String[details.seasons().size()]; for(int i=0;i<names.length;i++) names[i]=details.seasons().get(i).title(); new AlertDialog.Builder(this).setTitle("Wybierz sezon").setSingleChoiceItems(names,selectedSeason,(dialog,index) -> { selectSeason(index); dialog.dismiss(); }).setNegativeButton("Zamknij",null).show(); });
+                    seasonButton.setOnClickListener(v -> { String[] names=new String[details.seasons().size()]; for(int i=0;i<names.length;i++) names[i]=details.seasons().get(i).title(); new Ui.Dialog(this).setTitle("Wybierz sezon").setSingleChoiceItems(names,selectedSeason,(dialog,index) -> { selectSeason(index); dialog.dismiss(); }).setNegativeButton("Zamknij",null).show(); });
                 }
             } else {
             Spinner seasons=new Spinner(this,television?Spinner.MODE_DIALOG:Spinner.MODE_DROPDOWN); seasons.setPrompt("Wybierz sezon"); seasons.setFocusable(true); seasons.setFocusableInTouchMode(television); seasons.setContentDescription("Wybierz sezon"); seasons.setBackground(Ui.touch(this,Ui.SURFACE_HIGH,10,Ui.BORDER));

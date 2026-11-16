@@ -37,11 +37,11 @@ final class TvPhoneSetup {
             TextView instructions=new TextView(activity); instructions.setTextSize(18); instructions.setPadding(dp(24),0,0,0);
             instructions.setText("1. Telefon i TV połącz z tą samą siecią.\n2. Zeskanuj QR lub otwórz w telefonie:\n"+server.url()+"\n\n3. Wpisz kod: "+server.code()+"\n\nWpisz dane od dostawcy na telefonie.\nFormularz zamknie się po 5 minutach.");
             content.addView(instructions,new LinearLayout.LayoutParams(0,-2,1));
-            dialog=new AlertDialog.Builder(activity).setTitle("Dodaj źródło przez telefon").setView(content).setNegativeButton("Zamknij",(d,w) -> close()).create();
+            dialog=new Ui.Dialog(activity).setTitle("Dodaj źródło przez telefon").setView(content).setNegativeButton("Zamknij",(d,w) -> close()).create();
             dialog.setOnDismissListener(d -> close()); dialog.show();
             ui.postDelayed(() -> { close(); if(!activity.isFinishing() && !activity.isDestroyed()) Toast.makeText(activity,"Kod wygasł. Otwórz „Dodaj przez telefon” ponownie.",Toast.LENGTH_LONG).show(); },300000);
         } catch(Exception failure) {
-            close(); new AlertDialog.Builder(activity).setTitle("Połączenie przez telefon").setMessage("Połącz telewizor i telefon z tą samą siecią domową. Sieć gościnna lub izolacja urządzeń w routerze może blokować połączenie. Spróbuj ponownie albo wpisz źródło pilotem.").setPositiveButton("OK",null).show();
+            close(); new Ui.Dialog(activity).setTitle("Połączenie przez telefon").setMessage("Połącz telewizor i telefon z tą samą siecią domową. Sieć gościnna lub izolacja urządzeń w routerze może blokować połączenie. Spróbuj ponownie albo wpisz źródło pilotem.").setPositiveButton("OK",null).show();
         }
     }
     private InetAddress address() throws Exception {

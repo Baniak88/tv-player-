@@ -100,8 +100,9 @@ public final class TvActivity extends Activity {
         Button b=Ui.button(this,value); b.setTextSize(17); b.setTextColor(Ui.TEXT); b.setFocusable(true); b.setFocusableInTouchMode(true); b.setBackground(focus(Ui.SURFACE)); b.setOnClickListener(v -> action.run()); return b;
     }
     private String title(String kind) { return kind.equals("tv")?"Telewizja na żywo":kind.equals("movie")?"Filmy":"Seriale"; }
+    @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(DisplaySettings.wrap(base)); }
     @Override public void onCreate(Bundle state) {
-        super.onCreate(state); getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((was,now) -> TvShelfView.trace("focus "+focusName(was)+" -> "+focusName(now)));
+        DisplaySettings.apply(this); super.onCreate(state); getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((was,now) -> TvShelfView.trace("focus "+focusName(was)+" -> "+focusName(now)));
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON|WindowManager.LayoutParams.FLAG_SECURE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         TvBrowseState location=readLocation(state==null?navigationStore().getString("location",""):state.getString("location",""));
@@ -112,14 +113,14 @@ public final class TvActivity extends Activity {
         worker.execute(() -> { try { account=new TvAccountStore(this).load(); } catch(Exception ignored) {} runOnUiThread(() -> { if(!isDestroyed()) { if(!home) load(section); else status.setText(account==null?"Dodaj konto Xtream lub adres listy M3U, aby rozpocząć.":"Biblioteka jest gotowa. Wybierz TV, filmy lub seriale."); } }); });
     }
     private void build() {
-        page=column(); page.setBackgroundColor(TV_BG); page.setPadding(dp(32),dp(12),dp(32),dp(10)); // overscan-safe sides; Fire TV "Calibrate display" covers the rest
+        page=column(); page.setBackgroundColor(TV_BG); DisplaySettings.pad(page,dp(32),dp(12),dp(32),dp(10)); // overscan-safe sides; Fire TV "Calibrate display" covers the rest
         LinearLayout header=new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
         TextView brand=text(Ui.APP_NAME.toUpperCase(Locale.ROOT),18,Ui.TEXT); brand.setTypeface(null,Typeface.BOLD); brand.setLetterSpacing(.08f); header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
         TextClock clock=new TextClock(this); clock.setTextColor(Ui.MUTED); clock.setTextSize(18); clock.setFormat24Hour("HH:mm"); clock.setFormat12Hour("HH:mm"); header.addView(clock);
         page.addView(header,new LinearLayout.LayoutParams(-1,dp(30)));
         body=column(); page.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         status=text("",15,Ui.MUTED); status.setSingleLine(true); status.setEllipsize(android.text.TextUtils.TruncateAt.END); status.setPadding(0,dp(6),0,0); page.addView(status,new LinearLayout.LayoutParams(-1,dp(26)));
-        setContentView(page);
+        setContentView(page); Ui.localize(page);
         if(home) showHome(); else showCatalog();
     }
     private android.content.SharedPreferences navigationStore() { return getSharedPreferences("tv-navigation",MODE_PRIVATE); }
@@ -218,7 +219,7 @@ public final class TvActivity extends Activity {
         });
     }
     private void homeOptions() {
-        new AlertDialog.Builder(this).setTitle("Opcje").setItems(new String[]{"Konto","Źródło","Odśwież źródło","Ustawienia","O aplikacji","Wyjście"},(d,i) -> {
+        new Ui.Dialog(this).setTitle("Opcje").setItems(new String[]{"Konto","Źródło","Odśwież źródło","Ustawienia","O aplikacji","Wyjście"},(d,i) -> {
             switch(i) { case 0: account(); break; case 1: sourceDialog(); break; case 2: refresh(); break; case 3: settings(); break; case 4: info(); break; case 5: finish(); break; }
         }).show();
     }
@@ -404,13 +405,13 @@ public final class TvActivity extends Activity {
     }
     private void catalogOptions() {
         List<String> actions=new ArrayList<>(); actions.add("Kategorie"); actions.add("☆ Ulubione"); actions.add("Sortuj"); if(!section.equals("tv") && seriesTitle.isEmpty()) actions.add("Widok"); actions.add("Źródło"); actions.add("Konto"); actions.add("Ustawienia"); actions.add("Odśwież źródło"); actions.add("Główna");
-        new AlertDialog.Builder(this).setTitle("Opcje katalogu").setItems(actions.toArray(new String[0]),(d,index) -> {
+        new Ui.Dialog(this).setTitle("Opcje katalogu").setItems(actions.toArray(new String[0]),(d,index) -> {
             switch(actions.get(index)) { case "Kategorie": categories(); break; case "☆ Ulubione": onlyFavorites=!onlyFavorites; filter(); break; case "Sortuj": sort(); break; case "Źródło": sourceDialog(); break; case "Konto": account(); break; case "Ustawienia": settings(); break; case "Odśwież źródło": refresh(); break; case "Główna": showHome(); break; case "Widok": chooseView(); break; }
         }).setNegativeButton("Zamknij",null).show();
     }
     private void chooseView() {
         String[] values={"shelves","grid","list"}; String current=navigationStore().getString("view-"+section,"shelves");
-        new AlertDialog.Builder(this).setTitle("Widok biblioteki").setSingleChoiceItems(new String[]{"Rzędy okładek","Siatka plakatów","Lista"},Math.max(0,Arrays.asList(values).indexOf(current)),(d,index) -> {
+        new Ui.Dialog(this).setTitle("Widok biblioteki").setSingleChoiceItems(new String[]{"Rzędy okładek","Siatka plakatów","Lista"},Math.max(0,Arrays.asList(values).indexOf(current)),(d,index) -> {
             TvBrowseState before=location(); navigationStore().edit().putString("view-"+section,values[index]).apply(); catalogGrid=false; parentLocation=null;
             pendingLocation=new TvBrowseState(false,section,group,query,onlyFavorites,"","",before.selectedId(),before.selectedName(),before.selectedIndex(),0,0,0,0,true,false,before.shelfKey(),before.shelfIndex(),null);
             d.dismiss(); showCatalog(); rebuildGroups(); restoreContent(pendingLocation);
@@ -423,7 +424,7 @@ public final class TvActivity extends Activity {
         search.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence text,int start,int count,int after) {} public void onTextChanged(CharSequence text,int start,int before,int count) { String value=text.toString(); adapter.clear(); for(String label:labels) if(value.isEmpty() || TitleSearch.matches(label,value)) adapter.add(label); adapter.notifyDataSetChanged(); } public void afterTextChanged(android.text.Editable text) {}
         });
-        new AlertDialog.Builder(this).setTitle(section.equals("tv")?"Bukiety TV":"Kategorie · "+title(section)).setView(search).setSingleChoiceItems(adapter,-1,(d,index) -> {
+        new Ui.Dialog(this).setTitle(section.equals("tv")?"Bukiety TV":"Kategorie · "+title(section)).setView(search).setSingleChoiceItems(adapter,-1,(d,index) -> {
             String selected=adapter.getItem(index); TvBrowseState before=location(); group=selected.equals(labels.get(0))?"":selected; query=""; d.dismiss();
             if(shelves!=null && !home && !group.isEmpty()) { openShelfGrid(new TvShelfCatalog.Shelf(group,group,Collections.emptyList(),0)); parentLocation=before; }
             else { filter(); if(shelves!=null) shelves.focusCurrent(); else if(!shown.isEmpty()) { contentView().requestFocus(); contentView().setSelection(0); } }
@@ -536,7 +537,7 @@ public final class TvActivity extends Activity {
     private Channel selected() { if(home || shown.isEmpty()) return null; if(shelves!=null) return shelves.selected(); if(list==null || posters==null) return null; int index=contentView().getSelectedItemPosition(); return index>=0 && index<shown.size()?shown.get(index):null; }
     private void options(Channel channel) {
         List<String> actions=new ArrayList<>(); if(channel.kind().equals("movie")) actions.add("Szczegóły filmu"); actions.add(channel.kind().equals("series")?"Odcinki":"Odtwórz"); if(channel.kind().equals("tv")) actions.add("Program TV i archiwum"); actions.add(isFavorite(channel)?"Usuń z ulubionych":"Dodaj do ulubionych");
-        new AlertDialog.Builder(this).setTitle(channel.name()).setItems(actions.toArray(new String[0]),(d,index) -> { String action=actions.get(index); if(action.contains("ulubionych")) favorite(channel); else if(action.startsWith("Program")) GuideDialog.open(this,channel,worker,this::play); else if(action.equals("Odtwórz")) play(channel); else select(channel); }).setNegativeButton("Zamknij",null).show();
+        new Ui.Dialog(this).setTitle(channel.name()).setItems(actions.toArray(new String[0]),(d,index) -> { String action=actions.get(index); if(action.contains("ulubionych")) favorite(channel); else if(action.startsWith("Program")) GuideDialog.open(this,channel,worker,this::play); else if(action.equals("Odtwórz")) play(channel); else select(channel); }).setNegativeButton("Zamknij",null).show();
     }
     private void favorite(Channel channel) {
         if(isFavorite(channel)) { favorites.remove(channel.url()); List<Channel> episodes=seriesFolders.get(channel.url()); if(episodes!=null) for(Channel episode:episodes) favorites.remove(episode.url()); } else favorites.add(channel.url()); final Set<String> saved=new HashSet<>(favorites);
@@ -577,8 +578,8 @@ public final class TvActivity extends Activity {
         int top=pausedLocation==null?0:pausedLocation.top();
         pausedLocation=null; pendingLocation=null; livePreview.receive(token,channel); list.requestFocus(); list.setSelectionFromTop(index,top); rememberLocation();
     }
-    private void search() { EditText field=new EditText(this); field.setSingleLine(true); field.setText(query); new AlertDialog.Builder(this).setTitle("Szukaj w sekcji").setView(field).setPositiveButton("Szukaj",(d,w) -> { query=field.getText().toString().trim(); group=""; filter(); }).setNegativeButton("Anuluj",null).show(); }
-    private void sort() { new AlertDialog.Builder(this).setTitle("Kolejność kategorii").setItems(BouquetOrder.LABELS,(d,index) -> { getPreferences(MODE_PRIVATE).edit().putString("sort-"+section,BouquetOrder.MODES[index]).apply(); rebuildGroups(); }).show(); }
+    private void search() { EditText field=new EditText(this); field.setSingleLine(true); field.setText(query); new Ui.Dialog(this).setTitle("Szukaj w sekcji").setView(field).setPositiveButton("Szukaj",(d,w) -> { query=field.getText().toString().trim(); group=""; filter(); }).setNegativeButton("Anuluj",null).show(); }
+    private void sort() { new Ui.Dialog(this).setTitle("Kolejność kategorii").setItems(BouquetOrder.LABELS,(d,index) -> { getPreferences(MODE_PRIVATE).edit().putString("sort-"+section,BouquetOrder.MODES[index]).apply(); rebuildGroups(); }).show(); }
     private void account() {
         if(loadingAccount) return; loadingAccount=true;
         worker.execute(() -> {
@@ -587,21 +588,21 @@ public final class TvActivity extends Activity {
                 runOnUiThread(() -> {
                     loadingAccount=false; if(isFinishing() || isDestroyed()) return;
                     okhttp3.HttpUrl address=account==null?null:okhttp3.HttpUrl.parse(account.server()==null?"":account.server()); String host=account==null?"Nie dodano źródła":address==null?"Nieprawidłowy zapis źródła":address.host();
-                    new AlertDialog.Builder(this).setTitle("Konto i biblioteka").setMessage("Źródło: "+host+"\nKanały TV: "+Ui.count(channels.size())+"\nBukiety TV: "+Ui.count(bouquets.size())+"\n\nDane dostępu są przechowywane w zaszyfrowanej bibliotece.").setPositiveButton("Zmień źródło",(d,w) -> sourceDialog()).setNegativeButton("Zamknij",null).show();
+                    new Ui.Dialog(this).setTitle("Konto i biblioteka").setMessage("Źródło: "+host+"\nKanały TV: "+Ui.count(channels.size())+"\nBukiety TV: "+Ui.count(bouquets.size())+"\n\nDane dostępu są przechowywane w zaszyfrowanej bibliotece.").setPositiveButton("Zmień źródło",(d,w) -> sourceDialog()).setNegativeButton("Zamknij",null).show();
                 });
             } catch(Exception failure) { runOnUiThread(() -> { loadingAccount=false; error("Nie można odczytać konta i biblioteki."); }); }
         });
     }
     private void settings() {
-        new AlertDialog.Builder(this).setTitle("Ustawienia").setItems(new String[]{"Źródło: dodaj lub zmień","Źródło: odśwież listę","Połączenie internetowe (bufor)","Program TV (EPG): własny link XMLTV","O aplikacji"},(d,index) -> {
-            if(index==0) sourceDialog(); else if(index==1) refresh(); else if(index==2) PlaybackSettings.choose(this,() -> {}); else if(index==3) EpgSettings.choose(this,() -> GuideRepository.get(this).invalidateFailures()); else info();
+        new Ui.Dialog(this).setTitle("Ustawienia").setItems(new String[]{"Źródło: dodaj lub zmień","Źródło: odśwież listę","Połączenie internetowe (bufor)","Program TV (EPG): własny link XMLTV","Ekran i wygląd","O aplikacji"},(d,index) -> {
+            if(index==0) sourceDialog(); else if(index==1) refresh(); else if(index==2) PlaybackSettings.choose(this,() -> {}); else if(index==3) EpgSettings.choose(this,() -> GuideRepository.get(this).invalidateFailures()); else if(index==4) DisplaySettings.choose(this); else info();
         }).setNegativeButton("Zamknij",null).show();
     }
-    private void info() { new AlertDialog.Builder(this).setTitle(Ui.APP_NAME+" "+BuildConfig.VERSION_NAME).setMessage("Telewizja na żywo, filmy i seriale z Twojego źródła IPTV.\nProgram TV (EPG) i archiwum zależą od dostawcy.\n\nOK: wybierz lub odtwórz\nStrzałki: nawigacja\nMenu / przytrzymanie OK: opcje pozycji\nPlay/Pause: sterowanie odtwarzaniem").setPositiveButton("OK",null).show(); }
-    private void error(String message) { if(!isFinishing() && !isDestroyed()) new AlertDialog.Builder(this).setTitle(Ui.APP_NAME).setMessage(message).setPositiveButton("OK",null).show(); }
+    private void info() { new Ui.Dialog(this).setTitle(Ui.APP_NAME+" "+BuildConfig.VERSION_NAME).setMessage("Telewizja na żywo, filmy i seriale z Twojego źródła IPTV.\nProgram TV (EPG) i archiwum zależą od dostawcy.\n\nOK: wybierz lub odtwórz\nStrzałki: nawigacja\nMenu / przytrzymanie OK: opcje pozycji\nPlay/Pause: sterowanie odtwarzaniem").setPositiveButton("OK",null).show(); }
+    private void error(String message) { if(!isFinishing() && !isDestroyed()) new Ui.Dialog(this).setTitle(Ui.APP_NAME).setMessage(message).setPositiveButton("OK",null).show(); }
     private void sourceDialog() {
         if(busy || refreshing) return;
-        new AlertDialog.Builder(this).setTitle("Dodaj źródło").setItems(new String[]{"Dodaj przez telefon · ta sama sieć Wi-Fi","Konto Xtream Codes · wpisz pilotem","Adres listy M3U · wpisz pilotem"},(d,index) -> {
+        new Ui.Dialog(this).setTitle("Dodaj źródło").setItems(new String[]{"Dodaj przez telefon · ta sama sieć Wi-Fi","Konto Xtream Codes · wpisz pilotem","Adres listy M3U · wpisz pilotem"},(d,index) -> {
             if(index==0) { if(phoneSetup==null) phoneSetup=new TvPhoneSetup(this); phoneSetup.show(this::importSource); }
             else sourceForm(index==1);
         }).setNegativeButton("Anuluj",null).show();
@@ -611,7 +612,7 @@ public final class TvActivity extends Activity {
         EditText address=new EditText(this); address.setHint(xtream?"Serwer http:// lub https://":"Adres listy M3U"); address.setSingleLine(true); address.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI); fields.addView(address);
         EditText user=new EditText(this),password=new EditText(this); user.setHint("Login"); user.setSingleLine(true); password.setHint("Hasło"); password.setSingleLine(true); password.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
         if(xtream) { fields.addView(user); fields.addView(password); }
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(xtream?"Konto Xtream Codes":"Lista M3U").setView(fields).setPositiveButton("Połącz",null).setNegativeButton("Anuluj",null).create(); dialog.show();
+        AlertDialog dialog=new Ui.Dialog(this).setTitle(xtream?"Konto Xtream Codes":"Lista M3U").setView(fields).setPositiveButton("Połącz",null).setNegativeButton("Anuluj",null).create(); dialog.show();
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             try { SourceClient.validate(address.getText().toString()); } catch(IllegalArgumentException e) { address.setError("Podaj poprawny adres http:// lub https://"); return; }
             if(xtream && (user.getText().toString().trim().isEmpty() || password.getText().toString().isEmpty())) { user.setError("Wpisz login i hasło"); return; }
@@ -684,9 +685,9 @@ public final class TvActivity extends Activity {
         if(!home && list!=null && contentView().hasFocus() && bouquets.getVisibility()==View.VISIBLE) { bouquets.setSelection(group.isEmpty()?0:Math.max(0,groups.indexOf(group)+1)); bouquets.requestFocus(); return; }
         if(!home) {
             rememberLocation();
-            new AlertDialog.Builder(this).setTitle("Nawigacja").setItems(new String[]{"Wróć do przeglądania","Główna","TV","Filmy","Seriale"},(d,index) -> { if(index==1) showHome(); else if(index>=2) open(new String[]{"tv","movie","series"}[index-2]); }).setNegativeButton("Zamknij",null).show(); return;
+            new Ui.Dialog(this).setTitle("Nawigacja").setItems(new String[]{"Wróć do przeglądania","Główna","TV","Filmy","Seriale"},(d,index) -> { if(index==1) showHome(); else if(index>=2) open(new String[]{"tv","movie","series"}[index-2]); }).setNegativeButton("Zamknij",null).show(); return;
         }
-        new AlertDialog.Builder(this).setTitle("Zamknąć TV Player?").setPositiveButton("Wyjście",(d,w) -> finish()).setNegativeButton("Zostań",null).show();
+        new Ui.Dialog(this).setTitle("Zamknąć TV Player?").setPositiveButton("Wyjście",(d,w) -> finish()).setNegativeButton("Zostań",null).show();
     }
     @Override protected void onResume() {
         super.onResume(); foreground=true; scheduleGuides();

@@ -34,7 +34,7 @@ public final class GuideDialog {
         boolean playing=GuideRepository.get(activity).isObserving(channel);
         if(!playing && GuideRepository.get(activity).isObservingAny()) {
             // Opening a second stream would be refused by single-connection accounts (HTTP 458/429).
-            new AlertDialog.Builder(activity).setTitle("Program TV")
+            new Ui.Dialog(activity).setTitle("Program TV")
                 .setMessage("Teraz odtwarzany jest inny kanał. Twój dostawca pozwala zwykle na jedno połączenie naraz, więc program ze strumienia można odczytać tylko z oglądanego kanału.\n\nWłącz ten kanał i ponownie stuknij EPG albo ustaw link EPG.")
                 .setNegativeButton("Zamknij",null).setNeutralButton("Link EPG",(d,w) -> EpgSettings.choose(activity,() -> open(activity,channel,java.util.concurrent.ForkJoinPool.commonPool(),play)))
                 .setPositiveButton("Włącz kanał",(d,w) -> play.accept(channel)).show();
@@ -53,7 +53,7 @@ public final class GuideDialog {
     private static void show(Activity activity,Channel channel,GuideRepository.Data data,Consumer<Channel> play) {
         List<Guide.Program> programs=data.programs();
         if(programs.isEmpty()) {
-            AlertDialog.Builder error=new AlertDialog.Builder(activity).setTitle("Program TV")
+            AlertDialog.Builder error=new Ui.Dialog(activity).setTitle("Program TV")
                 .setMessage(data.error().isEmpty()?"Dostawca nie udostępnił programu dla tego kanału.":data.error()).setNegativeButton("Zamknij",null);
             error.setNeutralButton("Link EPG",(d,w) -> EpgSettings.choose(activity,() -> open(activity,channel,java.util.concurrent.ForkJoinPool.commonPool(),play)));
             if(!data.source().equals("Strumień DVB EIT")) error.setPositiveButton("Ze strumienia",(d,w) -> openStream(activity,channel,play));
@@ -67,10 +67,10 @@ public final class GuideDialog {
             Guide.Program p=programs.get(i); if(p.current(now)) current=i;
             labels[i]=(p.current(now)?"TERAZ · ":"")+date.format(java.time.Instant.ofEpochSecond(p.start()))+"  "+p.title()+(p.replayable(channel,now)?"  ↶":"");
         }
-        AlertDialog listing=new AlertDialog.Builder(activity).setTitle(channel.name()+" · Program TV")
+        AlertDialog listing=new Ui.Dialog(activity).setTitle(channel.name()+" · Program TV")
             .setItems(labels,(d,index) -> {
                 Guide.Program p=programs.get(index);
-                AlertDialog.Builder detail=new AlertDialog.Builder(activity).setTitle(p.title())
+                AlertDialog.Builder detail=new Ui.Dialog(activity).setTitle(p.title())
                     .setMessage(date.format(java.time.Instant.ofEpochSecond(p.start()))+" – "+date.format(java.time.Instant.ofEpochSecond(p.end()))+"\n\n"+p.description()+"\n\nŹródło: "+data.source())
                     .setNegativeButton("Zamknij",null).setNeutralButton("Na żywo",(parent,button) -> play.accept(channel));
                 if(p.replayable(channel,System.currentTimeMillis()/1000)) detail.setPositiveButton("Oglądaj od początku",(parent,button) -> {
@@ -81,7 +81,7 @@ public final class GuideDialog {
             }).setNegativeButton("Zamknij",null).create();
         listing.show(); listing.getListView().setSelection(current);
     }
-    private static void info(Activity activity,String text) { new AlertDialog.Builder(activity).setTitle("Program TV").setMessage(text).setPositiveButton("Zamknij",null).show(); }
+    private static void info(Activity activity,String text) { new Ui.Dialog(activity).setTitle("Program TV").setMessage(text).setPositiveButton("Zamknij",null).show(); }
 }
 
 

@@ -17,7 +17,7 @@ final class TvShelfView extends RecyclerView {
         void options(Channel channel);
         void navigation();
     }
-    static final int BLUE=Ui.TV_GOLD;
+
     private final Actions actions;
     private final LinearLayoutManager vertical;
     private List<TvShelfCatalog.Shelf> shelves=Collections.emptyList();
@@ -143,7 +143,7 @@ final class TvShelfView extends RecyclerView {
             super(view); view.setGravity(Gravity.CENTER_VERTICAL); view.setPadding(dp(12),dp(8),dp(16),dp(12));
             view.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{Ui.TV_CARD,Ui.BG}));
             LinearLayout copy=new LinearLayout(getContext()); copy.setOrientation(LinearLayout.VERTICAL);
-            TextView eyebrow=text("Z TWOJEJ BIBLIOTEKI",12,BLUE); eyebrow.setLetterSpacing(.12f); copy.addView(eyebrow);
+            TextView eyebrow=text("Z TWOJEJ BIBLIOTEKI",12,Ui.TV_GOLD); eyebrow.setLetterSpacing(.12f); copy.addView(eyebrow);
             title=text("Wybierz coś na dziś",compact()?22:28,Ui.TEXT); title.setTypeface(null,Typeface.BOLD); title.setMaxLines(compact()?1:2); title.setEllipsize(android.text.TextUtils.TruncateAt.END); copy.addView(title);
             subtitle=text("Filmy i seriale od Twojego dostawcy",15,Ui.MUTED); subtitle.setSingleLine(true); copy.addView(subtitle);
             hint=text("OK — wybierz",13,Ui.MUTED); hint.setPadding(0,dp(8),0,0); copy.addView(hint); view.addView(copy,new LinearLayout.LayoutParams(0,-2,1));

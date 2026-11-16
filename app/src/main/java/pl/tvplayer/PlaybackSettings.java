@@ -22,7 +22,7 @@ final class PlaybackSettings {
         boolean previous=weakInternet(activity);
         android.widget.TextView note=new android.widget.TextView(activity); note.setTextSize(13); int padding=Ui.dp(activity,20); note.setPadding(padding,Ui.dp(activity,8),padding,Ui.dp(activity,8));
         note.setText("Większy bufor pomaga przy chwilowych spadkach prędkości, ale wydłuża start. W źródłach adaptacyjnych preferuje dostępne warianty do 720p i 2,5 Mb/s. Przy stałej jakości wybierz kanał SD/HD zamiast FHD/4K.");
-        new AlertDialog.Builder(activity).setTitle("Połączenie internetowe").setView(note)
+        new Ui.Dialog(activity).setTitle("Połączenie internetowe").setView(note)
             .setSingleChoiceItems(new String[]{"Standard · szybszy start","Słabszy internet · większy bufor"},previous?1:0,(dialog,index) -> {
                 boolean weak=index==1;
                 activity.getSharedPreferences("playback-network",Context.MODE_PRIVATE).edit().putBoolean("weak",weak).apply(); dialog.dismiss();
