@@ -20,6 +20,7 @@ final class LivePreview {
     private final boolean television;
     private final PlayerView video;
     private final TextView title,schedule,notice;
+    private TextView programTitle,times,remaining,description; private ProgressBar progress;
     private final Button pause,full;
     private final Consumer<Channel> fullscreen;
     private final Runnable selectionChanged;
@@ -48,15 +49,32 @@ final class LivePreview {
     LivePreview(Activity activity,boolean wide,Bundle state,Consumer<Channel> fullscreen,Runnable selectionChanged,boolean television) {
         this.activity=activity; this.television=television; activity.setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC); this.fullscreen=fullscreen; this.selectionChanged=selectionChanged;
         remembered=state==null?"":state.getString("preview_url","");
-        panel=new LinearLayout(activity); panel.setOrientation(LinearLayout.VERTICAL); panel.setBackground(Ui.shape(activity,Ui.SURFACE,14,Ui.BORDER)); panel.setClipToOutline(true);
-        FrameLayout picture=new FrameLayout(activity); picture.setBackgroundColor(0xFF000000);
+        panel=new LinearLayout(activity); panel.setOrientation(LinearLayout.VERTICAL); panel.setBackground(Ui.shape(activity,television?Ui.TV_CARD:Ui.SURFACE,14,television?0:Ui.BORDER)); panel.setClipToOutline(true);
+        if(television) panel.setPadding(dp(12),dp(12),dp(12),dp(8));
+        FrameLayout picture=new FrameLayout(activity); picture.setBackground(Ui.shape(activity,0xFF000000,10,television?0x33FFFFFF:0)); picture.setClipToOutline(true);
         video=new PlayerView(activity); video.setUseController(false); video.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING); video.setKeepContentOnPlayerReset(false);
         picture.addView(video,new FrameLayout.LayoutParams(-1,-1));
         notice=Ui.text(activity,"",13,Ui.TEXT); notice.setGravity(Gravity.CENTER); notice.setPadding(dp(16),dp(10),dp(16),dp(10)); notice.setBackgroundColor(0xB3000000); notice.setVisibility(View.GONE);
         picture.addView(notice,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
-        if(television) { float screen=activity.getResources().getDisplayMetrics().widthPixels/activity.getResources().getDisplayMetrics().density; panel.addView(picture,new LinearLayout.LayoutParams(-1,dp((screen>=1100?420:320)*9/16))); }
+        if(television) { int screenHeight=Math.round(activity.getResources().getDisplayMetrics().heightPixels/activity.getResources().getDisplayMetrics().density); panel.addView(picture,new LinearLayout.LayoutParams(-1,dp(Math.min((televisionWidth()-24)*9/16,screenHeight*34/100)))); }
         else if(wide) panel.addView(picture,new LinearLayout.LayoutParams(-1,0,1));
         else { int height=Math.min(Math.round((activity.getResources().getDisplayMetrics().widthPixels-dp(32))*9f/16),Math.round(activity.getResources().getDisplayMetrics().heightPixels*0.21f)); panel.addView(picture,new LinearLayout.LayoutParams(-1,Math.max(dp(130),Math.min(dp(200),height)))); }
+        if(television) {
+            // Receiver-skin layout: channel in amber with a LIVE chip, programme title, times, remaining time, progress and synopsis.
+            LinearLayout head=new LinearLayout(activity); head.setGravity(Gravity.CENTER_VERTICAL); head.setPadding(dp(4),dp(12),dp(4),0);
+            channelLabel=Ui.text(activity,"",17,Ui.TV_GOLD); channelLabel.setSingleLine(true); channelLabel.setEllipsize(TextUtils.TruncateAt.END); head.addView(channelLabel,new LinearLayout.LayoutParams(0,-2,1));
+            TextView live=Ui.text(activity,"●  NA ŻYWO",12,Ui.TEXT); live.setTypeface(null,android.graphics.Typeface.BOLD); live.setPadding(dp(10),dp(4),dp(10),dp(4)); live.setBackground(Ui.shape(activity,0xFF0E1013,12,0x33FFFFFF));
+            android.text.SpannableString dot=new android.text.SpannableString("●  NA ŻYWO"); dot.setSpan(new android.text.style.ForegroundColorSpan(0xFFFF5A5A),0,1,0); live.setText(dot); head.addView(live);
+            panel.addView(head,new LinearLayout.LayoutParams(-1,-2));
+            programTitle=Ui.text(activity,"",21,Ui.TEXT); programTitle.setSingleLine(true); programTitle.setEllipsize(TextUtils.TruncateAt.END); programTitle.setPadding(dp(4),dp(4),dp(4),0); panel.addView(programTitle,new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout timing=new LinearLayout(activity); timing.setPadding(dp(4),dp(10),dp(4),0);
+            times=Ui.text(activity,"",15,Ui.TEXT); timing.addView(times,new LinearLayout.LayoutParams(0,-2,1));
+            remaining=Ui.text(activity,"",14,Ui.MUTED); timing.addView(remaining); panel.addView(timing,new LinearLayout.LayoutParams(-1,-2));
+            progress=new ProgressBar(activity,null,android.R.attr.progressBarStyleHorizontal); progress.setMax(1000);
+            progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Ui.TV_GOLD)); progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Ui.TV_LINE));
+            LinearLayout.LayoutParams bar=new LinearLayout.LayoutParams(-1,dp(4)); bar.leftMargin=dp(4); bar.rightMargin=dp(4); bar.topMargin=dp(6); panel.addView(progress,bar);
+            description=Ui.text(activity,"",14,Ui.MUTED); description.setMaxLines(2); description.setEllipsize(TextUtils.TruncateAt.END); description.setPadding(dp(4),dp(8),dp(4),0); panel.addView(description,new LinearLayout.LayoutParams(-1,0,1));
+        }
         LinearLayout controls=new LinearLayout(activity); controls.setGravity(Gravity.CENTER_VERTICAL); controls.setPadding(dp(4),0,dp(4),0);
         pause=Ui.button(activity,"Ⅱ"); pause.setId(View.generateViewId()); pause.setContentDescription("Wstrzymaj podgląd"); pause.setTextSize(18); Ui.ghost(pause,Ui.TEXT); controls.addView(pause,new LinearLayout.LayoutParams(dp(48),dp(48)));
         pause.setOnClickListener(v -> { if(player==null) { start(); return; } if(player.getPlayerError()!=null) { recovery.retryNow(); } else if(player.getPlayWhenReady()) player.pause(); else player.play(); });
@@ -66,12 +84,16 @@ final class LivePreview {
         full=Ui.button(activity,television?"Ekran":"⤢"); full.setTextSize(television?13:23); full.setContentDescription("Otwórz podgląd na pełnym ekranie"); Ui.ghost(full,Ui.TEXT); controls.addView(full,new LinearLayout.LayoutParams(dp(television?80:48),dp(48)));
         full.setOnClickListener(v -> { if(channel!=null) fullscreen.accept(channel); });
         panel.addView(controls,new LinearLayout.LayoutParams(-1,dp(48)));
+        if(television) { title.setTextSize(13); title.setTypeface(null,android.graphics.Typeface.NORMAL); title.setTextColor(Ui.MUTED); }
         schedule=Ui.text(activity,"",television?14:12,Ui.MUTED); schedule.setMaxLines(television?4:wide?2:1); schedule.setEllipsize(TextUtils.TruncateAt.END); schedule.setPadding(dp(12),0,dp(12),dp(8));
-        schedule.setContentDescription("Aktualny program podglądu"); schedule.setMinHeight(dp(24)); panel.addView(schedule,new LinearLayout.LayoutParams(-1,-2));
+        schedule.setContentDescription("Aktualny program podglądu"); schedule.setMinHeight(dp(24)); if(!television) panel.addView(schedule,new LinearLayout.LayoutParams(-1,-2));
         schedule.setOnClickListener(v -> { if(channel!=null) GuideDialog.open(activity,channel,Runnable::run,c -> { if(c.kind().equals("tv")) select(c); else fullscreen.accept(c); }); });
         panel.setVisibility(View.GONE);
     }
     private int dp(int n) { return Ui.dp(activity,n); }
+    private TextView channelLabel;
+    /** Preview card width on TV: about 40% of the screen, as in the receiver skin. */
+    int televisionWidth() { float screen=activity.getResources().getDisplayMetrics().widthPixels/activity.getResources().getDisplayMetrics().density; return Math.round(Math.max(300,Math.min(520,(screen-64)*0.40f))); }
     Channel selected() { return channel; }
     View controls() { return pause; }
     String selectedUrl() { return channel==null?"":channel.url(); }
@@ -95,7 +117,7 @@ final class LivePreview {
         if(!playable(selected)) return;
         boolean same=channel!=null && channel.url().equals(selected.url());
         if(!same) { release(); guide=null; }
-        channel=selected; remembered=selected.url(); title.setText("Na żywo · "+selected.name()); full.setEnabled(true); pause.setEnabled(true);
+        channel=selected; remembered=selected.url(); title.setText(television?"OK pełny ekran · Menu opcje":"Na żywo · "+selected.name()); if(channelLabel!=null) channelLabel.setText(selected.name()); full.setEnabled(true); pause.setEnabled(true);
         if(active && visible) { if(user && player!=null && player.getPlayerError()!=null && same) { recovery.retryNow(); } else start(); }
         rememberSelection();
         updateGuide(); if(active && visible) { ui.removeCallbacks(guideTick); ui.postDelayed(guideTick,1000); } if(user) selectionChanged.run();
@@ -104,9 +126,23 @@ final class LivePreview {
     private void updateGuide() {
         if(channel==null || !visible) return;
         GuideRepository repository=GuideRepository.get(activity); GuideRepository.Data data=repository.peek(channel,false);
-        if(data!=null) { guide=data; schedule.setText(GuideRepository.summary(data,System.currentTimeMillis()/1000)); return; }
+        if(data!=null) { guide=data; schedule.setText(GuideRepository.summary(data,System.currentTimeMillis()/1000)); showProgramme(data); return; }
+        showProgramme(guide);
         schedule.setText(guide==null?(television?"Program TV · Menu na kanale → Program TV i archiwum":"Program TV · dotknij, aby sprawdzić EPG"):GuideRepository.summary(guide,System.currentTimeMillis()/1000));
         // The channel rows already fetch provider EPG; the preview only observes their cache and EIT.
+    }
+    private void showProgramme(GuideRepository.Data data) {
+        if(programTitle==null) return;
+        long now=System.currentTimeMillis()/1000; Guide.Program current=null,next=null;
+        if(data!=null) for(Guide.Program program:data.programs()) { if(program.current(now)) current=program; else if(program.start()>now && (next==null || program.start()<next.start())) next=program; }
+        java.time.format.DateTimeFormatter clock=java.time.format.DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.systemDefault());
+        programTitle.setText(current!=null?current.title():data==null?"Wczytywanie programu…":"Brak programu TV dla tego kanału");
+        times.setText(current==null?"":clock.format(java.time.Instant.ofEpochSecond(current.start()))+"  –  "+clock.format(java.time.Instant.ofEpochSecond(current.end())));
+        remaining.setText(current==null?"":"Do końca: "+Math.max(1,(current.end()-now+59)/60)+" min");
+        progress.setVisibility(current==null?View.INVISIBLE:View.VISIBLE);
+        if(current!=null) progress.setProgress((int)Math.max(0,Math.min(1000,(now-current.start())*1000/Math.max(1,current.end()-current.start()))));
+        String about=current!=null && current.description()!=null?current.description().trim():"";
+        description.setText(!about.isEmpty()?about:next!=null?"Następnie "+clock.format(java.time.Instant.ofEpochSecond(next.start()))+"  "+next.title():"");
     }
     void resume() { active=true; if(player!=null && weak!=PlaybackSettings.weakInternet(activity)) release(); start(); ui.removeCallbacks(guideTick); ui.post(guideTick); }
     void pause() { active=false; ui.removeCallbacks(guideTick); release(); }
@@ -135,7 +171,7 @@ final class LivePreview {
         PlaybackHandoff.Transfer transfer=PlaybackHandoff.take(token,returned.url());
         if(transfer==null) { select(returned); return; }
         release(); activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); channel=returned; remembered=returned.url(); guide=null; player=transfer.player(); observing=true; weak=PlaybackSettings.weakInternet(activity);
-        title.setText("Na żywo · "+returned.name()); rememberSelection(); attach(); updateGuide(); selectionChanged.run();
+        title.setText(television?"OK pełny ekran · Menu opcje":"Na żywo · "+returned.name()); if(channelLabel!=null) channelLabel.setText(returned.name()); rememberSelection(); attach(); updateGuide(); selectionChanged.run();
     }
     private void release() {
         closeRecovery();

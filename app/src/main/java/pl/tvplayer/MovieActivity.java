@@ -83,34 +83,49 @@ public final class MovieActivity extends Activity {
     private void renderTelevision() {
         View previous=getCurrentFocus(); Object focused=previous==null?null:previous.getTag();
         int y=Math.max(restoredScroll,scroll.getScrollY()); restoredScroll=0; content.removeAllViews();
-        int width=getResources().getDisplayMetrics().widthPixels,heroHeight=dp(440);
-        FrameLayout hero=new FrameLayout(this); televisionHero=hero; hero.setBackgroundColor(Ui.SURFACE); content.addView(hero,new LinearLayout.LayoutParams(-1,heroHeight));
-        ImageView artwork=new ImageView(this); artwork.setScaleType(details.backdrop().isEmpty()?ImageView.ScaleType.FIT_CENTER:ImageView.ScaleType.CENTER_CROP); hero.addView(artwork,new FrameLayout.LayoutParams(-1,-1));
+        // Symmetric details page: dimmed backdrop, poster on the left, and one readable column with title, facts, synopsis, people and actions.
+        int width=getResources().getDisplayMetrics().widthPixels,heroHeight=getResources().getDisplayMetrics().heightPixels-dp(72),side=dp(48),posterWidth=Math.min(dp(250),width/4);
+        FrameLayout hero=new FrameLayout(this); televisionHero=hero; hero.setBackgroundColor(Ui.BG); content.addView(hero,new LinearLayout.LayoutParams(-1,heroHeight));
+        ImageView artwork=new ImageView(this); artwork.setScaleType(ImageView.ScaleType.CENTER_CROP); artwork.setAlpha(details.backdrop().isEmpty()?.18f:.35f); hero.addView(artwork,new FrameLayout.LayoutParams(-1,-1));
         ImageLoader.get(this).load(details.backdrop().isEmpty()?details.cover():details.backdrop(),artwork,width,heroHeight);
-        View shade=new View(this); shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{Ui.BG,0xE60A0D14,0x220A0D14})); hero.addView(shade,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout copy=column(); televisionCopy=copy; televisionCopyWidth=Math.min(width-dp(32),Math.max(dp(540),width*3/5)); copy.setPadding(dp(32),dp(72),dp(24),dp(20)); hero.addView(copy,new FrameLayout.LayoutParams(televisionCopyWidth,-2,Gravity.LEFT));
+        View shade=new View(this); shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,new int[]{0xF20B0C0F,0xCC0B0C0F,0x990B0C0F})); hero.addView(shade,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout layout=new LinearLayout(this); layout.setGravity(Gravity.CENTER_VERTICAL); layout.setPadding(side,dp(32),side,dp(32)); hero.addView(layout,new FrameLayout.LayoutParams(-1,-1));
+        FrameLayout poster=new FrameLayout(this); poster.setBackground(Ui.shape(this,Ui.TV_CARD,12,Ui.TV_LINE)); poster.setClipToOutline(true);
+        TextView posterName=text(details.title(),16,Ui.MUTED); posterName.setGravity(Gravity.CENTER); posterName.setPadding(dp(12),dp(12),dp(12),dp(12)); poster.addView(posterName,new FrameLayout.LayoutParams(-1,-1));
+        ImageView cover=new ImageView(this); cover.setScaleType(ImageView.ScaleType.CENTER_CROP); poster.addView(cover,new FrameLayout.LayoutParams(-1,-1));
+        String coverUrl=!details.cover().isEmpty()?details.cover():source.logo(); ImageLoader.get(this).load(coverUrl,cover,posterWidth,posterWidth*3/2);
+        layout.addView(poster,new LinearLayout.LayoutParams(posterWidth,posterWidth*3/2));
+        LinearLayout copy=column(); televisionCopy=copy; televisionCopyWidth=width-side*2-posterWidth-dp(40); copy.setPadding(dp(40),0,0,0); layout.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
         TextView title=text(details.title(),30,Ui.TEXT); title.setTypeface(null,Typeface.BOLD); title.setMaxLines(2); title.setEllipsize(TextUtils.TruncateAt.END); copy.addView(title);
         List<String> meta=new ArrayList<>(); if(!details.year().isEmpty()) meta.add(details.year()); if(details.durationSeconds()>0) meta.add(duration(details.durationSeconds())); if(!details.rating().isEmpty() && !details.rating().equals("0")) meta.add("★ "+details.rating());
-        TextView metadata=text(TextUtils.join("   ·   ",meta),17,Ui.MUTED); metadata.setPadding(0,dp(12),0,dp(6)); copy.addView(metadata);
-        progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal); progress.setMax(1000); progress.setProgressTintList(ColorStateList.valueOf(Ui.ACCENT)); copy.addView(progress,new LinearLayout.LayoutParams(-1,dp(4)));
+        TextView metadata=text(TextUtils.join("   ·   ",meta),17,Ui.TV_GOLD); metadata.setPadding(0,dp(10),0,0); copy.addView(metadata);
+        if(!details.genre().isEmpty()) { TextView genre=text(details.genre(),15,Ui.MUTED); genre.setPadding(0,dp(6),0,0); copy.addView(genre); }
+        if(loading) { TextView wait=text("Pobieranie opisu…",15,Ui.MUTED); wait.setPadding(0,dp(16),0,0); copy.addView(wait); }
+        TextView synopsis=text(details.overview().isEmpty()?(loading?"":failed?"Nie udało się pobrać opisu. Film możesz odtworzyć bez tych danych.":"Opis nie został udostępniony przez dostawcę."):details.overview(),18,Ui.TEXT);
+        synopsis.setLineSpacing(dp(4),1); synopsis.setMaxLines(6); synopsis.setEllipsize(TextUtils.TruncateAt.END); synopsis.setPadding(0,dp(16),0,0); copy.addView(synopsis);
+        LinearLayout description=copy;
+        if(failed) { Button retry=tvButton("Ponów pobieranie opisu",false); retry.setOnClickListener(v -> { loading=true; failed=false; render(); load(); }); LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-2,dp(48)); size.topMargin=dp(12); description.addView(retry,size); }
+        person(description,"Reżyseria",details.director()); person(description,"Obsada",details.cast());
+        progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal); progress.setMax(1000); progress.setProgressTintList(ColorStateList.valueOf(Ui.TV_GOLD)); progress.setProgressBackgroundTintList(ColorStateList.valueOf(Ui.TV_LINE));
+        LinearLayout.LayoutParams progressSize=new LinearLayout.LayoutParams(-1,dp(4)); progressSize.topMargin=dp(18); copy.addView(progress,progressSize);
         progressText=text("",15,Ui.MUTED); progressText.setPadding(0,dp(6),0,0); copy.addView(progressText);
-        LinearLayout actions=new LinearLayout(this); actions.setPadding(0,dp(14),0,0);
+        LinearLayout actions=new LinearLayout(this); actions.setPadding(0,dp(16),0,0);
         play=tvButton("▶  Odtwórz",true); play.setTag("movie-play"); play.setContentDescription("Odtwórz film"); play.setOnClickListener(v -> playback(false));
         star=tvButton("+  Moja lista",false); star.setTag("movie-star"); star.setOnClickListener(v -> favorite());
-        LinearLayout.LayoutParams playSize=new LinearLayout.LayoutParams(0,dp(52),1); playSize.rightMargin=dp(12); actions.addView(play,playSize); actions.addView(star,new LinearLayout.LayoutParams(dp(180),dp(52))); copy.addView(actions);
+        LinearLayout.LayoutParams playSize=new LinearLayout.LayoutParams(dp(240),dp(52)); playSize.rightMargin=dp(12); actions.addView(play,playSize); actions.addView(star,new LinearLayout.LayoutParams(dp(200),dp(52))); copy.addView(actions);
         restart=tvButton("Od początku",false); restart.setTag("movie-restart"); restart.setOnClickListener(v -> playback(true)); LinearLayout.LayoutParams restartSize=new LinearLayout.LayoutParams(-2,dp(48)); restartSize.topMargin=dp(10); copy.addView(restart,restartSize);
-        if(!details.genre().isEmpty()) { TextView genre=text(details.genre(),16,Ui.MUTED); genre.setPadding(0,dp(16),0,0); copy.addView(genre); }
-        LinearLayout description=column(); description.setPadding(dp(32),dp(20),dp(32),dp(28)); content.addView(description);
-        if(loading) description.addView(text("Pobieranie opisu…",15,Ui.MUTED));
-        TextView synopsis=text(details.overview().isEmpty()?(loading?"":failed?"Nie udało się pobrać opisu. Film możesz odtworzyć bez tych danych.":"Opis nie został udostępniony przez dostawcę."):details.overview(),18,Ui.TEXT); synopsis.setLineSpacing(dp(4),1); description.addView(synopsis);
-        if(failed) { Button retry=tvButton("Ponów pobieranie opisu",false); retry.setOnClickListener(v -> { loading=true; failed=false; render(); load(); }); LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-2,dp(48)); size.topMargin=dp(14); description.addView(retry,size); }
-        detail(description,"Reżyseria",details.director()); detail(description,"Obsada",details.cast());
         play.setId(View.generateViewId()); star.setId(View.generateViewId()); restart.setId(View.generateViewId());
         play.setNextFocusRightId(star.getId()); star.setNextFocusLeftId(play.getId()); restart.setNextFocusUpId(play.getId());
         updateProgress(); if(restart.getVisibility()==View.VISIBLE) { play.setNextFocusDownId(restart.getId()); star.setNextFocusDownId(restart.getId()); }
         View target="movie-star".equals(focused) && star.isEnabled()?star:"movie-restart".equals(focused) && restart.getVisibility()==View.VISIBLE?restart:play;
         if(previous==null || focused!=null) target.post(target::requestFocus);
         scroll.post(() -> scroll.scrollTo(0,y));
+    }
+    /** One compact line per credit on TV: muted label, then names. */
+    private void person(LinearLayout parent,String label,String value) {
+        if(value.isEmpty()) return; LinearLayout line=new LinearLayout(this); line.setPadding(0,dp(10),0,0);
+        line.addView(text(label,15,Ui.MUTED),new LinearLayout.LayoutParams(dp(110),-2));
+        TextView names=text(value,15,Ui.TEXT); names.setMaxLines(2); names.setEllipsize(TextUtils.TruncateAt.END); line.addView(names,new LinearLayout.LayoutParams(0,-2,1)); parent.addView(line);
     }
     private void detail(LinearLayout parent,String label,String value) { if(value.isEmpty()) return; TextView name=text(label,13,Ui.MUTED); name.setPadding(0,dp(22),0,dp(5)); parent.addView(name); TextView body=text(value,15,Ui.TEXT); body.setLineSpacing(dp(3),1); parent.addView(body); }
     private static String duration(long seconds) { long minutes=Math.max(1,(seconds+59)/60); return minutes>=60?(minutes/60)+" godz. "+(minutes%60==0?"":minutes%60+" min"):minutes+" min"; }
@@ -129,7 +144,7 @@ public final class MovieActivity extends Activity {
         if(television && televisionHero!=null && televisionCopy!=null) {
             // Text determines the hero height; a large backdrop must not expand a ScrollView child.
             televisionCopy.measure(View.MeasureSpec.makeMeasureSpec(televisionCopyWidth,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
-            int height=Math.max(dp(440),televisionCopy.getMeasuredHeight());
+            int height=Math.max(getResources().getDisplayMetrics().heightPixels-dp(72),televisionCopy.getMeasuredHeight()+dp(64));
             if(televisionHero.getLayoutParams().height!=height) televisionHero.setLayoutParams(new LinearLayout.LayoutParams(-1,height));
         }
     }

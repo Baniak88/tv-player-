@@ -18,6 +18,8 @@ final class Ui {
     static final int BG = 0xFF0B0C0F, SURFACE = 0xFF17191E, SURFACE_HIGH = 0xFF22252C, BORDER = 0xFF33363F,
         TEXT = 0xFFF4F5F7, MUTED = 0xFFA4A8B2, FAINT = 0xFF6C707A, ON_ACCENT = 0xFFFFFFFF, ACCENT = 0xFFFF3D5E,
         HIGHLIGHT = 0xFF35D0FF, STAR = 0xFFFFC53D, DANGER = 0xFFFF6B6B;
+    /** Minimal TV palette (receiver-skin style): graphite cards, one teal selection and a warm amber accent. */
+    static final int TV_CARD = 0xFF161A1F, TV_SELECT = 0xFF1E4C52, TV_GOLD = 0xFFF2B441, TV_LINE = 0xFF262B31;
     private Ui() { }
 
     static int dp(Context c, float n) { return Math.round(n * c.getResources().getDisplayMetrics().density); }
@@ -73,13 +75,14 @@ final class Ui {
 
     /** The remote must remain visible even on a filled coral primary button. */
     static void televisionButton(Button button,boolean primary) {
-        Context context=button.getContext(); int color=primary?ACCENT:SURFACE_HIGH;
+        // Minimal TV buttons: white primary with dark text, graphite secondary; focus is a clear amber/white frame.
+        Context context=button.getContext(); int color=primary?TEXT:SURFACE_HIGH;
         StateListDrawable states=new StateListDrawable();
-        GradientDrawable focused=shape(context,color,12,0); focused.setStroke(dp(context,3),TEXT);
-        states.addState(new int[]{android.R.attr.state_pressed},shape(context,lighter(color),12,TEXT));
+        GradientDrawable focused=shape(context,primary?TEXT:TV_SELECT,12,0); focused.setStroke(dp(context,3),primary?TV_GOLD:TEXT);
+        states.addState(new int[]{android.R.attr.state_pressed},shape(context,primary?0xFFDADDE2:lighter(color),12,TEXT));
         states.addState(new int[]{android.R.attr.state_focused},focused);
-        states.addState(new int[]{},shape(context,color,12,primary?0:BORDER));
-        button.setTextColor(buttonColors(TEXT)); button.setTypeface(null,android.graphics.Typeface.BOLD);
+        states.addState(new int[]{},shape(context,color,12,primary?0:TV_LINE));
+        button.setTextColor(buttonColors(primary?BG:TEXT)); button.setTypeface(null,android.graphics.Typeface.BOLD);
         button.setBackground(states); button.setFocusable(true); button.setFocusableInTouchMode(true);
     }
 

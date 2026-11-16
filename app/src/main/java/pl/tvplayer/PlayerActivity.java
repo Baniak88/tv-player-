@@ -214,7 +214,7 @@ public class PlayerActivity extends Activity {
         if(adjustments!=null) labels.add("Głośność i jasność");
         labels.add("Połączenie internetowe");
         if(television) labels.add("Zgodność dźwięku");
-        new AlertDialog.Builder(this).setTitle("Opcje odtwarzania").setAdapter(optionRows(labels),(d,i) -> {
+        AlertDialog options=new AlertDialog.Builder(this,television?android.R.style.Theme_Material_Dialog_Alert:0).setTitle(television?null:"Opcje odtwarzania").setAdapter(optionRows(labels),(d,i) -> {
             if(labels.get(i).equals("Zgodność dźwięku")) { chooseAudioOutput(); return; }
             if(labels.get(i).equals("Połączenie internetowe")) { PlaybackSettings.choose(this,() -> {
                 boolean playing=player!=null && player.getPlayWhenReady();
@@ -239,7 +239,15 @@ public class PlayerActivity extends Activity {
                 case 4: openGuide(); break;
                 case 5: if(RecordingService.active) stopService(new android.content.Intent(this,RecordingService.class)); else chooseRecording(); break;
             }
-        }).show();
+        }).create();
+        options.show();
+        if(television && options.getWindow()!=null) {
+            // TV: a compact panel docked on the right, full height and scrollable, so every option fits inside the overscan-safe area.
+            android.view.Window window=options.getWindow(); window.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
+            window.setLayout(dp(400),getResources().getDisplayMetrics().heightPixels-dp(48));
+            window.setBackgroundDrawable(Ui.shape(this,Ui.TV_CARD,16,Ui.TV_LINE)); window.setDimAmount(.45f);
+            ListView list=options.getListView(); if(list!=null) { list.setDivider(new android.graphics.drawable.ColorDrawable(Ui.TV_LINE)); list.setDividerHeight(Math.max(1,dp(1))); list.setPadding(0,dp(8),0,dp(8)); list.setClipToPadding(false); }
+        }
     }
     private void chooseAudioOutput() {
         boolean previous=PlaybackAudio.pcm(this);
@@ -265,12 +273,12 @@ public class PlayerActivity extends Activity {
                 LinearLayout row;
                 if(reused instanceof LinearLayout) row=(LinearLayout)reused;
                 else {
-                    row=new LinearLayout(PlayerActivity.this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(20),dp(10),dp(20),dp(10)); row.setMinimumHeight(dp(60));
-                    TextView icon=new TextView(PlayerActivity.this); icon.setGravity(Gravity.CENTER); icon.setTextSize(16); icon.setTextColor(Ui.ACCENT); icon.setTypeface(null,android.graphics.Typeface.BOLD);
-                    icon.setBackground(Ui.shape(PlayerActivity.this,0x26FF3D5E,20,0)); row.addView(icon,new LinearLayout.LayoutParams(dp(40),dp(40)));
+                    row=new LinearLayout(PlayerActivity.this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(television?18:20),dp(television?6:10),dp(television?18:20),dp(television?6:10)); row.setMinimumHeight(dp(television?52:60));
+                    TextView icon=new TextView(PlayerActivity.this); icon.setGravity(Gravity.CENTER); icon.setTextSize(television?14:16); icon.setTextColor(television?Ui.TV_GOLD:Ui.ACCENT); icon.setTypeface(null,android.graphics.Typeface.BOLD);
+                    icon.setBackground(Ui.shape(PlayerActivity.this,television?0x1AFFFFFF:0x26FF3D5E,20,0)); row.addView(icon,new LinearLayout.LayoutParams(dp(television?34:40),dp(television?34:40)));
                     LinearLayout copy=new LinearLayout(PlayerActivity.this); copy.setOrientation(LinearLayout.VERTICAL); copy.setPadding(dp(16),0,0,0);
-                    TextView label=new TextView(PlayerActivity.this); label.setTextSize(16); label.setTextColor(Ui.TEXT); copy.addView(label);
-                    TextView hint=new TextView(PlayerActivity.this); hint.setTextSize(12); hint.setTextColor(Ui.MUTED); copy.addView(hint);
+                    TextView label=new TextView(PlayerActivity.this); label.setTextSize(television?15:16); label.setTextColor(Ui.TEXT); copy.addView(label);
+                    TextView hint=new TextView(PlayerActivity.this); hint.setTextSize(12); hint.setTextColor(Ui.MUTED); hint.setSingleLine(true); copy.addView(hint);
                     row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
                 }
                 String label=labels.get(p);
