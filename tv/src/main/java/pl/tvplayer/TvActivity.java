@@ -41,6 +41,7 @@ public final class TvActivity extends Activity {
     private TvPhoneSetup phoneSetup;
     private LinearLayout page,body;
     private TextView status,heading,selectionInfo;
+    private ImageView backdrop;
     private LinearLayout navigation;
     private ListView bouquets,list,rail;
     private GridView posters;
@@ -60,7 +61,7 @@ public final class TvActivity extends Activity {
     private boolean scrolling,foreground;
     private final Runnable guideRows=this::loadVisibleGuides;
     private static final class ChannelRow {
-        LinearLayout view; ImageView logo; TextView number,name,epg,star; ProgressBar progress; Channel channel; boolean requested;
+        LinearLayout view; ImageView logo; TextView number,name,badges,epg,star; ProgressBar progress; Channel channel; boolean requested;
     }
     private static final class Poster {
         LinearLayout view; FrameLayout artwork; ImageView image; TextView name,placeholder,badge;
@@ -99,6 +100,13 @@ public final class TvActivity extends Activity {
     private Button button(String value,Runnable action) {
         Button b=Ui.button(this,value); b.setTextSize(17); b.setTextColor(Ui.TEXT); b.setFocusable(true); b.setFocusableInTouchMode(true); b.setBackground(focus(Ui.SURFACE)); b.setOnClickListener(v -> action.run()); return b;
     }
+    /** "UK| MOVIES" → "UK", "Sport" → "SP": a short badge for bouquet rows. */
+    private static String initials(String label) {
+        String clean=label.replaceAll("[^\\p{L}\\p{N} ]"," ").trim(); if(clean.isEmpty()) return "•";
+        String[] words=clean.split("\\s+"); String first=words[0];
+        if(first.length()<=3 && first.equals(first.toUpperCase(Locale.ROOT))) return first;
+        return words.length>1?(first.substring(0,1)+words[1].substring(0,1)).toUpperCase(Locale.ROOT):first.substring(0,Math.min(2,first.length())).toUpperCase(Locale.ROOT);
+    }
     private String title(String kind) { return kind.equals("tv")?"Telewizja na żywo":kind.equals("movie")?"Filmy":"Seriale"; }
     @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(DisplaySettings.wrap(base)); }
     @Override public void onCreate(Bundle state) {
@@ -113,14 +121,20 @@ public final class TvActivity extends Activity {
         worker.execute(() -> { try { account=new TvAccountStore(this).load(); } catch(Exception ignored) {} runOnUiThread(() -> { if(!isDestroyed()) { if(!home) load(section); else status.setText(account==null?"Dodaj konto Xtream lub adres listy M3U, aby rozpocząć.":"Biblioteka jest gotowa. Wybierz TV, filmy lub seriale."); } }); });
     }
     private void build() {
-        page=column(); page.setBackgroundColor(TV_BG); DisplaySettings.pad(page,dp(32),dp(12),dp(32),dp(10)); // overscan-safe sides; Fire TV "Calibrate display" covers the rest
+        page=column(); page.setBackgroundColor(0); DisplaySettings.pad(page,dp(32),dp(12),dp(32),dp(10)); // overscan-safe sides; Fire TV "Calibrate display" covers the rest
         LinearLayout header=new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView brand=text(Ui.APP_NAME.toUpperCase(Locale.ROOT),18,Ui.TEXT); brand.setTypeface(null,Typeface.BOLD); brand.setLetterSpacing(.08f); header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
+        TextView brand=text(Ui.APP_NAME.toUpperCase(Locale.ROOT),18,Ui.TEXT); brand.setTypeface(null,Typeface.BOLD); brand.setLetterSpacing(.08f);
+        android.text.SpannableString logo=new android.text.SpannableString(brand.getText()); logo.setSpan(new android.text.style.ForegroundColorSpan(Ui.TV_GOLD),0,Math.min(4,logo.length()),0); brand.setText(logo); header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
         TextClock clock=new TextClock(this); clock.setTextColor(Ui.MUTED); clock.setTextSize(18); clock.setFormat24Hour("HH:mm"); clock.setFormat12Hour("HH:mm"); header.addView(clock);
         page.addView(header,new LinearLayout.LayoutParams(-1,dp(30)));
         body=column(); page.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         status=text("",15,Ui.MUTED); status.setSingleLine(true); status.setEllipsize(android.text.TextUtils.TruncateAt.END); status.setPadding(0,dp(6),0,0); page.addView(status,new LinearLayout.LayoutParams(-1,dp(26)));
-        setContentView(page); Ui.localize(page);
+        // Backdrop layer: navy gradient everywhere; on home a softly enlarged poster from the library glows behind the tiles.
+        FrameLayout root=new FrameLayout(this); root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFF1F2A36,0xFF151A22,0xFF0F1318}));
+        backdrop=new ImageView(this); backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP); backdrop.setAlpha(.30f); root.addView(backdrop,new FrameLayout.LayoutParams(-1,-1));
+        View scrim=new View(this); scrim.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x66101820,0x22101820,0xCC0F1318})); root.addView(scrim,new FrameLayout.LayoutParams(-1,-1));
+        root.addView(page,new FrameLayout.LayoutParams(-1,-1));
+        setContentView(root); Ui.localize(root);
         if(home) showHome(); else showCatalog();
     }
     private android.content.SharedPreferences navigationStore() { return getSharedPreferences("tv-navigation",MODE_PRIVATE); }
@@ -198,14 +212,20 @@ public final class TvActivity extends Activity {
         heading=text("",22,Ui.TEXT);
         shelves=createShelves(); body.addView(shelves,new LinearLayout.LayoutParams(-1,0,1)); showHomeRows(true);
         status.setText(account==null?"Dodaj źródło w Opcje → Źródło → Dodaj przez telefon":"← → wybierz  ·  OK otwórz  ·  ↓ Twoja biblioteka  ·  Menu opcje");
-        rememberLocation(); loadHomePreviews(); ui.postDelayed(this::prefetchLibrary,1200);
+        rememberLocation(); loadHomePreviews(); showBackdrop(); ui.postDelayed(this::prefetchLibrary,1200);
     }
     private void showHomeRows(boolean focus) {
         if(!home || shelves==null) return;
-        List<Channel> shortcuts=new ArrayList<>(); shortcuts.add(new Channel("Telewizja na żywo","section:tv","Oglądaj","","shortcut")); shortcuts.add(new Channel("Filmy","section:movie","Oglądaj","","shortcut")); shortcuts.add(new Channel("Seriale","section:series","Oglądaj","","shortcut"));
+        List<Channel> shortcuts=new ArrayList<>(); shortcuts.add(new Channel("Telewizja na żywo","section:tv",countLine("tv"),"","shortcut")); shortcuts.add(new Channel("Filmy","section:movie",countLine("movie"),"","shortcut")); shortcuts.add(new Channel("Seriale","section:series",countLine("series"),"","shortcut"));
         List<TvShelfCatalog.Shelf> rows=new ArrayList<>(); rows.add(new TvShelfCatalog.Shelf("start","Oglądaj",shortcuts,shortcuts.size())); rows.addAll(homePreview);
         TvBrowseState anchor=homeRecovery!=null?homeRecovery:focus?null:location(); boolean ready=homeRecovery==null || rows.stream().anyMatch(row -> row.key().equals(homeRecovery.shelfKey()));
         shelves.submit(rows,anchor,ready && (homeRecovery!=null || focus || shelves.hasFocus())); if(ready) homeRecovery=null;
+    }
+    /** A tiny poster scaled up full screen reads as a soft blur behind the home tiles (no RenderEffect on Fire OS 7). */
+    private void showBackdrop() {
+        if(backdrop==null) return; String art="";
+        if(home) for(TvShelfCatalog.Shelf row:homePreview) { for(Channel item:row.channels()) if(!item.logo().isEmpty()) { art=item.logo(); break; } if(!art.isEmpty()) break; }
+        backdrop.setVisibility(art.isEmpty()?View.GONE:View.VISIBLE); ImageLoader.get(this).load(art,backdrop,dp(18),dp(27));
     }
     private void loadHomePreviews() {
         final int request=++homeRequest;
@@ -215,7 +235,7 @@ public final class TvActivity extends Activity {
                 if(!movies.isEmpty()) preview.add(new TvShelfCatalog.Shelf("home-movies","Filmy z Twojej biblioteki",movies,movies.size()));
                 if(!series.isEmpty()) preview.add(new TvShelfCatalog.Shelf("home-series","Twoje seriale",series,series.size()));
             } catch(Exception ignored) { }
-            runOnUiThread(() -> { if(isDestroyed() || request!=homeRequest) return; homePreview=preview; if(home) showHomeRows(false); });
+            runOnUiThread(() -> { if(isDestroyed() || request!=homeRequest) return; homePreview=preview; if(home) { showHomeRows(false); showBackdrop(); } });
         });
     }
     private void homeOptions() {
@@ -236,6 +256,16 @@ public final class TvActivity extends Activity {
         TvBrowseState restore=pendingLocation; rebuildGroups(); restoreContent(restore);
         if(restore==null && shelves==null) { if(bouquets.getVisibility()==View.VISIBLE) bouquets.requestFocus(); else contentView().requestFocus(); }
     }
+    /** "+5 000 kanałów" style line for the home tiles, from the last time the section was loaded. */
+    private String countLine(String kind) {
+        int count=navigationStore().getInt("count-"+kind,-1); if(count<=0) return "";
+        return "+"+Ui.count(count)+(kind.equals("tv")?" kanałów":kind.equals("movie")?" filmów":" seriali");
+    }
+    private void rememberCount(String kind,TvCatalog.Catalog catalog) {
+        int count=catalog.items().size(); if(navigationStore().getInt("count-"+kind,-1)==count) return;
+        navigationStore().edit().putInt("count-"+kind,count).apply();
+        runOnUiThread(() -> { if(home && !isDestroyed()) showHomeRows(false); });
+    }
     private Object sectionLock(String kind) { return sectionLocks.computeIfAbsent(kind,key -> new Object()); }
     /** Prepares every section once per source in the background: decrypts the saved library and, for Xtream, downloads a section that was never fetched. */
     private void prefetchLibrary() {
@@ -253,7 +283,7 @@ public final class TvActivity extends Activity {
                             new LibraryStore(this).updateSection(kind,loaded); getPreferences(MODE_PRIVATE).edit().putBoolean("loaded-"+kind,true).apply();
                         }
                         if(epoch!=sourceEpoch) return;
-                        catalogs.put(kind,loaded); preparedCatalogs.put(kind,presentation(kind,loaded));
+                        catalogs.put(kind,loaded); TvCatalog.Catalog prepared=presentation(kind,loaded); preparedCatalogs.put(kind,prepared); rememberCount(kind,prepared);
                     }
                 } catch(Exception ignored) { /* The section is loaded normally when opened. */ }
             }
@@ -291,14 +321,14 @@ public final class TvActivity extends Activity {
                         return;
                     }
                 }
-                if(epoch==sourceEpoch) catalogs.put(kind,loaded); final TvCatalog.Catalog result=presentation(kind,loaded); if(epoch==sourceEpoch) preparedCatalogs.put(kind,result);
+                if(epoch==sourceEpoch) catalogs.put(kind,loaded); final TvCatalog.Catalog result=presentation(kind,loaded); if(epoch==sourceEpoch) { preparedCatalogs.put(kind,result); rememberCount(kind,result); }
                 runOnUiThread(() -> { if(isDestroyed() || request!=generation || epoch!=sourceEpoch) return; busy=false; applyCatalog(result); });
             } catch(Exception e) { runOnUiThread(() -> { if(!isDestroyed() && request==generation && epoch==sourceEpoch) { busy=false; status.setText("Nie udało się wczytać biblioteki."); error("Nie można pobrać katalogu. Sprawdź połączenie i ważność źródła."); } }); }
         } });
     }
     private void progress(String value) { runOnUiThread(() -> { if(!isDestroyed()) status.setText(value); }); }
     private void showCatalog() {
-        home=false; scrolling=false; body.removeAllViews();
+        home=false; scrolling=false; body.removeAllViews(); if(backdrop!=null) { ImageLoader.get(this).load("",backdrop,dp(18),dp(27)); backdrop.setVisibility(View.GONE); }
         if(shelfLayout()) { showStreamingCatalog(); return; }
         clearCatalogViews(); addNavigation();
         heading=text(title(section),22,Ui.TEXT); heading.setSingleLine(true); heading.setEllipsize(android.text.TextUtils.TruncateAt.END); heading.setTypeface(null,Typeface.BOLD); heading.setPadding(0,dp(10),0,dp(8)); body.addView(heading);
@@ -319,7 +349,7 @@ public final class TvActivity extends Activity {
         if(sidebar==0) bouquets.setVisibility(View.GONE);
         split.addView(bouquets,new LinearLayout.LayoutParams(dp(sidebar),-1));
         FrameLayout catalog=new FrameLayout(this);
-        list=new ListView(this); list.setId(View.generateViewId()); list.setDivider(new ColorDrawable(Ui.TV_LINE)); list.setDividerHeight(Math.max(1,dp(1))); list.setItemsCanFocus(false); list.setDrawSelectorOnTop(false); list.setSelector(listCursor());
+        list=new ListView(this); list.setId(View.generateViewId()); list.setDivider(new ColorDrawable(0)); list.setDividerHeight(dp(6)); list.setItemsCanFocus(false); list.setDrawSelectorOnTop(true); list.setSelector(cardCursor());
         rows=new BaseAdapter() {
             public int getCount() { return shown.size(); } public Object getItem(int p) { return shown.get(p); } public long getItemId(int p) { return p; }
             public View getView(int p,View reused,ViewGroup parent) { return channelRow(shown.get(p),reused); }
@@ -442,13 +472,17 @@ public final class TvActivity extends Activity {
     private View channelRow(Channel channel,View reused) {
         ChannelRow row=reused!=null && reused.getTag() instanceof ChannelRow?(ChannelRow)reused.getTag():null;
         if(row==null) {
-            // Receiver-skin channel row: number, logo, bold name, current programme and a slim progress bar.
-            row=new ChannelRow(); row.view=new LinearLayout(this); row.view.setGravity(Gravity.CENTER_VERTICAL); row.view.setPadding(dp(10),dp(6),dp(14),dp(6)); row.view.setMinimumHeight(dp(60));
-            row.number=text("",15,Ui.MUTED); row.number.setGravity(Gravity.CENTER); row.view.addView(row.number,new LinearLayout.LayoutParams(dp(36),-2));
-            row.logo=new ImageView(this); row.logo.setScaleType(ImageView.ScaleType.FIT_CENTER); row.view.addView(row.logo,new LinearLayout.LayoutParams(dp(48),dp(34)));
-            LinearLayout copy=column(); copy.setPadding(dp(12),0,dp(10),0);
-            row.name=text("",18,Ui.TEXT); row.name.setTypeface(null,Typeface.BOLD); row.name.setSingleLine(true); row.name.setEllipsize(android.text.TextUtils.TruncateAt.END); copy.addView(row.name);
-            LinearLayout line=new LinearLayout(this); line.setGravity(Gravity.CENTER_VERTICAL);
+            // Channel card: dark logo box, bold name with quality/EPG badges, current programme with a slim progress bar, favourite star.
+            row=new ChannelRow(); row.view=new LinearLayout(this); row.view.setGravity(Gravity.CENTER_VERTICAL); row.view.setPadding(dp(10),dp(7),dp(14),dp(7)); row.view.setMinimumHeight(dp(60));
+            row.number=text("",13,Ui.MUTED); row.number.setGravity(Gravity.CENTER); row.view.addView(row.number,new LinearLayout.LayoutParams(dp(30),-2));
+            FrameLayout logoBox=new FrameLayout(this); logoBox.setBackground(Ui.shape(this,0xFF141821,8,0)); logoBox.setPadding(dp(5),dp(4),dp(5),dp(4));
+            row.logo=new ImageView(this); row.logo.setScaleType(ImageView.ScaleType.FIT_CENTER); logoBox.addView(row.logo,new FrameLayout.LayoutParams(-1,-1)); row.view.addView(logoBox,new LinearLayout.LayoutParams(dp(62),dp(46)));
+            LinearLayout copy=column(); copy.setPadding(dp(12),0,dp(8),0);
+            LinearLayout head=new LinearLayout(this); head.setGravity(Gravity.CENTER_VERTICAL);
+            row.name=text("",17,Ui.TEXT); row.name.setTypeface(null,Typeface.BOLD); row.name.setSingleLine(true); row.name.setEllipsize(android.text.TextUtils.TruncateAt.END); head.addView(row.name,new LinearLayout.LayoutParams(0,-2,1));
+            row.badges=text("",10,0xFF10141A); row.badges.setTypeface(null,Typeface.BOLD); row.badges.setLetterSpacing(.06f); row.badges.setPadding(dp(5),dp(1),dp(5),dp(1)); row.badges.setBackground(Ui.shape(this,0xD9E6E8EC,3,0)); LinearLayout.LayoutParams chip=new LinearLayout.LayoutParams(-2,-2); chip.leftMargin=dp(8); head.addView(row.badges,chip);
+            copy.addView(head,new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout line=new LinearLayout(this); line.setGravity(Gravity.CENTER_VERTICAL); line.setPadding(0,dp(3),0,0);
             row.epg=text("",14,Ui.MUTED); row.epg.setSingleLine(true); row.epg.setEllipsize(android.text.TextUtils.TruncateAt.END); line.addView(row.epg,new LinearLayout.LayoutParams(0,-2,1));
             row.progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal); row.progress.setMax(1000); row.progress.setProgressTintList(ColorStateList.valueOf(Ui.TV_GOLD)); row.progress.setProgressBackgroundTintList(ColorStateList.valueOf(Ui.TV_LINE));
             LinearLayout.LayoutParams bar=new LinearLayout.LayoutParams(dp(44),dp(4)); bar.leftMargin=dp(10); line.addView(row.progress,bar);
@@ -460,6 +494,7 @@ public final class TvActivity extends Activity {
         boolean playing=livePreview!=null && channel.url().equals(livePreview.selectedUrl());
         // Transparent rows let the teal list cursor show through; the channel in the preview gets a faint tint and amber name.
         row.view.setBackground(rowBackground(playing)); row.name.setTextColor(playing?Ui.TV_GOLD:Ui.TEXT);
+        String badge=badges(channel); row.badges.setText(badge); row.badges.setVisibility(badge.isEmpty()?View.GONE:View.VISIBLE);
         if(channel.kind().equals("tv")) showGuide(row,GuideRepository.get(this).peek(channel,false)); else { row.epg.setText(channel.group()); row.epg.setVisibility(View.VISIBLE); }
         ImageLoader.get(this).load(channel.logo(),row.logo,dp(52),dp(38)); scheduleGuides(); return row.view;
     }
@@ -472,9 +507,20 @@ public final class TvActivity extends Activity {
         if(data!=null) for(Guide.Program program:data.programs()) if(program.current(now)) playing=program;
         if(row.progress!=null) { row.progress.setVisibility(playing==null?View.GONE:View.VISIBLE); if(playing!=null) row.progress.setProgress((int)Math.max(0,Math.min(1000,(now-playing.start())*1000/Math.max(1,playing.end()-playing.start())))); }
     }
-    private android.graphics.drawable.Drawable rowBackground(boolean playing) {
-        GradientDrawable line=new GradientDrawable(); line.setColor(playing?0x14FFFFFF:0); line.setCornerRadius(dp(6));
-        return line;
+    private android.graphics.drawable.Drawable rowBackground(boolean playing) { return Ui.shape(this,playing?0xFF333B4A:0xFF242A35,10,0); }
+    /** Quality and service badges shown beside the channel name, e.g. "FHD · EPG". */
+    private static String badges(Channel channel) {
+        String name=channel.name().toUpperCase(Locale.ROOT); List<String> parts=new ArrayList<>();
+        if(name.matches(".*\\b(4K|UHD)\\b.*")) parts.add("4K"); else if(name.matches(".*\\bFHD\\b.*")) parts.add("FHD"); else if(name.matches(".*\\bHD\\b.*")) parts.add("HD");
+        if(!channel.epgId().isEmpty()) parts.add("EPG"); if(channel.archiveDays()>0) parts.add("ARCH");
+        return String.join(" · ",parts);
+    }
+    /** Selected channel card: lighter overlay with an accent bar on the left edge (drawn above the opaque card). */
+    private android.graphics.drawable.Drawable cardCursor() {
+        GradientDrawable light=Ui.shape(this,0x26FFFFFF,10,0x40FFFFFF); GradientDrawable edge=Ui.shape(this,Ui.TV_GOLD,2,0);
+        android.graphics.drawable.LayerDrawable focused=new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{light,edge});
+        focused.setLayerWidth(1,dp(4)); focused.setLayerGravity(1,Gravity.START|Gravity.FILL_VERTICAL);
+        StateListDrawable states=new StateListDrawable(); states.addState(new int[]{android.R.attr.state_focused},focused); states.addState(new int[]{android.R.attr.state_pressed},focused); states.addState(new int[]{},new ColorDrawable(0)); return states;
     }
     /** Teal list cursor with an amber edge (drawn below the transparent rows), as in the receiver skin. */
     private android.graphics.drawable.Drawable listCursor() {
@@ -508,10 +554,22 @@ public final class TvActivity extends Activity {
         List<String> labels=new ArrayList<>(); labels.add(seriesTitle.isEmpty()?"Cała oferta":"Wszystkie odcinki"); labels.addAll(groups);
         if(shelves!=null) { bindRail(); filter(); return; }
         rebinding=true;
+        final int total=items.size();
+        // Bouquet rail as in the reference: round badge with the bouquet's initials, name, and the channel count under the active one.
         bouquets.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,labels) {
             @Override public View getView(int p,View reused,ViewGroup parent) {
-                TextView row=(TextView)super.getView(p,reused,parent); boolean active=p==0?group.isEmpty():group.equals(groups.get(p-1));
-                row.setLayoutParams(new AbsListView.LayoutParams(-1,-2)); row.setTextSize(16); row.setTextColor(active?Ui.TV_GOLD:Ui.TEXT); row.setTypeface(null,active?Typeface.BOLD:Typeface.NORMAL); row.setMinHeight(dp(50)); row.setMaxLines(2); row.setEllipsize(android.text.TextUtils.TruncateAt.END); row.setPadding(dp(16),dp(8),dp(10),dp(8)); row.setBackground(null); return row;
+                LinearLayout row=reused instanceof LinearLayout?(LinearLayout)reused:null; TextView badge,name,count;
+                if(row==null) {
+                    row=new LinearLayout(TvActivity.this); row.setGravity(Gravity.CENTER_VERTICAL); row.setLayoutParams(new AbsListView.LayoutParams(-1,-2)); row.setMinimumHeight(dp(50)); row.setPadding(dp(10),dp(6),dp(10),dp(6));
+                    badge=text("",11,Ui.TEXT); badge.setGravity(Gravity.CENTER); badge.setTypeface(null,Typeface.BOLD); row.addView(badge,new LinearLayout.LayoutParams(dp(32),dp(32)));
+                    LinearLayout copy=column(); copy.setPadding(dp(12),0,0,0); name=text("",16,Ui.TEXT); name.setMaxLines(2); name.setEllipsize(android.text.TextUtils.TruncateAt.END); copy.addView(name);
+                    count=text("",12,Ui.MUTED); copy.addView(count); row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+                } else { badge=(TextView)row.getChildAt(0); LinearLayout copy=(LinearLayout)row.getChildAt(1); name=(TextView)copy.getChildAt(0); count=(TextView)copy.getChildAt(1); }
+                String label=getItem(p); boolean active=p==0?group.isEmpty():group.equals(groups.get(p-1));
+                badge.setText(initials(label)); badge.setTextColor(active?0xFF10141A:Ui.TEXT); badge.setBackground(Ui.shape(TvActivity.this,active?Ui.TV_GOLD:0x26FFFFFF,16,0));
+                name.setText(label); name.setTextColor(active?Ui.TEXT:0xB3FFFFFF); name.setTypeface(null,active?Typeface.BOLD:Typeface.NORMAL);
+                Integer size=p==0?Integer.valueOf(total):counts.get(groups.get(p-1)); count.setText(size==null?"":Ui.count(size)+(section.equals("tv")?" kanałów":" pozycji")); count.setVisibility(active && size!=null?View.VISIBLE:View.GONE);
+                return row;
             }
         }); bouquets.setSelection(group.isEmpty()?0:Math.max(0,groups.indexOf(group)+1)); filter(); if(pendingLocation==null) ui.post(() -> rebinding=false);
     }

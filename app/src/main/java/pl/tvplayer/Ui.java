@@ -22,7 +22,7 @@ final class Ui {
     /** Minimal TV palette (receiver-skin style): graphite cards, one teal selection and a warm amber accent. */
     static final int TV_CARD = 0xFF161A1F, TV_LINE = 0xFF262B31;
     /** Selection and accent colours of the chosen theme (see DisplaySettings). */
-    static int TV_SELECT = 0xFF1E4C52, TV_GOLD = 0xFFF2B441;
+    static int TV_SELECT = 0xFF2F3A4D, TV_GOLD = 0xFFF5C518;
     /** English interface (DisplaySettings); Polish is the default and the source language. */
     static volatile boolean english;
     private static final int R_SOURCE = 0x7f0a0ff0, R_SHOWN = 0x7f0a0ff1;

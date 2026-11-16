@@ -23,7 +23,7 @@ final class Translations {
             "Marginesy ekranu", "Screen margins", "Wielkość tekstu", "Text size", "Kolory", "Colours", "Język", "Language",
             "Brak dodatkowego marginesu", "No extra margin", "Mały margines (2,5%)", "Small margin (2.5%)", "Duży margines (5%)", "Large margin (5%)",
             "Mały tekst", "Small text", "Standardowy tekst", "Standard text", "Duży tekst", "Large text", "Bardzo duży tekst", "Extra large text",
-            "Morski i bursztyn (domyślny)", "Teal and amber (default)", "Niebieski", "Blue", "Zielony", "Green", "Fioletowy", "Purple", "Czerwony", "Red", "Grafitowy", "Graphite",
+            "Granat i żółty (domyślny)", "Navy and yellow (default)", "Morski i bursztyn", "Teal and amber", "Niebieski", "Blue", "Zielony", "Green", "Fioletowy", "Purple", "Czerwony", "Red", "Grafitowy", "Graphite",
             "Dodaj źródło", "Add source", "Dodaj przez telefon · ta sama sieć Wi-Fi", "Add with phone · same Wi-Fi", "Konto Xtream Codes · wpisz pilotem", "Xtream Codes account · type with remote",
             "Adres listy M3U · wpisz pilotem", "M3U list address · type with remote", "Konto i biblioteka", "Account and library", "Zmień źródło", "Change source",
             "Nawigacja", "Navigation", "Wróć do przeglądania", "Back to browsing", "Zamknąć TV Player?", "Close TV Player?", "Zostań", "Stay",

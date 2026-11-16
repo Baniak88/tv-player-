@@ -8,10 +8,11 @@ final class TvTileIcon extends Drawable {
     static final int TV=0,MOVIE=1,SERIES=2;
     private final int kind,size;
     private final Paint stroke=new Paint(Paint.ANTI_ALIAS_FLAG),fill=new Paint(Paint.ANTI_ALIAS_FLAG);
-    TvTileIcon(int kind,int size) {
+    TvTileIcon(int kind,int size) { this(kind,size,0xFFFFFFFF); }
+    TvTileIcon(int kind,int size,int color) {
         this.kind=kind; this.size=size;
-        stroke.setStyle(Paint.Style.STROKE); stroke.setColor(0xFFFFFFFF); stroke.setStrokeCap(Paint.Cap.ROUND); stroke.setStrokeJoin(Paint.Join.ROUND);
-        fill.setStyle(Paint.Style.FILL); fill.setColor(0xFFFFFFFF);
+        stroke.setStyle(Paint.Style.STROKE); stroke.setColor(color); stroke.setStrokeCap(Paint.Cap.ROUND); stroke.setStrokeJoin(Paint.Join.ROUND);
+        fill.setStyle(Paint.Style.FILL); fill.setColor(color);
     }
     static int kind(String url) { return url.equals("section:movie")?MOVIE:url.equals("section:series")?SERIES:TV; }
     @Override public void draw(Canvas canvas) {

@@ -125,8 +125,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.12-preview.apk
-          gh release create v0.9.12-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.12 Preview" --notes "Bukiety TV w kolejności dostawcy także wtedy, gdy lista M3U pomija część kategorii (np. filmowe) – po aktualizacji użyj raz Opcje → Odśwież źródło. Ustawienia ekranu, kolorów i języka."
-          gh release upload v0.9.12-tv-preview OKTV-Player-TV-0.9.12-preview.apk bundle/OKTV-FireStick-Chromebook.zip
+          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.13-preview.apk
+          gh release create v0.9.13-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.13 Preview" --notes "Nowy wygląd: szklane kafelki z żółtymi ikonami i rozmytym tłem na stronie głównej, karty kanałów z plakietkami HD/EPG, lista bukietów z ikonami, podgląd na pełną wysokość z opisem na obrazie, granatowo-żółta kolorystyka."
+          gh release upload v0.9.13-tv-preview OKTV-Player-TV-0.9.13-preview.apk bundle/OKTV-FireStick-Chromebook.zip
 
 

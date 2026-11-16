@@ -50,30 +50,37 @@ final class LivePreview {
         this.activity=activity; this.television=television; activity.setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC); this.fullscreen=fullscreen; this.selectionChanged=selectionChanged;
         remembered=state==null?"":state.getString("preview_url","");
         panel=new LinearLayout(activity); panel.setOrientation(LinearLayout.VERTICAL); panel.setBackground(Ui.shape(activity,television?Ui.TV_CARD:Ui.SURFACE,14,television?0:Ui.BORDER)); panel.setClipToOutline(true);
-        if(television) panel.setPadding(dp(12),dp(12),dp(12),dp(8));
         FrameLayout picture=new FrameLayout(activity); picture.setBackground(Ui.shape(activity,0xFF000000,10,television?0x33FFFFFF:0)); picture.setClipToOutline(true);
         video=new PlayerView(activity); video.setUseController(false); video.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING); video.setKeepContentOnPlayerReset(false);
         picture.addView(video,new FrameLayout.LayoutParams(-1,-1));
         notice=Ui.text(activity,"",13,Ui.TEXT); notice.setGravity(Gravity.CENTER); notice.setPadding(dp(16),dp(10),dp(16),dp(10)); notice.setBackgroundColor(0xB3000000); notice.setVisibility(View.GONE);
         picture.addView(notice,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
-        if(television) { int screenHeight=Math.round(activity.getResources().getDisplayMetrics().heightPixels/activity.getResources().getDisplayMetrics().density); panel.addView(picture,new LinearLayout.LayoutParams(-1,dp(Math.min((televisionWidth()-24)*9/16,screenHeight*34/100)))); }
+        LinearLayout info=null;
+        if(television) {
+            // Reference layout: the live picture fills the whole card; programme details sit on a dark fade at the bottom.
+            video.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM); picture.setBackgroundColor(0xFF000000);
+            FrameLayout stage=new FrameLayout(activity); stage.addView(picture,new FrameLayout.LayoutParams(-1,-1));
+            View fade=new View(activity); fade.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00000000,0x99000000,0xF20B0E13})); FrameLayout.LayoutParams fadeSize=new FrameLayout.LayoutParams(-1,-1); stage.addView(fade,fadeSize);
+            info=new LinearLayout(activity); info.setOrientation(LinearLayout.VERTICAL); info.setPadding(dp(16),dp(12),dp(16),dp(6)); stage.addView(info,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+            panel.addView(stage,new LinearLayout.LayoutParams(-1,0,1));
+        }
         else if(wide) panel.addView(picture,new LinearLayout.LayoutParams(-1,0,1));
         else { int height=Math.min(Math.round((activity.getResources().getDisplayMetrics().widthPixels-dp(32))*9f/16),Math.round(activity.getResources().getDisplayMetrics().heightPixels*0.21f)); panel.addView(picture,new LinearLayout.LayoutParams(-1,Math.max(dp(130),Math.min(dp(200),height)))); }
         if(television) {
             // Receiver-skin layout: channel in amber with a LIVE chip, programme title, times, remaining time, progress and synopsis.
-            LinearLayout head=new LinearLayout(activity); head.setGravity(Gravity.CENTER_VERTICAL); head.setPadding(dp(4),dp(12),dp(4),0);
+            LinearLayout head=new LinearLayout(activity); head.setGravity(Gravity.CENTER_VERTICAL); head.setPadding(0,0,0,dp(4));
             channelLabel=Ui.text(activity,"",17,Ui.TV_GOLD); channelLabel.setSingleLine(true); channelLabel.setEllipsize(TextUtils.TruncateAt.END); head.addView(channelLabel,new LinearLayout.LayoutParams(0,-2,1));
             TextView live=Ui.text(activity,"●  NA ŻYWO",12,Ui.TEXT); live.setTypeface(null,android.graphics.Typeface.BOLD); live.setPadding(dp(10),dp(4),dp(10),dp(4)); live.setBackground(Ui.shape(activity,0xFF0E1013,12,0x33FFFFFF));
             android.text.SpannableString dot=new android.text.SpannableString("●  NA ŻYWO"); dot.setSpan(new android.text.style.ForegroundColorSpan(0xFFFF5A5A),0,1,0); live.setText(dot); head.addView(live);
-            panel.addView(head,new LinearLayout.LayoutParams(-1,-2));
-            programTitle=Ui.text(activity,"",21,Ui.TEXT); programTitle.setSingleLine(true); programTitle.setEllipsize(TextUtils.TruncateAt.END); programTitle.setPadding(dp(4),dp(4),dp(4),0); panel.addView(programTitle,new LinearLayout.LayoutParams(-1,-2));
-            LinearLayout timing=new LinearLayout(activity); timing.setPadding(dp(4),dp(10),dp(4),0);
+            info.addView(head,new LinearLayout.LayoutParams(-1,-2));
+            programTitle=Ui.text(activity,"",20,Ui.TEXT); programTitle.setTypeface(null,android.graphics.Typeface.BOLD); programTitle.setSingleLine(true); programTitle.setEllipsize(TextUtils.TruncateAt.END); programTitle.setPadding(0,dp(2),0,0); info.addView(programTitle,new LinearLayout.LayoutParams(-1,-2));
+            description=Ui.text(activity,"",13,0xCCFFFFFF); description.setMaxLines(3); description.setEllipsize(TextUtils.TruncateAt.END); description.setPadding(0,dp(6),0,0); info.addView(description,new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout timing=new LinearLayout(activity); timing.setPadding(0,dp(10),0,0);
             times=Ui.text(activity,"",15,Ui.TEXT); timing.addView(times,new LinearLayout.LayoutParams(0,-2,1));
-            remaining=Ui.text(activity,"",14,Ui.MUTED); timing.addView(remaining); panel.addView(timing,new LinearLayout.LayoutParams(-1,-2));
+            remaining=Ui.text(activity,"",14,Ui.MUTED); timing.addView(remaining); info.addView(timing,new LinearLayout.LayoutParams(-1,-2));
             progress=new ProgressBar(activity,null,android.R.attr.progressBarStyleHorizontal); progress.setMax(1000);
             progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Ui.TV_GOLD)); progress.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Ui.TV_LINE));
-            LinearLayout.LayoutParams bar=new LinearLayout.LayoutParams(-1,dp(4)); bar.leftMargin=dp(4); bar.rightMargin=dp(4); bar.topMargin=dp(6); panel.addView(progress,bar);
-            description=Ui.text(activity,"",14,Ui.MUTED); description.setMaxLines(2); description.setEllipsize(TextUtils.TruncateAt.END); description.setPadding(dp(4),dp(8),dp(4),0); panel.addView(description,new LinearLayout.LayoutParams(-1,0,1));
+            LinearLayout.LayoutParams bar=new LinearLayout.LayoutParams(-1,dp(4)); bar.topMargin=dp(6); info.addView(progress,bar);
         }
         LinearLayout controls=new LinearLayout(activity); controls.setGravity(Gravity.CENTER_VERTICAL); controls.setPadding(dp(4),0,dp(4),0);
         pause=Ui.button(activity,"Ⅱ"); pause.setId(View.generateViewId()); pause.setContentDescription("Wstrzymaj podgląd"); pause.setTextSize(18); Ui.ghost(pause,Ui.TEXT); controls.addView(pause,new LinearLayout.LayoutParams(dp(48),dp(48)));
@@ -83,7 +90,7 @@ final class LivePreview {
         internet.setOnClickListener(v -> PlaybackSettings.choose(activity,() -> { release(); start(); selectionChanged.run(); }));
         full=Ui.button(activity,television?"Ekran":"⤢"); full.setTextSize(television?13:23); full.setContentDescription("Otwórz podgląd na pełnym ekranie"); Ui.ghost(full,Ui.TEXT); controls.addView(full,new LinearLayout.LayoutParams(dp(television?80:48),dp(48)));
         full.setOnClickListener(v -> { if(channel!=null) fullscreen.accept(channel); });
-        panel.addView(controls,new LinearLayout.LayoutParams(-1,dp(television?32:48)));
+        if(info!=null) info.addView(controls,new LinearLayout.LayoutParams(-1,dp(28))); else panel.addView(controls,new LinearLayout.LayoutParams(-1,dp(48)));
         if(television) {
             // On TV OK opens full screen and the buffer setting lives in the player options, so the card keeps only a key hint.
             pause.setVisibility(View.GONE); internet.setVisibility(View.GONE); full.setVisibility(View.GONE);
