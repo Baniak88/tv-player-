@@ -269,7 +269,7 @@ public final class TvActivity extends Activity {
         runOnUiThread(() -> { if(home && !isDestroyed()) showHomeRows(false); });
     }
     private Object sectionLock(String kind) { return sectionLocks.computeIfAbsent(kind,key -> new Object()); }
-    /** Prepares every section once per source in the background: decrypts the saved library and, for Xtream, downloads a section that was never fetched. */
+    /** Prepares every saved section once per source in the background (decrypt + presentation), never downloading from the provider. */
     private void prefetchLibrary() {
         if(prefetched || account==null || isDestroyed()) return; prefetched=true; final int epoch=sourceEpoch; final TvAccountStore.Account target=account;
         prefetcher.execute(() -> {
@@ -280,12 +280,9 @@ public final class TvActivity extends Activity {
                 try {
                     synchronized(sectionLock(kind)) {
                         if(preparedCatalogs.containsKey(kind)) continue;
+                        // Only the library already saved on the device is prepared; provider downloads still happen when a section is opened.
+                        if(target.type().equals("xtream") && !getPreferences(MODE_PRIVATE).getBoolean("loaded-"+kind,false)) continue;
                         List<Channel> loaded=catalogs.get(kind); if(loaded==null) loaded=new LibraryStore(this).loadSection(kind,new HashSet<>());
-                        if(target.type().equals("xtream") && !getPreferences(MODE_PRIVATE).getBoolean("loaded-"+kind,false)) {
-                            loaded=source.xtreamSection(target.server(),target.user(),target.password(),kind,value -> { });
-                            if(isDestroyed() || epoch!=sourceEpoch) return;
-                            new LibraryStore(this).updateSection(kind,loaded); getPreferences(MODE_PRIVATE).edit().putBoolean("loaded-"+kind,true).apply();
-                        }
                         if(epoch!=sourceEpoch) return;
                         catalogs.put(kind,loaded); TvCatalog.Catalog prepared=presentation(kind,loaded); preparedCatalogs.put(kind,prepared); rememberCount(kind,prepared);
                     }
