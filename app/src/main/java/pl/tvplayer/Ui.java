@@ -28,6 +28,10 @@ final class Ui {
     private static final int R_SOURCE = 0x7f0a0ff0, R_SHOWN = 0x7f0a0ff1;
     private Ui() { }
 
+    static boolean television(Context context) {
+        return (context.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_TYPE_MASK) == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+            || context.getPackageManager().hasSystemFeature("android.software.leanback");
+    }
     static String tr(String text) { return english ? Translations.english(text) : text; }
 
     /** Translates every label in a window and keeps doing so as screens change; a no-op in Polish. */
@@ -52,7 +56,7 @@ final class Ui {
 
     /** AlertDialog builder that translates its texts and list rows when English is chosen. */
     static final class Dialog extends android.app.AlertDialog.Builder {
-        Dialog(Context context) { super(context); }
+        Dialog(Context context) { super(context, television(context) ? android.R.style.Theme_Material_Dialog_Alert : 0); }
         Dialog(Context context, int theme) { super(context, theme); }
         @Override public Dialog setTitle(CharSequence title) { super.setTitle(title == null ? null : tr(title.toString())); return this; }
         @Override public Dialog setMessage(CharSequence message) { super.setMessage(message == null ? null : tr(message.toString())); return this; }
@@ -61,7 +65,13 @@ final class Ui {
         @Override public Dialog setPositiveButton(CharSequence text, android.content.DialogInterface.OnClickListener listener) { super.setPositiveButton(text == null ? null : tr(text.toString()), listener); return this; }
         @Override public Dialog setNegativeButton(CharSequence text, android.content.DialogInterface.OnClickListener listener) { super.setNegativeButton(text == null ? null : tr(text.toString()), listener); return this; }
         @Override public Dialog setNeutralButton(CharSequence text, android.content.DialogInterface.OnClickListener listener) { super.setNeutralButton(text == null ? null : tr(text.toString()), listener); return this; }
-        @Override public android.app.AlertDialog create() { android.app.AlertDialog dialog = super.create(); if (english) dialog.setOnShowListener(d -> { if (dialog.getWindow() != null) localize(dialog.getWindow().getDecorView()); }); return dialog; }
+        @Override public android.app.AlertDialog create() {
+            android.app.AlertDialog dialog = super.create();
+            // On TV every dialog is a dark card, matching the app instead of the light Fire OS style.
+            if (television(getContext()) && dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(shape(getContext(), 0xF2111620, 16, 0x26FFFFFF));
+            if (english) dialog.setOnShowListener(d -> { if (dialog.getWindow() != null) localize(dialog.getWindow().getDecorView()); });
+            return dialog;
+        }
         private static CharSequence[] translated(CharSequence[] items) { if (!english || items == null) return items; CharSequence[] copy = new CharSequence[items.length]; for (int i = 0; i < items.length; i++) copy[i] = items[i] == null ? null : Translations.english(items[i].toString()); return copy; }
     }
 

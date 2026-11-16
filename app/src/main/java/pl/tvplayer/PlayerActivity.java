@@ -223,7 +223,7 @@ public class PlayerActivity extends Activity {
         if(adjustments!=null) labels.add("Głośność i jasność");
         labels.add("Połączenie internetowe");
         if(television) labels.add("Zgodność dźwięku");
-        AlertDialog options=new Ui.Dialog(this,television?android.R.style.Theme_Material_Dialog_Alert:0).setTitle(television?null:"Opcje odtwarzania").setAdapter(optionRows(labels),(d,i) -> {
+        android.content.DialogInterface.OnClickListener choose=(d,i) -> {
             if(labels.get(i).equals("Zgodność dźwięku")) { chooseAudioOutput(); return; }
             if(labels.get(i).equals("Połączenie internetowe")) { PlaybackSettings.choose(this,() -> {
                 boolean playing=player!=null && player.getPlayWhenReady();
@@ -248,15 +248,28 @@ public class PlayerActivity extends Activity {
                 case 4: openGuide(); break;
                 case 5: if(RecordingService.active) stopService(new android.content.Intent(this,RecordingService.class)); else chooseRecording(); break;
             }
-        }).create();
-        options.show();
-        if(television && options.getWindow()!=null) {
-            // TV: a compact panel docked on the right, full height and scrollable, so every option fits inside the overscan-safe area.
-            android.view.Window window=options.getWindow(); window.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
-            window.setLayout(dp(400),getResources().getDisplayMetrics().heightPixels-dp(48));
-            window.setBackgroundDrawable(Ui.shape(this,Ui.TV_CARD,16,Ui.TV_LINE)); window.setDimAmount(.45f);
-            ListView list=options.getListView(); if(list!=null) { list.setDivider(new android.graphics.drawable.ColorDrawable(Ui.TV_LINE)); list.setDividerHeight(Math.max(1,dp(1))); list.setPadding(0,dp(8),0,dp(8)); list.setClipToPadding(false); }
-        }
+        };
+        if(television) { televisionOptions(labels,choose); return; }
+        new Ui.Dialog(this).setTitle("Opcje odtwarzania").setAdapter(optionRows(labels),choose).show();
+    }
+    /** TV options: a dark panel of our own (not the light Fire OS dialog) docked inside the overscan-safe area on the right. */
+    private void televisionOptions(List<String> labels,android.content.DialogInterface.OnClickListener choose) {
+        android.app.Dialog panel=new android.app.Dialog(this,android.R.style.Theme_Translucent_NoTitleBar);
+        FrameLayout root=new FrameLayout(this); root.setBackgroundColor(0x66000000); root.setOnClickListener(v -> panel.dismiss());
+        LinearLayout card=new LinearLayout(this); card.setOrientation(LinearLayout.VERTICAL); card.setClickable(true); card.setPadding(0,dp(14),0,dp(10));
+        card.setBackground(Ui.shape(this,0xF2111620,16,0x26FFFFFF)); card.setClipToOutline(true);
+        TextView heading=new TextView(this); heading.setText("Opcje odtwarzania"); heading.setTextSize(18); heading.setTextColor(Ui.TEXT); heading.setTypeface(null,android.graphics.Typeface.BOLD); heading.setPadding(dp(20),0,dp(20),dp(10)); card.addView(heading);
+        ListView list=new ListView(this); list.setAdapter(optionRows(labels)); list.setDivider(new android.graphics.drawable.ColorDrawable(0x14FFFFFF)); list.setDividerHeight(Math.max(1,dp(1)));
+        android.graphics.drawable.StateListDrawable cursor=new android.graphics.drawable.StateListDrawable();
+        android.graphics.drawable.LayerDrawable focused=new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{Ui.shape(this,0x26FFFFFF,0,0),Ui.shape(this,Ui.TV_GOLD,0,0)});
+        focused.setLayerWidth(1,dp(4)); focused.setLayerGravity(1,Gravity.START|Gravity.FILL_VERTICAL);
+        cursor.addState(new int[]{android.R.attr.state_focused},focused); cursor.addState(new int[]{android.R.attr.state_pressed},focused); cursor.addState(new int[]{},new android.graphics.drawable.ColorDrawable(0));
+        list.setSelector(cursor); list.setDrawSelectorOnTop(false); list.setOnItemClickListener((parent,view,index,id) -> { panel.dismiss(); choose.onClick(panel,index); });
+        card.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+        root.addView(card,new FrameLayout.LayoutParams(dp(420),-1,Gravity.END)); DisplaySettings.pad(root,dp(48),dp(32),dp(48),dp(32));
+        panel.setContentView(root); Ui.localize(root);
+        if(panel.getWindow()!=null) { panel.getWindow().setLayout(-1,-1); panel.getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN); }
+        panel.show(); list.requestFocus();
     }
     private void chooseAudioOutput() {
         boolean previous=PlaybackAudio.pcm(this);
