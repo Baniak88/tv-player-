@@ -125,8 +125,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.14-preview.apk
-          gh release create v0.9.14-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.14 Preview" --notes "Ciemniejsze, spokojniejsze tło dopasowane do kart, mniejsza domyślna czcionka (większą można wybrać w Ustawienia → Ekran i wygląd)."
-          gh release upload v0.9.14-tv-preview OKTV-Player-TV-0.9.14-preview.apk bundle/OKTV-FireStick-Chromebook.zip
+          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.15-preview.apk
+          gh release create v0.9.15-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.15 Preview" --notes "Szybsze przejścia między sekcjami, płynniejsze odtwarzanie (większy bufor w trakcie oglądania), ciemne panele opcji, jednolite ciemne tło."
+          gh release upload v0.9.15-tv-preview OKTV-Player-TV-0.9.15-preview.apk bundle/OKTV-FireStick-Chromebook.zip
 
 

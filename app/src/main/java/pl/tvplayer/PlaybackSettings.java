@@ -10,8 +10,9 @@ final class PlaybackSettings {
     static boolean weakInternet(Context context) { return context.getSharedPreferences("playback-network",Context.MODE_PRIVATE).getBoolean("weak",false); }
     static DefaultLoadControl loadControl(Context context) {
         boolean weak=weakInternet(context);
-        return new DefaultLoadControl.Builder().setBufferDurationsMs(weak?15000:5000,weak?45000:20000,weak?4000:1500,weak?6000:3000)
-            .setTargetBufferBytes(32*1024*1024).setPrioritizeTimeOverSizeThresholds(false).setBackBuffer(10000,true).build();
+        // Start as quickly as before (1.5 s), but keep a much deeper buffer once playing so short network dips do not stutter.
+        return new DefaultLoadControl.Builder().setBufferDurationsMs(weak?25000:15000,weak?60000:45000,weak?4000:1500,weak?6000:3500)
+            .setTargetBufferBytes(64*1024*1024).setPrioritizeTimeOverSizeThresholds(false).setBackBuffer(10000,true).build();
     }
     static TrackSelectionParameters tracks(Context context,TrackSelectionParameters current) {
         boolean weak=weakInternet(context);

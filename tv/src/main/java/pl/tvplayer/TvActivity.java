@@ -42,6 +42,7 @@ public final class TvActivity extends Activity {
     private LinearLayout page,body;
     private TextView status,heading,selectionInfo;
     private ImageView backdrop;
+    private List<Channel> countsSource; private String countsMode=""; private Map<String,Integer> countsCache=Collections.emptyMap();
     private LinearLayout navigation;
     private ListView bouquets,list,rail;
     private GridView posters;
@@ -58,7 +59,8 @@ public final class TvActivity extends Activity {
     private static final int TV_BG=Ui.BG,TV_BLUE=Ui.ACCENT;
     private int generation;
     private final android.os.Handler ui=new android.os.Handler(android.os.Looper.getMainLooper());
-    private boolean scrolling,foreground;
+    private boolean scrolling;
+    private volatile boolean foreground;
     private final Runnable guideRows=this::loadVisibleGuides;
     private static final class ChannelRow {
         LinearLayout view; ImageView logo; TextView number,name,badges,epg,star; ProgressBar progress; Channel channel; boolean requested;
@@ -243,10 +245,11 @@ public final class TvActivity extends Activity {
         }).show();
     }
     private void open(String kind) { if(!home && section.equals(kind)) return; busy=false; if(!home) rememberLocation(); TvBrowseState saved=readLocation(navigationStore().getString("section-"+kind,"")); if(saved!=null) { restoreLocation(saved); return; } generation++; section=kind; group=""; query=""; seriesTitle=""; seriesFolderUrl=""; parentLocation=null; pendingLocation=null; catalogGrid=false; catalogReady=false; onlyFavorites=false; seriesFolders=Collections.emptyMap(); items=new ArrayList<>(); shown=new ArrayList<>(); groups=new ArrayList<>(); home=false; showCatalog(); focusNavigation(); load(kind); }
-    private TvCatalog.Catalog presentation(String kind,List<Channel> channels) { return kind.equals("series")?TvCatalog.series(channels):new TvCatalog.Catalog(channels,Collections.emptyMap()); }
+    /** Built off the UI thread: separator rows are dropped here so opening a section does no per-item regex work on screen. */
+    private TvCatalog.Catalog presentation(String kind,List<Channel> channels) { TvCatalog.Catalog catalog=kind.equals("series")?TvCatalog.series(channels):new TvCatalog.Catalog(channels,Collections.emptyMap()); return new TvCatalog.Catalog(Channel.withoutSeparators(catalog.items()),catalog.folders()); }
     private void applyCatalog(TvCatalog.Catalog catalog) {
         catalogReady=true;
-        items=Channel.withoutSeparators(catalog.items()); seriesFolders=catalog.folders();
+        items=catalog.items(); seriesFolders=catalog.folders();
         if(!seriesTitle.isEmpty()) {
             List<Channel> episodes=seriesFolders.get(seriesFolderUrl);
             if(episodes!=null) { seriesRootItems=items; items=TvCatalog.seasons(episodes); }
@@ -270,8 +273,10 @@ public final class TvActivity extends Activity {
     private void prefetchLibrary() {
         if(prefetched || account==null || isDestroyed()) return; prefetched=true; final int epoch=sourceEpoch; final TvAccountStore.Account target=account;
         prefetcher.execute(() -> {
-            for(String kind:new String[]{"movie","series","tv"}) {
+            for(String kind:new String[]{"tv","movie","series"}) {
                 if(isDestroyed() || epoch!=sourceEpoch) return;
+                // Never compete with playback for the CPU: stop while a player is in front and resume on the next home visit.
+                if(!foreground) { prefetched=false; return; }
                 try {
                     synchronized(sectionLock(kind)) {
                         if(preparedCatalogs.containsKey(kind)) continue;
@@ -351,7 +356,7 @@ public final class TvActivity extends Activity {
         list=new ListView(this); list.setId(View.generateViewId()); list.setDivider(new ColorDrawable(0)); list.setDividerHeight(dp(6)); list.setItemsCanFocus(false); list.setDrawSelectorOnTop(true); list.setSelector(cardCursor());
         rows=new BaseAdapter() {
             public int getCount() { return shown.size(); } public Object getItem(int p) { return shown.get(p); } public long getItemId(int p) { return p; }
-            public View getView(int p,View reused,ViewGroup parent) { return channelRow(shown.get(p),reused); }
+            public View getView(int p,View reused,ViewGroup parent) { return channelRow(shown.get(p),reused,p); }
         };
         list.setOnScrollListener(new AbsListView.OnScrollListener() {
             public void onScrollStateChanged(AbsListView view,int state) { scrolling=state!=SCROLL_STATE_IDLE; scheduleGuides(); }
@@ -468,7 +473,7 @@ public final class TvActivity extends Activity {
         List<Channel> folder=seriesFolders.get(channel.url());
         selectionInfo.setText(channel.name()+(folder==null?"":" · "+Ui.count(folder.size())+" odcinków"));
     }
-    private View channelRow(Channel channel,View reused) {
+    private View channelRow(Channel channel,View reused,int position) {
         ChannelRow row=reused!=null && reused.getTag() instanceof ChannelRow?(ChannelRow)reused.getTag():null;
         if(row==null) {
             // Channel card: dark logo box, bold name with quality/EPG badges, current programme with a slim progress bar, favourite star.
@@ -489,7 +494,7 @@ public final class TvActivity extends Activity {
             row.star=text("",20,Ui.TV_GOLD); row.view.addView(row.star); row.view.setTag(row);
         }
         row.channel=channel; row.requested=false; row.name.setText(channel.name()); row.star.setText(isFavorite(channel)?"★":"");
-        int position=shown.indexOf(channel); row.number.setText(channel.kind().equals("tv") && position>=0?String.valueOf(position+1):""); row.number.setVisibility(channel.kind().equals("tv")?View.VISIBLE:View.GONE);
+        row.number.setText(channel.kind().equals("tv") && position>=0?String.valueOf(position+1):""); row.number.setVisibility(channel.kind().equals("tv")?View.VISIBLE:View.GONE);
         boolean playing=livePreview!=null && channel.url().equals(livePreview.selectedUrl());
         // Transparent rows let the teal list cursor show through; the channel in the preview gets a faint tint and amber name.
         row.view.setBackground(rowBackground(playing)); row.name.setTextColor(playing?Ui.TV_GOLD:Ui.TEXT);
@@ -549,7 +554,9 @@ public final class TvActivity extends Activity {
         ImageLoader.get(this).load(channel.logo(),card.image,width,height); card.placeholder.setText(channel.name()); card.badge.setVisibility(isFavorite(channel)?View.VISIBLE:View.GONE); card.name.setText(channel.name()); card.view.setContentDescription(channel.name()); return card.view;
     }
     private void rebuildGroups() {
-        Map<String,Integer> counts=BouquetOrder.counts(items,getPreferences(MODE_PRIVATE).getString("sort-"+section,"provider")); groups=new ArrayList<>(counts.keySet());
+        String sortMode=getPreferences(MODE_PRIVATE).getString("sort-"+section,"provider");
+        if(countsSource!=items || !sortMode.equals(countsMode)) { countsCache=BouquetOrder.counts(items,sortMode); countsSource=items; countsMode=sortMode; } // reused while browsing bouquets
+        Map<String,Integer> counts=countsCache; groups=new ArrayList<>(counts.keySet());
         List<String> labels=new ArrayList<>(); labels.add(seriesTitle.isEmpty()?"Cała oferta":"Wszystkie odcinki"); labels.addAll(groups);
         if(shelves!=null) { bindRail(); filter(); return; }
         rebinding=true;
@@ -749,7 +756,7 @@ public final class TvActivity extends Activity {
         new Ui.Dialog(this).setTitle("Zamknąć TV Player?").setPositiveButton("Wyjście",(d,w) -> finish()).setNegativeButton("Zostań",null).show();
     }
     @Override protected void onResume() {
-        super.onResume(); foreground=true; scheduleGuides();
+        super.onResume(); foreground=true; scheduleGuides(); ui.postDelayed(this::prefetchLibrary,2500); // resumes background preparation paused for playback
         ImageLoader.get(this).resume(page);
         if(livePreview!=null) livePreview.resume();
         if(!home && !busy && pausedLocation!=null) { pendingLocation=pausedLocation; if(shelves!=null) filter(); else restoreContent(pendingLocation); } pausedLocation=null;
