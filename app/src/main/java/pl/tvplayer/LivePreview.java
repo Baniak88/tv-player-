@@ -83,8 +83,12 @@ final class LivePreview {
         internet.setOnClickListener(v -> PlaybackSettings.choose(activity,() -> { release(); start(); selectionChanged.run(); }));
         full=Ui.button(activity,television?"Ekran":"⤢"); full.setTextSize(television?13:23); full.setContentDescription("Otwórz podgląd na pełnym ekranie"); Ui.ghost(full,Ui.TEXT); controls.addView(full,new LinearLayout.LayoutParams(dp(television?80:48),dp(48)));
         full.setOnClickListener(v -> { if(channel!=null) fullscreen.accept(channel); });
-        panel.addView(controls,new LinearLayout.LayoutParams(-1,dp(48)));
-        if(television) { title.setTextSize(13); title.setTypeface(null,android.graphics.Typeface.NORMAL); title.setTextColor(Ui.MUTED); }
+        panel.addView(controls,new LinearLayout.LayoutParams(-1,dp(television?32:48)));
+        if(television) {
+            // On TV OK opens full screen and the buffer setting lives in the player options, so the card keeps only a key hint.
+            pause.setVisibility(View.GONE); internet.setVisibility(View.GONE); full.setVisibility(View.GONE);
+            title.setTextSize(13); title.setTypeface(null,android.graphics.Typeface.NORMAL); title.setTextColor(Ui.MUTED); title.setPadding(0,0,0,0);
+        }
         schedule=Ui.text(activity,"",television?14:12,Ui.MUTED); schedule.setMaxLines(television?4:wide?2:1); schedule.setEllipsize(TextUtils.TruncateAt.END); schedule.setPadding(dp(12),0,dp(12),dp(8));
         schedule.setContentDescription("Aktualny program podglądu"); schedule.setMinHeight(dp(24)); if(!television) panel.addView(schedule,new LinearLayout.LayoutParams(-1,-2));
         schedule.setOnClickListener(v -> { if(channel!=null) GuideDialog.open(activity,channel,Runnable::run,c -> { if(c.kind().equals("tv")) select(c); else fullscreen.accept(c); }); });
