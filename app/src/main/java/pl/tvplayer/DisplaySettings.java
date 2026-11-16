@@ -12,11 +12,12 @@ final class DisplaySettings {
     private static final String STORE = "display-settings";
     static final String[] MARGINS = {"Brak dodatkowego marginesu", "Mały margines (2,5%)", "Duży margines (5%)"};
     static final String[] SIZES = {"Mały tekst", "Standardowy tekst", "Duży tekst", "Bardzo duży tekst"};
-    private static final float[] SCALES = {.9f, 1f, 1.12f, 1.25f};
+    // "Standard" is slightly smaller than Android's default: TV layouts read better with more room around the text.
+    private static final float[] SCALES = {.82f, .9f, 1f, 1.12f};
     static final String[] THEMES = {"Granat i żółty (domyślny)", "Morski i bursztyn", "Niebieski", "Zielony", "Fioletowy", "Czerwony", "Grafitowy"};
     /** Selection colour and accent colour for each theme. */
     private static final int[][] PALETTES = {
-        {0xFF2F3A4D, 0xFFF5C518}, {0xFF1E4C52, 0xFFF2B441}, {0xFF1F3F66, 0xFF5AB0FF}, {0xFF1F4D33, 0xFF5BD68A},
+        {0xFF243041, 0xFFF5C518}, {0xFF1E4C52, 0xFFF2B441}, {0xFF1F3F66, 0xFF5AB0FF}, {0xFF1F4D33, 0xFF5BD68A},
         {0xFF3B2A5C, 0xFFB794FF}, {0xFF5A2027, 0xFFFF6B6B}, {0xFF3A3D44, 0xFFE6E8EC}};
     static final String[] LANGUAGES = {"Polski", "English"};
     private DisplaySettings() { }

@@ -133,9 +133,9 @@ final class TvShelfView extends RecyclerView {
         // Minimal: graphite tiles; the focused one turns teal with a white frame (no competing brand colours).
         // Glass cards: translucent over the backdrop; the focused one brightens and shows an accent tab on top.
         StateListDrawable states=new StateListDrawable();
-        GradientDrawable glass=Ui.shape(getContext(),0x99405A66,16,0x66FFFFFF); GradientDrawable tab=Ui.shape(getContext(),Ui.TV_GOLD,3,0);
+        GradientDrawable glass=Ui.shape(getContext(),0x8C2A3A44,16,0x59FFFFFF); GradientDrawable tab=Ui.shape(getContext(),Ui.TV_GOLD,3,0);
         LayerDrawable focused=new LayerDrawable(new android.graphics.drawable.Drawable[]{glass,tab}); focused.setLayerGravity(1,Gravity.TOP|Gravity.CENTER_HORIZONTAL); focused.setLayerSize(1,dp(64),dp(5));
-        GradientDrawable normal=Ui.shape(getContext(),0x59324752,16,0x26FFFFFF);
+        GradientDrawable normal=Ui.shape(getContext(),0x661C252C,16,0x1FFFFFFF);
         states.addState(new int[]{android.R.attr.state_focused},focused); states.addState(new int[]{},normal); return states;
     }
     private static int dim(int color) { return android.graphics.Color.rgb(android.graphics.Color.red(color)*7/10,android.graphics.Color.green(color)*7/10,android.graphics.Color.blue(color)*7/10); }

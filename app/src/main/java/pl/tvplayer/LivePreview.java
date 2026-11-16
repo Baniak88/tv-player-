@@ -49,7 +49,7 @@ final class LivePreview {
     LivePreview(Activity activity,boolean wide,Bundle state,Consumer<Channel> fullscreen,Runnable selectionChanged,boolean television) {
         this.activity=activity; this.television=television; activity.setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC); this.fullscreen=fullscreen; this.selectionChanged=selectionChanged;
         remembered=state==null?"":state.getString("preview_url","");
-        panel=new LinearLayout(activity); panel.setOrientation(LinearLayout.VERTICAL); panel.setBackground(Ui.shape(activity,television?Ui.TV_CARD:Ui.SURFACE,14,television?0:Ui.BORDER)); panel.setClipToOutline(true);
+        panel=new LinearLayout(activity); panel.setOrientation(LinearLayout.VERTICAL); panel.setBackground(Ui.shape(activity,television?0xFF10141A:Ui.SURFACE,14,television?0:Ui.BORDER)); panel.setClipToOutline(true);
         FrameLayout picture=new FrameLayout(activity); picture.setBackground(Ui.shape(activity,0xFF000000,10,television?0x33FFFFFF:0)); picture.setClipToOutline(true);
         video=new PlayerView(activity); video.setUseController(false); video.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING); video.setKeepContentOnPlayerReset(false);
         picture.addView(video,new FrameLayout.LayoutParams(-1,-1));

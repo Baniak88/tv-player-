@@ -130,9 +130,9 @@ public final class TvActivity extends Activity {
         body=column(); page.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         status=text("",15,Ui.MUTED); status.setSingleLine(true); status.setEllipsize(android.text.TextUtils.TruncateAt.END); status.setPadding(0,dp(6),0,0); page.addView(status,new LinearLayout.LayoutParams(-1,dp(26)));
         // Backdrop layer: navy gradient everywhere; on home a softly enlarged poster from the library glows behind the tiles.
-        FrameLayout root=new FrameLayout(this); root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFF1F2A36,0xFF151A22,0xFF0F1318}));
-        backdrop=new ImageView(this); backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP); backdrop.setAlpha(.30f); root.addView(backdrop,new FrameLayout.LayoutParams(-1,-1));
-        View scrim=new View(this); scrim.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x66101820,0x22101820,0xCC0F1318})); root.addView(scrim,new FrameLayout.LayoutParams(-1,-1));
+        FrameLayout root=new FrameLayout(this); root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFF141A22,0xFF0E1218,0xFF0A0D11})); // LED TVs brighten dark blue a lot, so the base stays near black
+        backdrop=new ImageView(this); backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP); backdrop.setAlpha(.14f); root.addView(backdrop,new FrameLayout.LayoutParams(-1,-1));
+        View scrim=new View(this); scrim.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xB30A0D11,0x8C0A0D11,0xE60A0D11})); root.addView(scrim,new FrameLayout.LayoutParams(-1,-1));
         root.addView(page,new FrameLayout.LayoutParams(-1,-1));
         setContentView(root); Ui.localize(root);
         if(home) showHome(); else showCatalog();
@@ -507,7 +507,7 @@ public final class TvActivity extends Activity {
         if(data!=null) for(Guide.Program program:data.programs()) if(program.current(now)) playing=program;
         if(row.progress!=null) { row.progress.setVisibility(playing==null?View.GONE:View.VISIBLE); if(playing!=null) row.progress.setProgress((int)Math.max(0,Math.min(1000,(now-playing.start())*1000/Math.max(1,playing.end()-playing.start())))); }
     }
-    private android.graphics.drawable.Drawable rowBackground(boolean playing) { return Ui.shape(this,playing?0xFF333B4A:0xFF242A35,10,0); }
+    private android.graphics.drawable.Drawable rowBackground(boolean playing) { return Ui.shape(this,playing?0xFF232A36:0xFF181C24,10,0); }
     /** Quality and service badges shown beside the channel name, e.g. "FHD · EPG". */
     private static String badges(Channel channel) {
         String name=channel.name().toUpperCase(Locale.ROOT); List<String> parts=new ArrayList<>();
@@ -517,7 +517,7 @@ public final class TvActivity extends Activity {
     }
     /** Selected channel card: lighter overlay with an accent bar on the left edge (drawn above the opaque card). */
     private android.graphics.drawable.Drawable cardCursor() {
-        GradientDrawable light=Ui.shape(this,0x26FFFFFF,10,0x40FFFFFF); GradientDrawable edge=Ui.shape(this,Ui.TV_GOLD,2,0);
+        GradientDrawable light=Ui.shape(this,0x1AFFFFFF,10,0x33FFFFFF); GradientDrawable edge=Ui.shape(this,Ui.TV_GOLD,2,0);
         android.graphics.drawable.LayerDrawable focused=new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{light,edge});
         focused.setLayerWidth(1,dp(4)); focused.setLayerGravity(1,Gravity.START|Gravity.FILL_VERTICAL);
         StateListDrawable states=new StateListDrawable(); states.addState(new int[]{android.R.attr.state_focused},focused); states.addState(new int[]{android.R.attr.state_pressed},focused); states.addState(new int[]{},new ColorDrawable(0)); return states;
@@ -566,7 +566,7 @@ public final class TvActivity extends Activity {
                     count=text("",12,Ui.MUTED); copy.addView(count); row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
                 } else { badge=(TextView)row.getChildAt(0); LinearLayout copy=(LinearLayout)row.getChildAt(1); name=(TextView)copy.getChildAt(0); count=(TextView)copy.getChildAt(1); }
                 String label=getItem(p); boolean active=p==0?group.isEmpty():group.equals(groups.get(p-1));
-                badge.setText(initials(label)); badge.setTextColor(active?0xFF10141A:Ui.TEXT); badge.setBackground(Ui.shape(TvActivity.this,active?Ui.TV_GOLD:0x26FFFFFF,16,0));
+                badge.setText(initials(label)); badge.setTextColor(active?0xFF10141A:Ui.TEXT); badge.setBackground(Ui.shape(TvActivity.this,active?Ui.TV_GOLD:0x1FFFFFFF,16,0));
                 name.setText(label); name.setTextColor(active?Ui.TEXT:0xB3FFFFFF); name.setTypeface(null,active?Typeface.BOLD:Typeface.NORMAL);
                 Integer size=p==0?Integer.valueOf(total):counts.get(groups.get(p-1)); count.setText(size==null?"":Ui.count(size)+(section.equals("tv")?" kanałów":" pozycji")); count.setVisibility(active && size!=null?View.VISIBLE:View.GONE);
                 return row;
