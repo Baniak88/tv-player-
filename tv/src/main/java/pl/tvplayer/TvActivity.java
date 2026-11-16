@@ -313,7 +313,8 @@ public final class TvActivity extends Activity {
             if(event.getAction()==KeyEvent.ACTION_DOWN && event.getRepeatCount()==0) chooseGroup(bouquets.getSelectedItemPosition(),true);
             return true;
         });
-        int sidebar=section.equals("tv") || !seriesTitle.isEmpty()?(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density>=1100?220:200):0;
+        // Category grids keep the category list on the left too, so another category is one press away.
+        int sidebar=section.equals("tv") || !seriesTitle.isEmpty() || catalogGrid?(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density>=1100?220:200):0;
         if(sidebar==0) bouquets.setVisibility(View.GONE);
         split.addView(bouquets,new LinearLayout.LayoutParams(dp(sidebar),-1));
         FrameLayout catalog=new FrameLayout(this);
@@ -491,7 +492,7 @@ public final class TvActivity extends Activity {
             card=new Poster(); card.view=column(); card.view.setPadding(dp(5),dp(5),dp(5),dp(6)); card.view.setBackground(Ui.shape(this,Ui.SURFACE,8,0));
             card.artwork=new FrameLayout(this); card.artwork.setBackground(Ui.shape(this,Ui.SURFACE_HIGH,10,0)); card.artwork.setClipToOutline(true); card.view.addView(card.artwork,new LinearLayout.LayoutParams(-1,height));
             card.placeholder=text("",15,Ui.MUTED); card.placeholder.setGravity(Gravity.CENTER); card.placeholder.setPadding(dp(8),dp(8),dp(8),dp(8)); card.placeholder.setMaxLines(4); card.artwork.addView(card.placeholder,new FrameLayout.LayoutParams(-1,-1));
-            card.image=new ImageView(this); card.image.setScaleType(ImageView.ScaleType.FIT_CENTER); card.artwork.addView(card.image,new FrameLayout.LayoutParams(-1,-1));
+            card.image=new ImageView(this); card.image.setScaleType(ImageView.ScaleType.CENTER_CROP); card.artwork.addView(card.image,new FrameLayout.LayoutParams(-1,-1));
             card.badge=text("★",16,Ui.STAR); card.badge.setGravity(Gravity.CENTER); card.badge.setBackground(Ui.shape(this,0xCC0A0D14,14,0));
             FrameLayout.LayoutParams badgeSize=new FrameLayout.LayoutParams(dp(30),dp(30),Gravity.TOP|Gravity.END); badgeSize.topMargin=dp(6); badgeSize.rightMargin=dp(6); card.artwork.addView(card.badge,badgeSize);
             card.name=text("",16,Ui.TEXT); card.name.setMaxLines(2); card.name.setEllipsize(android.text.TextUtils.TruncateAt.END); card.name.setPadding(dp(4),dp(6),dp(4),0); card.view.addView(card.name,new LinearLayout.LayoutParams(-1,dp(52))); card.view.setTag(card);
