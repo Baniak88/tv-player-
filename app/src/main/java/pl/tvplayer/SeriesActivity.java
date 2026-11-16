@@ -100,7 +100,7 @@ public final class SeriesActivity extends Activity {
     }
     private void render() {
         header.removeAllViews(); header.setPadding(0,0,0,0); if(!television && details.cover().isEmpty() && details.backdrop().isEmpty()) header.addView(new View(this),new LinearLayout.LayoutParams(-1,dp(52)));
-        FrameLayout hero=new FrameLayout(this); hero.setBackgroundColor(Ui.SURFACE); int heroHeight=television?Math.max(dp(410),Math.min(getResources().getDisplayMetrics().heightPixels-dp(120),Math.min(dp(210),getResources().getDisplayMetrics().widthPixels/5)*3/2+dp(84))):Math.min(dp(260),Math.max(dp(160),getResources().getDisplayMetrics().widthPixels*9/16)); hero.setMinimumHeight(heroHeight);
+        FrameLayout hero=new FrameLayout(this); hero.setBackgroundColor(Ui.SURFACE); int heroHeight=television?Math.max(dp(410),Math.min(getResources().getDisplayMetrics().heightPixels-dp(120),Math.min(dp(230),getResources().getDisplayMetrics().widthPixels/5)*3/2+dp(64))):Math.min(dp(260),Math.max(dp(160),getResources().getDisplayMetrics().widthPixels*9/16)); hero.setMinimumHeight(heroHeight);
         ImageView artwork=new ImageView(this); artwork.setScaleType(details.backdrop().isEmpty()&&!television?ImageView.ScaleType.FIT_CENTER:ImageView.ScaleType.CENTER_CROP); if(television) { artwork.setAlpha(details.backdrop().isEmpty()?.18f:.35f); hero.setBackgroundColor(Ui.BG); } hero.addView(artwork,new FrameLayout.LayoutParams(-1,-1));
         ImageLoader.get(this).load(details.backdrop().isEmpty()?details.cover():details.backdrop(),artwork,getResources().getDisplayMetrics().widthPixels,heroHeight);
         View scrim=new View(this); scrim.setBackground(new GradientDrawable(television?GradientDrawable.Orientation.LEFT_RIGHT:GradientDrawable.Orientation.TOP_BOTTOM,television?new int[]{0xF20B0C0F,0xCC0B0C0F,0x990B0C0F}:new int[]{0x220E0F11,0x110E0F11,Ui.BG})); hero.addView(scrim,new FrameLayout.LayoutParams(-1,-1));
@@ -117,8 +117,12 @@ public final class SeriesActivity extends Activity {
         if(!details.overview().isEmpty()) { synopsis.setContentDescription("Opis serialu. Wybierz, aby przeczytać całość."); synopsis.setOnClickListener(v -> new Ui.Dialog(this).setTitle(details.title()).setMessage(details.overview()).setPositiveButton("Zamknij",null).show()); }
         if(!details.genre().isEmpty()) { TextView genre=text(details.genre(),television?15:13,Ui.MUTED); genre.setPadding(0,dp(12),0,0); copy.addView(genre); }
         if(television) {
+            // Same order as film details: facts, genre, synopsis, then the actions and where playback resumes.
+            if(actions.getParent()==copy) { copy.removeView(actions); copy.removeView(playHint); actions.setPadding(0,dp(16),0,dp(6)); copy.addView(actions); copy.addView(playHint); }
+        }
+        if(television) {
             // Same symmetric layout as film details: poster on the left, one readable column on the right, both vertically centred.
-            int posterWidth=Math.min(dp(210),getResources().getDisplayMetrics().widthPixels/5);
+            int posterWidth=Math.min(dp(230),getResources().getDisplayMetrics().widthPixels/5);
             LinearLayout layout=new LinearLayout(this); layout.setGravity(Gravity.CENTER_VERTICAL); layout.setPadding(dp(48),dp(40),dp(48),dp(24));
             FrameLayout poster=new FrameLayout(this); poster.setBackground(Ui.shape(this,Ui.TV_CARD,12,Ui.TV_LINE)); poster.setClipToOutline(true);
             ImageView cover=new ImageView(this); cover.setScaleType(ImageView.ScaleType.CENTER_CROP); poster.addView(cover,new FrameLayout.LayoutParams(-1,-1)); ImageLoader.get(this).load(details.cover().isEmpty()?source.logo():details.cover(),cover,posterWidth,posterWidth*3/2);
@@ -127,7 +131,7 @@ public final class SeriesActivity extends Activity {
         if(television || !details.cover().isEmpty() || !details.backdrop().isEmpty()) header.addView(hero,new LinearLayout.LayoutParams(-1,heroHeight)); if(!television) header.addView(copy);
         Button back=back(); back.setVisibility(View.GONE); /* Back key on TV, system back on phones */ FrameLayout.LayoutParams backSize=new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP|Gravity.LEFT); backSize.leftMargin=dp(television?26:14); backSize.topMargin=dp(12); hero.addView(back,backSize);
         TextView brand=text(Ui.BRAND,12,Ui.ACCENT); brand.setVisibility(View.GONE); brand.setTypeface(null,Typeface.BOLD); FrameLayout.LayoutParams brandSize=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT); brandSize.rightMargin=dp(18); brandSize.topMargin=dp(26); hero.addView(brand,brandSize);
-        LinearLayout seasonBar=new LinearLayout(this); seasonBar.setPadding(dp(television?32:18),dp(16),dp(television?32:18),dp(8)); seasonBar.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout seasonBar=new LinearLayout(this); seasonBar.setPadding(dp(television?48:18),dp(16),dp(television?48:18),dp(8)); seasonBar.setGravity(Gravity.CENTER_VERTICAL);
         TextView label=text("Odcinki",television?24:20,Ui.TEXT); label.setTypeface(null,Typeface.BOLD); seasonBar.addView(label,new LinearLayout.LayoutParams(0,-2,1));
         seasonButton=null;
         if(!details.seasons().isEmpty()) {
@@ -168,7 +172,7 @@ public final class SeriesActivity extends Activity {
         EpisodeRow holder;
         if(reused!=null && reused.getTag() instanceof EpisodeRow) holder=(EpisodeRow)reused.getTag();
         else {
-            holder=new EpisodeRow(); holder.row=new LinearLayout(this); holder.row.setGravity(Gravity.TOP); holder.row.setPadding(dp(television?32:18),dp(10),dp(television?32:18),dp(10)); holder.row.setMinimumHeight(dp(television?146:96)); holder.row.setBackground(Ui.touch(this,Ui.BG,10,Ui.BORDER)); holder.row.setFocusable(television); holder.row.setFocusableInTouchMode(television); holder.row.setClickable(true); holder.row.setTag(holder);
+            holder=new EpisodeRow(); holder.row=new LinearLayout(this); holder.row.setGravity(Gravity.TOP); holder.row.setPadding(dp(television?48:18),dp(10),dp(television?48:18),dp(10)); holder.row.setMinimumHeight(dp(television?146:96)); holder.row.setBackground(Ui.touch(this,Ui.BG,10,Ui.BORDER)); holder.row.setFocusable(television); holder.row.setFocusableInTouchMode(television); holder.row.setClickable(true); holder.row.setTag(holder);
             FrameLayout thumb=new FrameLayout(this); thumb.setBackground(Ui.shape(this,Ui.SURFACE_HIGH,8,0)); thumb.setClipToOutline(true); int width=dp(television?220:128),height=width*9/16;
             holder.image=new ImageView(this); thumb.addView(holder.image,new FrameLayout.LayoutParams(-1,-1)); TextView icon=text("▶",television?26:20,Ui.TEXT); icon.setGravity(Gravity.CENTER); icon.setShadowLayer(dp(4),0,0,0xFF000000); thumb.addView(icon,new FrameLayout.LayoutParams(-1,-1));
             holder.progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal); holder.progress.setMax(1000); holder.progress.setProgressTintList(ColorStateList.valueOf(Ui.TEXT)); thumb.addView(holder.progress,new FrameLayout.LayoutParams(-1,dp(4),Gravity.BOTTOM)); holder.row.addView(thumb,new LinearLayout.LayoutParams(width,height));
