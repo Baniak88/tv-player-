@@ -39,6 +39,7 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 5
           name: OKTV-Player-1.1.7
           path: |
             app/build/outputs/apk/debug/app-debug.apk
@@ -93,6 +94,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          retention-days: 5
           name: Android-install-report
           path: smoke-output/
 
