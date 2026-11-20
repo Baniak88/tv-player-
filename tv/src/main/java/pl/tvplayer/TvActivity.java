@@ -245,7 +245,10 @@ public final class TvActivity extends Activity {
             switch(i) { case 0: account(); break; case 1: sourceDialog(); break; case 2: refresh(); break; case 3: settings(); break; case 4: info(); break; case 5: finish(); break; }
         }).show();
     }
-    private void open(String kind) { if(!home && section.equals(kind)) return; busy=false; if(!home) rememberLocation(); TvBrowseState saved=readLocation(navigationStore().getString("section-"+kind,"")); if(saved!=null) { restoreLocation(saved); return; } generation++; section=kind; group=""; query=""; seriesTitle=""; seriesFolderUrl=""; parentLocation=null; pendingLocation=null; catalogGrid=false; catalogReady=false; onlyFavorites=false; seriesFolders=Collections.emptyMap(); items=new ArrayList<>(); shown=new ArrayList<>(); groups=new ArrayList<>(); home=false; showCatalog(); focusNavigation(); load(kind); }
+    private void open(String kind) { if(!home && section.equals(kind)) return; busy=false; if(!home) rememberLocation(); TvBrowseState saved=readLocation(navigationStore().getString("section-"+kind,""));
+        // A section tab always opens its catalogue: never inside one series' episode list, which hid every other series.
+        while(saved!=null && !saved.folderTitle().isEmpty()) saved=saved.parent();
+        if(saved!=null) { restoreLocation(saved); return; } generation++; section=kind; group=""; query=""; seriesTitle=""; seriesFolderUrl=""; parentLocation=null; pendingLocation=null; catalogGrid=false; catalogReady=false; onlyFavorites=false; seriesFolders=Collections.emptyMap(); items=new ArrayList<>(); shown=new ArrayList<>(); groups=new ArrayList<>(); home=false; showCatalog(); focusNavigation(); load(kind); }
     /** Built off the UI thread: separator rows are dropped here so opening a section does no per-item regex work on screen. */
     private TvCatalog.Catalog presentation(String kind,List<Channel> channels) { TvCatalog.Catalog catalog=kind.equals("series")?TvCatalog.series(channels):new TvCatalog.Catalog(channels,Collections.emptyMap()); return new TvCatalog.Catalog(Channel.withoutSeparators(catalog.items()),catalog.folders()); }
     private void applyCatalog(TvCatalog.Catalog catalog) {
