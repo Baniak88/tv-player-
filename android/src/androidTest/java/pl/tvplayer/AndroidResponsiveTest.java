@@ -61,7 +61,7 @@ public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
     }
     @Test public void playbackOptionsFitPortraitAndLandscapeAndExposeTheLastAction() throws Exception {
         section("TV","tv",a.name()); waitFor("Preview missing",() -> { try { return preview()!=null; } catch(Exception e) { return false; } }); playing(preview());
-        opens(PlayerActivity.class.getName(),() -> tap(home,a.name())); AndroidScreenTest.rotate(child,true);
+        opens(PlayerActivity.class.getName(),() -> tap(find(root(home),a.name()))); AndroidScreenTest.rotate(child,true);
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR,child.getRequestedOrientation());
         tap(child,"Opcje odtwarzania"); AlertDialog options=(AlertDialog)field(child,"androidOptions"); dialogFits(child,options);
         screenshot(options.getWindow().getDecorView(),"android-options-portrait");
@@ -94,7 +94,7 @@ public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
         selectBouquet("UK | MOVIES","UK"); waitFor("UK live channel is missing",() -> find(root(home),"UK Movies test")!=null);
         assertNull("A channel from another bouquet is still shown",find(root(home),a.name())); screenshot(home,"android-bouquet-selected");
         waitFor("UK preview missing",() -> { try { return preview()!=null; } catch(Exception e) { return false; } }); playing(preview());
-        opens(PlayerActivity.class.getName(),() -> tap(home,"UK Movies test")); close(child); child=null; waitFor("Library did not resume",home::hasWindowFocus);
+        opens(PlayerActivity.class.getName(),() -> tap(find(root(home),"UK Movies test"))); close(child); child=null; waitFor("Library did not resume",home::hasWindowFocus);
         assertEquals("UK | MOVIES",field(home,"group")); AndroidScreenTest.rotate(home,false); assertEquals("UK | MOVIES",field(home,"group")); AndroidScreenTest.rotate(home,true);
         section("Filmy","movie",movie.name()); selectBouquet("UK VOD","UK"); assertNotNull(find(root(home),otherMovie.name())); assertNull(find(root(home),movie.name()));
         section("Seriale","series",series.name()); selectBouquet("UK SERIALE","UK"); assertNotNull(find(root(home),otherSeries.name())); assertNull(find(root(home),series.name()));
