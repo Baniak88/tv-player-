@@ -16,7 +16,8 @@ final class AndroidPlaybackErrors {
             case 403: text="Dostawca odmówił dostępu do tego materiału. Sprawdź ważność konta i odśwież źródło."; break;
             case 404: case 410: text="Ten adres filmu jest niedostępny lub wygasł. Odśwież ofertę dostawcy."; break;
             case 416: text="Serwer odrzucił zapisaną pozycję filmu. Spróbuj odtworzyć materiał od początku."; break;
-            case 429: case 458: text="Dostawca ograniczył liczbę żądań lub jednoczesnych odtworzeń. Zamknij inne odtwarzanie i spróbuj ponownie."; break;
+            case 458: text="Serwer dostawcy odrzucił odtwarzanie. Jeśli to samo konto odtwarza na innym urządzeniu, zatrzymaj tam odtwarzanie. Spróbuj ponownie za chwilę."; break;
+            case 429: text="Dostawca ograniczył liczbę żądań lub jednoczesnych odtworzeń. Zamknij inne odtwarzanie i spróbuj ponownie."; break;
             default: text=code>=500?"Serwer dostawcy jest niedostępny. Spróbuj ponownie później.":"Nie można odtworzyć materiału. Sprawdź połączenie i dostępność filmu u dostawcy.";
         }
         return code==0?text:text+"\nHTTP "+code;

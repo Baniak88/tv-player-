@@ -82,5 +82,54 @@ public class AndroidMovieHttpTest {
         try { source.open(new DataSpec.Builder().setUri(server.url("/movie.mp4").toString()).setPosition(4L*1024*1024).build()); fail("An expensive range fallback must not be attempted"); } catch(HttpDataSource.InvalidResponseCodeException denied) { assertEquals(416,denied.responseCode); } finally { source.close(); }
         assertEquals(1,server.getRequestCount());
     }
+    @Test public void hlsMovieRecoversWhenProviderTemporarilyRefusesSegment() throws Exception {
+        String playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:60\n#EXTINF:60,\nsegment.ts?ticket=abc\n#EXT-X-ENDLIST\n";
+        AtomicInteger segments = new AtomicInteger();
+        AtomicLong refusedAt = new AtomicLong(), retriedAt = new AtomicLong();
+        server.setDispatcher(new Dispatcher() {
+            @Override public MockResponse dispatch(RecordedRequest request) {
+                if ("/movie.m3u8".equals(request.getPath())) {
+                    return new MockResponse().setHeader("Content-Type", "application/vnd.apple.mpegurl").setBody(playlist);
+                }
+                if (!"/segment.ts?ticket=abc".equals(request.getPath())) return new MockResponse().setResponseCode(404);
+                if (segments.incrementAndGet() == 1) {
+                    refusedAt.set(android.os.SystemClock.elapsedRealtime());
+                    return new MockResponse().setResponseCode(458).setHeader("Retry-After", "6");
+                }
+                retriedAt.compareAndSet(0, android.os.SystemClock.elapsedRealtime());
+                return stream(request);
+            }
+        });
+        server.start();
+        start(server.url("/movie.m3u8").toString());
+        playing();
+        assertTrue("Retried before Retry-After expired", retriedAt.get() - refusedAt.get() >= 6000);
+    }
+
+    @Test public void persistent458StopsAfterOneDelayedRetryAndReportsStatus() throws Exception {
+        server.setDispatcher(new Dispatcher() {
+            @Override public MockResponse dispatch(RecordedRequest request) {
+                return new MockResponse().setResponseCode(458);
+            }
+        });
+        server.start();
+        start(server.url("/movie.mp4?ticket=private-test-marker").toString());
+        waitFor("No terminal HTTP 458 message", () -> {
+            try {
+                return ((android.widget.TextView)field(player, "message")).getText().toString().contains("HTTP 458");
+            } catch(Exception e) { return false; }
+        });
+        assertEquals(2, server.getRequestCount());
+        assertFalse(((android.widget.TextView)field(player, "message")).getText().toString().contains("private-test-marker"));
+    }
+
+    @Test public void retryAfterDatesAndLongDelaysAreRespected() {
+        long now = java.time.Instant.parse("2026-11-20T12:00:00Z").toEpochMilli();
+        assertEquals(19000, AndroidLoadErrorPolicy.retryDelay("Fri, 20 Nov 2026 12:00:19 GMT", now));
+        assertEquals(C.TIME_UNSET, AndroidLoadErrorPolicy.retryDelay("Fri, 20 Nov 2026 12:03:00 GMT", now));
+        assertEquals(C.TIME_UNSET, AndroidLoadErrorPolicy.retryDelay("120", now));
+        assertEquals(C.TIME_UNSET, AndroidLoadErrorPolicy.retryDelay("invalid", now));
+        assertEquals(5000, AndroidLoadErrorPolicy.retryDelay("0", now));
+    }
     @After public void cleanup() throws Exception { close(player); HttpsURLConnection.setDefaultSSLSocketFactory(previousTls); if(secure!=null) secure.shutdown(); server.shutdown(); }
 }
