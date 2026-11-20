@@ -43,7 +43,8 @@ public final class TvActivity extends Activity {
     private TextView status,heading,selectionInfo;
     private ImageView backdrop;
     private List<Channel> countsSource; private String countsMode=""; private Map<String,Integer> countsCache=Collections.emptyMap();
-    private GridLayout navigation;
+    private LinearLayout navigation;
+    private Button[] navigationTabs;
     private Spinner androidCategories;
     private boolean bindingAndroidCategories;
     private ListView bouquets,list,rail;
@@ -182,20 +183,25 @@ public final class TvActivity extends Activity {
     }
     private boolean shelfLayout() { return !section.equals("tv") && seriesTitle.isEmpty() && !catalogGrid && navigationStore().getString("view-"+section,"shelves").equals("shelves"); }
     private void addNavigation() {
-        navigation=new GridLayout(this); navigation.setColumnCount(AndroidLayout.width(this)<600?3:6); navigation.setPadding(0,dp(4),0,dp(4));
+        navigation=column(); navigation.setPadding(0,dp(4),0,dp(4));
+        int columns=AndroidLayout.width(this)<600?3:6; LinearLayout row=null;
         String[] labels={"Główna","TV","Filmy","Seriale","Szukaj","Opcje"};
+        navigationTabs=new Button[labels.length];
         for(int i=0;i<labels.length;i++) {
+            // Ordinary weighted rows avoid GridLayout retaining oversized column bounds
+            // across Android configuration changes and pushing tabs beyond the screen.
+            if(i%columns==0) { row=new LinearLayout(this); navigation.addView(row,new LinearLayout.LayoutParams(-1,dp(44))); }
             final int index=i; Button tab=button(labels[i],() -> { if(index==0) showHome(); else if(index<=3) open(new String[]{"tv","movie","series"}[index-1]); else if(index==4) { if(home) open("movie"); search(); } else if(home) homeOptions(); else catalogOptions(); });
             tab.setId(View.generateViewId()); tab.setTextSize(15); tab.setSingleLine(true); tab.setPadding(dp(14),0,dp(14),0); tab.setMinHeight(0); tab.setMinimumHeight(0);
             boolean active=home?i==0:i==1 && section.equals("tv") || i==2 && section.equals("movie") || i==3 && section.equals("series");
             android.graphics.drawable.StateListDrawable background=new android.graphics.drawable.StateListDrawable(); background.addState(new int[]{android.R.attr.state_focused},Ui.shape(this,Ui.TEXT,20,0)); background.addState(new int[]{},Ui.shape(this,0,20,0)); tab.setBackground(background);
             tab.setTextColor(new ColorStateList(new int[][]{new int[]{android.R.attr.state_focused},new int[]{}},new int[]{TV_BG,active?Ui.TEXT:Ui.MUTED})); tab.setTypeface(null,active?Typeface.BOLD:Typeface.NORMAL);
-            GridLayout.LayoutParams size=new GridLayout.LayoutParams(GridLayout.spec(GridLayout.UNDEFINED),GridLayout.spec(GridLayout.UNDEFINED,1f)); size.width=0; size.height=dp(44); size.rightMargin=dp(4); navigation.addView(tab,size);
+            LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(0,-1,1); size.rightMargin=dp(4); row.addView(tab,size); navigationTabs[i]=tab;
         }
         body.addView(navigation,new LinearLayout.LayoutParams(-1,-2));
     }
     private static String focusName(View view) { return view==null?"null":view.getClass().getSimpleName()+(view.getContentDescription()!=null?"/"+view.getContentDescription():view instanceof TextView?"/"+((TextView)view).getText():""); }
-    private void focusNavigation() { StackTraceElement[] from=new Throwable().getStackTrace(); TvShelfView.trace("focusNavigation from "+(from.length>1?from[1].getMethodName()+":"+from[1].getLineNumber():"?")+(from.length>2?" < "+from[2].getMethodName()+":"+from[2].getLineNumber():"")); if(navigation!=null) navigation.getChildAt(home?0:section.equals("tv")?1:section.equals("movie")?2:3).requestFocus(); }
+    private void focusNavigation() { StackTraceElement[] from=new Throwable().getStackTrace(); TvShelfView.trace("focusNavigation from "+(from.length>1?from[1].getMethodName()+":"+from[1].getLineNumber():"?")+(from.length>2?" < "+from[2].getMethodName()+":"+from[2].getLineNumber():"")); if(navigationTabs!=null) navigationTabs[home?0:section.equals("tv")?1:section.equals("movie")?2:3].requestFocus(); }
     private TvShelfView createShelves() {
         return new TvShelfView(this,new TvShelfView.Actions() {
             public void selected(Channel channel,String row,int index) { if(channel!=null) describe(channel); }
@@ -375,8 +381,8 @@ public final class TvActivity extends Activity {
         AdapterView.OnItemLongClickListener menu=(parent,view,position,id) -> { options(shown.get(position)); return true; }; list.setOnItemLongClickListener(menu); posters.setOnItemLongClickListener(menu);
         bouquets.setNextFocusRightId(contentView().getId()); list.setNextFocusLeftId(bouquets.getId()); posters.setNextFocusLeftId(bouquets.getId());
         int tab=section.equals("tv")?1:section.equals("movie")?2:3;
-        bouquets.setNextFocusUpId(navigation.getChildAt(tab).getId()); list.setNextFocusUpId(navigation.getChildAt(tab).getId()); posters.setNextFocusUpId(navigation.getChildAt(tab).getId());
-        for(int i=0;i<navigation.getChildCount();i++) navigation.getChildAt(i).setNextFocusDownId(bouquets.getId());
+        bouquets.setNextFocusUpId(navigationTabs[tab].getId()); list.setNextFocusUpId(navigationTabs[tab].getId()); posters.setNextFocusUpId(navigationTabs[tab].getId());
+        for(Button button:navigationTabs) button.setNextFocusDownId(bouquets.getId());
         split.addView(catalog,AndroidLayout.portrait(this)?new LinearLayout.LayoutParams(-1,0,1):new LinearLayout.LayoutParams(0,-1,1));
         if(section.equals("tv")) {
             livePreview=new LivePreview(this,!AndroidLayout.portrait(this),null,this::play,() -> { if(rows!=null) rows.notifyDataSetChanged(); },!AndroidLayout.portrait(this));
@@ -411,7 +417,7 @@ public final class TvActivity extends Activity {
         FrameLayout content=new FrameLayout(this); shelves=createShelves(); content.addView(shelves,new FrameLayout.LayoutParams(-1,-1));
         emptyState=text("Brak pozycji. Wybierz kategorię lub odśwież źródło.",19,Ui.MUTED); emptyState.setGravity(Gravity.CENTER); content.addView(emptyState,new FrameLayout.LayoutParams(-1,-1));
         split.addView(content,AndroidLayout.portrait(this)?new LinearLayout.LayoutParams(-1,0,1):new LinearLayout.LayoutParams(0,-1,1)); body.addView(split,new LinearLayout.LayoutParams(-1,0,1)); bindRail(); filter();
-        for(int i=0;i<navigation.getChildCount();i++) navigation.getChildAt(i).setOnKeyListener((v,code,event) -> { if(code==KeyEvent.KEYCODE_DPAD_DOWN) { if(event.getAction()==KeyEvent.ACTION_DOWN) shelves.focusCurrent(); return true; } return false; });
+        for(Button button:navigationTabs) button.setOnKeyListener((v,code,event) -> { if(code==KeyEvent.KEYCODE_DPAD_DOWN) { if(event.getAction()==KeyEvent.ACTION_DOWN) shelves.focusCurrent(); return true; } return false; });
     }
     private void addAndroidCategories() {
         androidCategories=new Spinner(this); androidCategories.setContentDescription("Wybierz kategorię");

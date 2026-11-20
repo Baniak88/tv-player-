@@ -18,11 +18,13 @@ import static pl.tvplayer.TvTestUi.*;
 public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
     private void visible(View view) {
         assertNotNull(view); Rect box=new Rect(),screen=new Rect(); assertTrue("Control is hidden",view.getGlobalVisibleRect(box)); view.getRootView().getGlobalVisibleRect(screen);
-        assertTrue("Control extends past the left/right edge",box.left>=screen.left && box.right<=screen.right); assertTrue(box.width()>0 && box.height()>0);
+        int[] origin=new int[2]; view.getLocationOnScreen(origin);
+        assertTrue("Control extends past the left/right edge",origin[0]>=screen.left && origin[0]+view.getWidth()<=screen.right); assertTrue(box.width()>0 && box.height()>0);
     }
     private ExoPlayer preview() throws Exception { return (ExoPlayer)field(field(home,"livePreview"),"player"); }
     @Test public void portraitHomeAndCataloguesFitAndKeepTheSelectedSection() throws Exception {
-        assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_USER,home.getRequestedOrientation()); AndroidScreenTest.rotate(home,true);
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_USER,home.getRequestedOrientation());
+        for(int i=0;i<3;i++) { AndroidScreenTest.rotate(home,false); for(String label:new String[]{"Główna","TV","Filmy","Seriale","Szukaj","Opcje"}) visible(clickable(root(home),label)); AndroidScreenTest.rotate(home,true); }
         for(String label:new String[]{"Główna","TV","Filmy","Seriale","Szukaj","Opcje"}) visible(clickable(root(home),label));
         screenshot(home,"android-home-portrait"); section("Filmy","movie",movie.name()); visible((View)field(home,"androidCategories")); screenshot(home,"android-movies-portrait");
         section("Seriale","series",series.name()); screenshot(home,"android-series-portrait"); AndroidScreenTest.rotate(home,false); assertEquals("series",field(home,"section")); assertNotNull(find(root(home),series.name())); screenshot(home,"android-series-landscape");
