@@ -77,8 +77,9 @@ public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
     private void selectBouquet(String name,String searchText) throws Exception {
         tap((View)field(home,"androidCategories")); AlertDialog dialog=(AlertDialog)field(home,"androidBouquetsDialog"); dialogFits(home,dialog);
         EditText search=dialog.getWindow().getDecorView().findViewWithTag("android-bouquet-search");
-        instrument().runOnMainSync(() -> search.setText(searchText));
-        waitFor("Bouquet search returned no row",() -> find(dialog.getWindow().getDecorView(),name)!=null);
+        visible(search); tap(search); instrument().sendStringSync(searchText);
+        ListView list=dialog.getWindow().getDecorView().findViewWithTag("android-bouquet-list");
+        waitFor("Bouquet search did not filter the visible list",() -> searchText.contentEquals(search.getText()) && list.getAdapter().getCount()==1 && find(dialog.getWindow().getDecorView(),name)!=null);
         screenshot(dialog.getWindow().getDecorView(),"android-bouquets-portrait"); tap(find(dialog.getWindow().getDecorView(),name));
         waitFor("Bouquet selection did not filter the catalogue",() -> { try { return name.equals(field(home,"group")); } catch(Exception error) { return false; } });
     }

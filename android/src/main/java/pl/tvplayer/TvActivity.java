@@ -487,18 +487,36 @@ public final class TvActivity extends Activity {
     private void categories() {
         List<String> labels=new ArrayList<>(); labels.add(seriesTitle.isEmpty()?"Cała oferta":"Wszystkie odcinki"); labels.addAll(groups);
         List<String> visible=new ArrayList<>(labels); ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_list_item_single_choice,visible);
+        LinearLayout content=new LinearLayout(this) {
+            @Override protected void onMeasure(int widthSpec,int heightSpec) {
+                int desired=Math.min(dp(480),Math.max(dp(120),getResources().getDisplayMetrics().heightPixels-dp(200)));
+                if(View.MeasureSpec.getMode(heightSpec)!=View.MeasureSpec.UNSPECIFIED) desired=Math.min(desired,View.MeasureSpec.getSize(heightSpec));
+                super.onMeasure(widthSpec,View.MeasureSpec.makeMeasureSpec(desired,View.MeasureSpec.EXACTLY));
+            }
+        }; content.setOrientation(LinearLayout.VERTICAL);
         EditText search=new EditText(this); search.setSingleLine(true); search.setHint("Szukaj bukietu, np. UK Movies"); search.setTextSize(17); search.setPadding(dp(20),dp(10),dp(20),dp(10));
+        search.setTag("android-bouquet-search"); content.addView(search,new LinearLayout.LayoutParams(-1,-2));
+        ListView choices=new ListView(this); choices.setTag("android-bouquet-list"); choices.setChoiceMode(ListView.CHOICE_MODE_SINGLE); choices.setAdapter(adapter);
+        content.addView(choices,new LinearLayout.LayoutParams(-1,0,1));
         search.addTextChangedListener(new android.text.TextWatcher() {
-            public void beforeTextChanged(CharSequence text,int start,int count,int after) {} public void onTextChanged(CharSequence text,int start,int before,int count) { String value=text.toString(); adapter.clear(); for(String label:labels) if(value.isEmpty() || TitleSearch.matches(label,value)) adapter.add(label); adapter.notifyDataSetChanged(); } public void afterTextChanged(android.text.Editable text) {}
+            public void beforeTextChanged(CharSequence text,int start,int count,int after) {}
+            public void onTextChanged(CharSequence text,int start,int before,int count) {
+                String value=text.toString(); adapter.setNotifyOnChange(false); adapter.clear();
+                for(String label:labels) if(value.isEmpty() || TitleSearch.matches(label,value)) adapter.add(label);
+                adapter.notifyDataSetChanged(); choices.clearChoices(); int checked=adapter.getPosition(group.isEmpty()?labels.get(0):group); if(checked>=0) choices.setItemChecked(checked,true);
+            }
+            public void afterTextChanged(android.text.Editable text) {}
         });
-        search.setTag("android-bouquet-search");
         int checked=group.isEmpty()?0:labels.indexOf(group);
+        if(checked>=0) choices.setItemChecked(checked,true);
         if(androidBouquetsDialog!=null) androidBouquetsDialog.dismiss();
-        androidBouquetsDialog=new Ui.Dialog(this).setTitle(section.equals("tv")?"Bukiety TV":"Bukiety · "+title(section)).setView(search).setSingleChoiceItems(adapter,checked,(d,index) -> {
-            String selected=adapter.getItem(index); TvBrowseState before=location(); group=selected.equals(labels.get(0))?"":selected; query=""; onlyFavorites=false; d.dismiss();
+        choices.setOnItemClickListener((parent,row,index,id) -> {
+            String selected=adapter.getItem(index); TvBrowseState before=location(); group=selected.equals(labels.get(0))?"":selected; query=""; onlyFavorites=false; androidBouquetsDialog.dismiss();
             if(shelves!=null && !home && !group.isEmpty()) { openShelfGrid(new TvShelfCatalog.Shelf(group,group,Collections.emptyList(),0)); parentLocation=before; }
             else { filter(); if(shelves!=null) shelves.focusCurrent(); else if(!shown.isEmpty()) { contentView().requestFocus(); contentView().setSelection(0); } }
-        }).setPositiveButton("Odśwież źródło",(d,w) -> refresh()).setNegativeButton("Zamknij",null).create();
+        });
+        androidBouquetsDialog=new Ui.Dialog(this).setTitle(section.equals("tv")?"Bukiety TV":"Bukiety · "+title(section)).setView(content)
+            .setPositiveButton("Odśwież źródło",(d,w) -> refresh()).setNegativeButton("Zamknij",null).create();
         androidBouquetsDialog.show(); AndroidLayout.fitDialog(this,androidBouquetsDialog);
     }
     private void openShelfGrid(TvShelfCatalog.Shelf row) {
