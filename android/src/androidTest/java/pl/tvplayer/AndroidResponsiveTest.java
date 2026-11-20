@@ -17,7 +17,8 @@ import static pl.tvplayer.TvTestUi.*;
 @RunWith(AndroidJUnit4.class)
 public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
     private void visible(View view) {
-        assertNotNull(view); Rect box=new Rect(),screen=new Rect(); assertTrue("Control is hidden",view.getGlobalVisibleRect(box)); view.getRootView().getGlobalVisibleRect(screen);
+        assertNotNull(view); Rect box=new Rect(),screen=new Rect(); assertTrue("Control is hidden",view.getGlobalVisibleRect(box));
+        View root=view.getRootView(); int[] corner=new int[2]; root.getLocationOnScreen(corner); screen.set(corner[0],corner[1],corner[0]+root.getWidth(),corner[1]+root.getHeight());
         int[] origin=new int[2]; view.getLocationOnScreen(origin);
         assertTrue("Control extends past the left/right edge",origin[0]>=screen.left && origin[0]+view.getWidth()<=screen.right); assertTrue(box.width()>0 && box.height()>0);
     }
