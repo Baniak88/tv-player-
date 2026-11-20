@@ -7,6 +7,14 @@ import android.view.View;
 
 /** Android screen sizing; the Fire Stick source and build do not include this class. */
 final class AndroidLayout {
+    /** Phone dialogs use the available width, including on 320 dp portrait screens. */
+    static void fitDialog(android.app.Activity activity,android.app.Dialog dialog) {
+        if(dialog==null || !dialog.isShowing() || dialog.getWindow()==null) return;
+        int available=activity.getResources().getDisplayMetrics().widthPixels;
+        int margin=Ui.dp(activity,16);
+        dialog.getWindow().setLayout(Math.max(1,Math.min(available-2*margin,Ui.dp(activity,560))),android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE|android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+    }
     static boolean portrait(Context context) { return context.getResources().getConfiguration().orientation==Configuration.ORIENTATION_PORTRAIT; }
     static int width(Context context) { return Math.round(context.getResources().getDisplayMetrics().widthPixels/context.getResources().getDisplayMetrics().density); }
     static void insets(View root) {

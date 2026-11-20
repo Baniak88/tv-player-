@@ -45,8 +45,8 @@ public final class TvActivity extends Activity {
     private List<Channel> countsSource; private String countsMode=""; private Map<String,Integer> countsCache=Collections.emptyMap();
     private LinearLayout navigation;
     private Button[] navigationTabs;
-    private Spinner androidCategories;
-    private boolean bindingAndroidCategories;
+    private Button androidCategories;
+    private AlertDialog androidBouquetsDialog;
     private ListView bouquets,list,rail;
     private GridView posters;
     private BaseAdapter rows,covers;
@@ -420,28 +420,19 @@ public final class TvActivity extends Activity {
         for(Button button:navigationTabs) button.setOnKeyListener((v,code,event) -> { if(code==KeyEvent.KEYCODE_DPAD_DOWN) { if(event.getAction()==KeyEvent.ACTION_DOWN) shelves.focusCurrent(); return true; } return false; });
     }
     private void addAndroidCategories() {
-        androidCategories=new Spinner(this); androidCategories.setContentDescription("Wybierz kategorię");
+        androidCategories=Ui.button(this,""); androidCategories.setTextSize(16); androidCategories.setTextColor(Ui.TV_GOLD);
+        androidCategories.setGravity(Gravity.CENTER_VERTICAL|Gravity.START); androidCategories.setMaxLines(2); androidCategories.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        androidCategories.setMinimumHeight(dp(48)); androidCategories.setPadding(dp(12),dp(8),dp(12),dp(8));
         androidCategories.setBackground(Ui.shape(this,Ui.SURFACE_HIGH,10,Ui.BORDER));
-        body.addView(androidCategories,new LinearLayout.LayoutParams(-1,dp(48))); updateAndroidCategories();
+        androidCategories.setOnClickListener(view -> categories());
+        body.addView(androidCategories,new LinearLayout.LayoutParams(-1,-2)); updateAndroidCategories();
     }
     private void updateAndroidCategories() {
         if(androidCategories==null) return;
-        bindingAndroidCategories=true;
-        List<String> names=new ArrayList<>(); names.add(shelves!=null?"Wszystkie":"Cała oferta"); if(shelves!=null) names.add("★ Moja lista"); names.addAll(groups);
-        int selected=shelves!=null?(onlyFavorites?1:group.isEmpty()?0:Math.max(0,groups.indexOf(group)+2)):(group.isEmpty()?0:Math.max(0,groups.indexOf(group)+1));
-        ArrayAdapter<String> choices=new ArrayAdapter<String>(this,android.R.layout.simple_spinner_item,names) {
-            @Override public View getView(int p,View reused,ViewGroup parent) { TextView view=(TextView)super.getView(p,reused,parent); view.setTextColor(Ui.TV_GOLD); view.setTextSize(16); view.setPadding(dp(12),0,dp(8),0); return view; }
-            @Override public View getDropDownView(int p,View reused,ViewGroup parent) { TextView view=(TextView)super.getDropDownView(p,reused,parent); view.setTextColor(Ui.TEXT); view.setBackgroundColor(Ui.SURFACE_HIGH); view.setPadding(dp(12),dp(12),dp(8),dp(12)); return view; }
-        };
-        choices.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item); androidCategories.setOnItemSelectedListener(null); androidCategories.setAdapter(choices); androidCategories.setSelection(Math.min(selected,names.size()-1),false);
-        androidCategories.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            public void onNothingSelected(AdapterView<?> parent) { }
-            public void onItemSelected(AdapterView<?> parent,View view,int position,long id) {
-                if(bindingAndroidCategories || parent!=androidCategories || !parent.isAttachedToWindow()) return;
-                if(shelves!=null) { boolean favorite=position==1; String chosen=position<2?"":groups.get(position-2); if(favorite==onlyFavorites && chosen.equals(group)) return; onlyFavorites=favorite; group=chosen; filter(); }
-                else { String chosen=position==0?"":groups.get(position-1); if(!chosen.equals(group)) chooseGroup(position,false); }
-            }
-        }); bindingAndroidCategories=false;
+        String label=section.equals("tv")?"Bukiety TV":section.equals("movie")?"Bukiety filmów":"Bukiety seriali";
+        String selected=group.isEmpty()?(onlyFavorites?"Ulubione":"Cała oferta"):group;
+        androidCategories.setText(label+" ("+groups.size()+") · "+selected+"  ▾");
+        androidCategories.setContentDescription(label+": "+selected+". Wybierz bukiet");
     }
     @Override public void onConfigurationChanged(android.content.res.Configuration configuration) {
         TvBrowseState before=location(); Channel selected=livePreview==null?null:livePreview.selected(); boolean loading=busy; int request=generation;
@@ -450,6 +441,7 @@ public final class TvActivity extends Activity {
         if(transfer!=null) { if(livePreview!=null && selected!=null) livePreview.receive(transfer,selected); else PlaybackHandoff.discard(transfer); }
         foreground=active; if(active && livePreview!=null) livePreview.resume(); scheduleGuides();
         if(!home) restoreContent(before);
+        AndroidLayout.fitDialog(this,androidBouquetsDialog);
     }
 
     /** Left category list for films and series: all, my list, then the provider's categories. */
@@ -499,11 +491,15 @@ public final class TvActivity extends Activity {
         search.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence text,int start,int count,int after) {} public void onTextChanged(CharSequence text,int start,int before,int count) { String value=text.toString(); adapter.clear(); for(String label:labels) if(value.isEmpty() || TitleSearch.matches(label,value)) adapter.add(label); adapter.notifyDataSetChanged(); } public void afterTextChanged(android.text.Editable text) {}
         });
-        new Ui.Dialog(this).setTitle(section.equals("tv")?"Bukiety TV":"Kategorie · "+title(section)).setView(search).setSingleChoiceItems(adapter,-1,(d,index) -> {
-            String selected=adapter.getItem(index); TvBrowseState before=location(); group=selected.equals(labels.get(0))?"":selected; query=""; d.dismiss();
+        search.setTag("android-bouquet-search");
+        int checked=group.isEmpty()?0:labels.indexOf(group);
+        if(androidBouquetsDialog!=null) androidBouquetsDialog.dismiss();
+        androidBouquetsDialog=new Ui.Dialog(this).setTitle(section.equals("tv")?"Bukiety TV":"Bukiety · "+title(section)).setView(search).setSingleChoiceItems(adapter,checked,(d,index) -> {
+            String selected=adapter.getItem(index); TvBrowseState before=location(); group=selected.equals(labels.get(0))?"":selected; query=""; onlyFavorites=false; d.dismiss();
             if(shelves!=null && !home && !group.isEmpty()) { openShelfGrid(new TvShelfCatalog.Shelf(group,group,Collections.emptyList(),0)); parentLocation=before; }
             else { filter(); if(shelves!=null) shelves.focusCurrent(); else if(!shown.isEmpty()) { contentView().requestFocus(); contentView().setSelection(0); } }
-        }).setPositiveButton("Odśwież źródło",(d,w) -> refresh()).setNegativeButton("Zamknij",null).show();
+        }).setPositiveButton("Odśwież źródło",(d,w) -> refresh()).setNegativeButton("Zamknij",null).create();
+        androidBouquetsDialog.show(); AndroidLayout.fitDialog(this,androidBouquetsDialog);
     }
     private void openShelfGrid(TvShelfCatalog.Shelf row) {
         if(home) { open(row.key().equals("home-series")?"series":"movie"); return; }
@@ -622,6 +618,7 @@ public final class TvActivity extends Activity {
     }
     private void filter() {
         if(home) return;
+        updateAndroidCategories();
         TvBrowseState anchor=pendingLocation!=null?pendingLocation:location(); boolean firstFocus=shelves!=null && shelves.selected()==null;
         shown=new ArrayList<>(); String[] tokens=TitleSearch.tokens(query); Map<String,Boolean> matchingGroups=new HashMap<>();
         for(Channel channel:items) if((group.isEmpty() || group.equals(channel.group())) && (!onlyFavorites || isFavorite(channel)) && (tokens.length==0 || matchingGroups.computeIfAbsent(channel.group(),value -> TitleSearch.score(TitleSearch.normalize(value),tokens)>=0) || TitleSearch.score(TitleSearch.normalize(channel.name()),tokens)>=0)) shown.add(channel);
@@ -804,6 +801,6 @@ public final class TvActivity extends Activity {
         worker.execute(() -> { try { Set<String> saved=new LibraryStore(this).loadFavorites(); runOnUiThread(() -> { if(!isDestroyed() && !favorites.equals(saved)) { favorites.clear(); favorites.addAll(saved); if(!home) filter(); } }); } catch(Exception ignored) {} });
     }
     @Override protected void onPause() { pausedLocation=location(); rememberLocation(); foreground=false; ui.removeCallbacks(guideRows); if(livePreview!=null) livePreview.pause(); ImageLoader.get(this).pause(page); if(phoneSetup!=null) phoneSetup.close(); super.onPause(); }
-    @Override protected void onDestroy() { generation++; homeRequest++; sourceEpoch++; ui.removeCallbacksAndMessages(null); if(livePreview!=null) livePreview.destroy(); source.cancel(); worker.shutdown(); prefetcher.shutdown(); sourceWorker.shutdownNow(); super.onDestroy(); }
+    @Override protected void onDestroy() { if(androidBouquetsDialog!=null) androidBouquetsDialog.dismiss(); generation++; homeRequest++; sourceEpoch++; ui.removeCallbacksAndMessages(null); if(livePreview!=null) livePreview.destroy(); source.cancel(); worker.shutdown(); prefetcher.shutdown(); sourceWorker.shutdownNow(); super.onDestroy(); }
     @Override protected void onSaveInstanceState(Bundle state) { state.putString("location",json.toJson(pendingLocation!=null?pendingLocation:location())); super.onSaveInstanceState(state); }
 }

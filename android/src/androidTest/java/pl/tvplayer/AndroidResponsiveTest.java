@@ -23,7 +23,7 @@ public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
     }
     private ExoPlayer preview() throws Exception { return (ExoPlayer)field(field(home,"livePreview"),"player"); }
     @Test public void portraitHomeAndCataloguesFitAndKeepTheSelectedSection() throws Exception {
-        assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_USER,home.getRequestedOrientation());
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR,home.getRequestedOrientation());
         for(int i=0;i<3;i++) { AndroidScreenTest.rotate(home,false); for(String label:new String[]{"Główna","TV","Filmy","Seriale","Szukaj","Opcje"}) visible(clickable(root(home),label)); AndroidScreenTest.rotate(home,true); }
         for(String label:new String[]{"Główna","TV","Filmy","Seriale","Szukaj","Opcje"}) visible(clickable(root(home),label));
         screenshot(home,"android-home-portrait"); section("Filmy","movie",movie.name()); visible((View)field(home,"androidCategories")); screenshot(home,"android-movies-portrait");
@@ -49,5 +49,54 @@ public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
     @Test public void rotatingAMovieKeepsItsPlayerAndPlaybackPosition() throws Exception {
         section("Filmy","movie",movie.name()); opens(MovieActivity.class.getName(),() -> tap(home,movie.name())); View play=(View)field(child,"play"); opens(PlayerActivity.class.getName(),() -> tap(play)); waitFor("Movie player missing",() -> { try { return field(child,"player")!=null; } catch(Exception e) { return false; } }); ExoPlayer player=(ExoPlayer)field(child,"player"); playing(player);
         instrument().runOnMainSync(() -> player.seekTo(5000)); playing(player); AndroidScreenTest.rotate(child,true); assertSame(player,field(child,"player")); playing(player); final long[] position={0}; instrument().runOnMainSync(() -> position[0]=player.getCurrentPosition()); assertTrue("Movie restarted during rotation",position[0]>=4500); screenshot(child,"android-player-film-portrait"); AndroidScreenTest.rotate(child,false); assertSame(player,field(child,"player")); playing(player);
+    }
+    private void dialogFits(Activity activity,AlertDialog dialog) throws Exception {
+        waitFor("Dialog extends outside the phone screen",() -> {
+            boolean[] fit={false}; instrument().runOnMainSync(() -> {
+                View decor=dialog.getWindow().getDecorView(); int[] xy=new int[2]; decor.getLocationOnScreen(xy);
+                android.util.DisplayMetrics display=activity.getResources().getDisplayMetrics();
+                fit[0]=dialog.isShowing() && decor.getWidth()>0 && decor.getHeight()>0 && xy[0]>=0 && xy[1]>=0 && xy[0]+decor.getWidth()<=display.widthPixels && xy[1]+decor.getHeight()<=display.heightPixels;
+            }); return fit[0];
+        });
+    }
+    @Test public void playbackOptionsFitPortraitAndLandscapeAndExposeTheLastAction() throws Exception {
+        section("TV","tv",a.name()); waitFor("Preview missing",() -> { try { return preview()!=null; } catch(Exception e) { return false; } }); playing(preview());
+        opens(PlayerActivity.class.getName(),() -> tap(home,a.name())); AndroidScreenTest.rotate(child,true);
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR,child.getRequestedOrientation());
+        tap(child,"Opcje odtwarzania"); AlertDialog options=(AlertDialog)field(child,"androidOptions"); dialogFits(child,options);
+        screenshot(options.getWindow().getDecorView(),"android-options-portrait");
+        AndroidScreenTest.rotate(child,false); dialogFits(child,options); screenshot(options.getWindow().getDecorView(),"android-options-landscape");
+        AndroidScreenTest.rotate(child,true); dialogFits(child,options); ListView list=options.getListView();
+        instrument().runOnMainSync(() -> list.setSelection(list.getCount()-1));
+        waitFor("Last playback action is unreachable",() -> find(options.getWindow().getDecorView(),"Zgodność dźwięku")!=null);
+        tap(find(options.getWindow().getDecorView(),"Zgodność dźwięku"));
+        click("Stereo PCM · gdy brak dźwięku"); waitFor("Audio action did not apply",() -> PlaybackAudio.pcm(context()));
+        playing((ExoPlayer)field(child,"player"));
+        instrument().runOnMainSync(() -> PlaybackAudio.pcm(context(),false));
+    }
+    private void selectBouquet(String name,String searchText) throws Exception {
+        tap((View)field(home,"androidCategories")); AlertDialog dialog=(AlertDialog)field(home,"androidBouquetsDialog"); dialogFits(home,dialog);
+        EditText search=dialog.getWindow().getDecorView().findViewWithTag("android-bouquet-search");
+        instrument().runOnMainSync(() -> search.setText(searchText));
+        waitFor("Bouquet search returned no row",() -> find(dialog.getWindow().getDecorView(),name)!=null);
+        screenshot(dialog.getWindow().getDecorView(),"android-bouquets-portrait"); tap(find(dialog.getWindow().getDecorView(),name));
+        waitFor("Bouquet selection did not filter the catalogue",() -> { try { return name.equals(field(home,"group")); } catch(Exception error) { return false; } });
+    }
+    @Test public void portraitBouquetButtonFindsM3uGroupsAndPreservesSelectionOnReturn() throws Exception {
+        java.util.List<Channel> channels=new java.util.ArrayList<>(java.util.Arrays.asList(a,b,movie,series));
+        StringBuilder m3u=new StringBuilder("#EXTM3U\n#EXTINF:-1 group-title=\"UK | MOVIES\",UK Movies test\n"+server.url("/uk.ts")+"\n");
+        for(int i=0;i<30;i++) m3u.append("#EXTINF:-1 group-title=\"Bukiet ").append(i).append("\",Kanał ").append(i).append('\n').append(server.url("/extra"+i+".ts")).append('\n');
+        channels.addAll(M3uParser.parse(m3u.toString(),server.url("/").toString()));
+        Channel otherMovie=new Channel("Film UK",server.url("/film2.mp4").toString(),"UK VOD","","movie").withLogo(movie.logo());
+        Channel otherSeries=new Channel("Serial UK",series.url().replace("series_id=9","series_id=10"),"UK SERIALE","","series").withLogo(series.logo());
+        channels.add(otherMovie); channels.add(otherSeries); new LibraryStore(context()).save(channels,java.util.Collections.emptySet());
+        AndroidScreenTest.rotate(home,true); section("TV","tv",a.name());
+        selectBouquet("UK | MOVIES","UK"); waitFor("UK live channel is missing",() -> find(root(home),"UK Movies test")!=null);
+        assertNull("A channel from another bouquet is still shown",find(root(home),a.name())); screenshot(home,"android-bouquet-selected");
+        waitFor("UK preview missing",() -> { try { return preview()!=null; } catch(Exception e) { return false; } }); playing(preview());
+        opens(PlayerActivity.class.getName(),() -> tap(home,"UK Movies test")); close(child); child=null; waitFor("Library did not resume",home::hasWindowFocus);
+        assertEquals("UK | MOVIES",field(home,"group")); AndroidScreenTest.rotate(home,false); assertEquals("UK | MOVIES",field(home,"group")); AndroidScreenTest.rotate(home,true);
+        section("Filmy","movie",movie.name()); selectBouquet("UK VOD","UK"); assertNotNull(find(root(home),otherMovie.name())); assertNull(find(root(home),movie.name()));
+        section("Seriale","series",series.name()); selectBouquet("UK SERIALE","UK"); assertNotNull(find(root(home),otherSeries.name())); assertNull(find(root(home),series.name()));
     }
 }

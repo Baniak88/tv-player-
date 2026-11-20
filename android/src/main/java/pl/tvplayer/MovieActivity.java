@@ -39,7 +39,7 @@ public final class MovieActivity extends Activity {
         DisplaySettings.apply(this);
         super.onCreate(state); repository=new MovieRepository(this); String url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }
         television=getIntent().getBooleanExtra("television",false) || (getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_TYPE_MASK)==android.content.res.Configuration.UI_MODE_TYPE_TELEVISION;
-        if(television) { setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_USER); getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN); }
+        if(television) { setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR); getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN); }
         source=new Channel(getIntent().getStringExtra("name"),url,getIntent().getStringExtra("group"),"","movie").withLogo(getIntent().getStringExtra("logo")); details=MovieDetails.fallback(source); loading=MovieDetails.endpoint(source)!=null;
         if(state!=null) restoredScroll=state.getInt("scroll");
         scroll=new ScrollView(this); scroll.setBackgroundColor(Ui.BG); scroll.setFillViewport(true); scroll.setClipToPadding(false);

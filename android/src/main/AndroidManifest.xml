@@ -8,16 +8,16 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
     <uses-feature android:name="android.software.leanback" android:required="false"/>
     <application android:theme="@style/TvTheme" android:name="pl.tvplayer.AndroidApplication" android:label="OKTV Player Android" android:icon="@drawable/ic_player" android:banner="@drawable/oktv_banner" android:allowBackup="false" android:usesCleartextTraffic="true" android:supportsRtl="true">
-        <activity android:name="pl.tvplayer.TvActivity" android:exported="true" android:screenOrientation="fullUser" android:configChanges="keyboard|keyboardHidden|navigation|screenSize|orientation">
+        <activity android:name="pl.tvplayer.TvActivity" android:exported="true" android:screenOrientation="fullSensor" android:configChanges="keyboard|keyboardHidden|navigation|screenSize|orientation">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
             </intent-filter>
         </activity>
-        <activity android:name="pl.tvplayer.PlayerActivity" android:exported="false" android:screenOrientation="fullUser" android:supportsPictureInPicture="true" android:resizeableActivity="true" android:configChanges="keyboard|keyboardHidden|navigation|screenSize|orientation"/>
-        <activity android:name="pl.tvplayer.MovieActivity" android:exported="false" android:screenOrientation="fullUser" android:configChanges="keyboard|keyboardHidden|navigation|screenSize|orientation"/>
-        <activity android:name="pl.tvplayer.SeriesActivity" android:exported="false" android:screenOrientation="fullUser" android:configChanges="keyboard|keyboardHidden|navigation|screenSize|orientation"/>
+        <activity android:name="pl.tvplayer.PlayerActivity" android:exported="false" android:screenOrientation="fullSensor" android:supportsPictureInPicture="true" android:resizeableActivity="true" android:configChanges="keyboard|keyboardHidden|navigation|screenSize|orientation"/>
+        <activity android:name="pl.tvplayer.MovieActivity" android:exported="false" android:screenOrientation="fullSensor" android:configChanges="keyboard|keyboardHidden|navigation|screenSize|orientation"/>
+        <activity android:name="pl.tvplayer.SeriesActivity" android:exported="false" android:screenOrientation="fullSensor" android:configChanges="keyboard|keyboardHidden|navigation|screenSize|orientation"/>
         <service android:name="pl.tvplayer.RecordingService" android:exported="false" android:foregroundServiceType="dataSync"/>
     </application>
 </manifest>

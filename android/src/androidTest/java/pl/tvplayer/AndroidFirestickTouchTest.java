@@ -110,7 +110,10 @@ public class AndroidFirestickTouchTest {
         tap(home,label); waitFor("Section did not load: "+label,() -> { try { return !((Boolean)field(home,"busy")) && kind.equals(field(home,"section")) && find(root(home),title)!=null; } catch(Exception error) { return false; } });
     }
     protected void screenshot(Activity activity,String name) {
-        instrument().runOnMainSync(() -> { View root=root(activity); Bitmap bitmap=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap)); try(FileOutputStream out=context().openFileOutput(name+".png",0)) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } catch(IOException e) { throw new AssertionError(e); } finally { bitmap.recycle(); } });
+        screenshot(root(activity),name);
+    }
+    protected void screenshot(View root,String name) {
+        instrument().runOnMainSync(() -> { Bitmap bitmap=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap)); try(FileOutputStream out=context().openFileOutput(name+".png",0)) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } catch(IOException e) { throw new AssertionError(e); } finally { bitmap.recycle(); } });
     }
     protected void playing(ExoPlayer player) throws Exception { assertNotNull(player); waitFor("Touch playback did not start",() -> { boolean[] ready={false}; instrument().runOnMainSync(() -> ready[0]=player.isPlaying() && player.getAudioFormat()!=null); return ready[0]; }); }
     protected Activity opens(String className,Throwing action) throws Exception { Instrumentation.ActivityMonitor monitor=instrument().addMonitor(className,null,false); try { action.run(); Activity opened=monitor.waitForActivityWithTimeout(15000); assertNotNull("Touch did not open "+className,opened); child=opened; waitFor("Child has no focus",opened::hasWindowFocus); return opened; } finally { instrument().removeMonitor(monitor); } }
