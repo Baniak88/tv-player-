@@ -1,6 +1,7 @@
 package pl.tvplayer;
 
 import android.content.Context;
+import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 
@@ -9,8 +10,11 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 final class PlaybackNetwork {
     static DefaultMediaSourceFactory sources(Context context,Channel live) {
         DefaultDataSource.Factory upstream=new DefaultDataSource.Factory(context.getApplicationContext(),AndroidHttpSource::new);
-        if(live==null) return new DefaultMediaSourceFactory(upstream);
-        GuideRepository guide=GuideRepository.get(context);
-        return new DefaultMediaSourceFactory(() -> new EitDataSource(upstream.createDataSource(),live,guide));
+        DataSource.Factory media = upstream;
+        if (live != null) {
+            GuideRepository guide = GuideRepository.get(context);
+            media = () -> new EitDataSource(upstream.createDataSource(), live, guide);
+        }
+        return new DefaultMediaSourceFactory(media).setLoadErrorHandlingPolicy(new AndroidLoadErrorPolicy());
     }
 }
