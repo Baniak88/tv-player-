@@ -15,9 +15,15 @@ final class AndroidLoadErrorPolicy extends DefaultLoadErrorHandlingPolicy {
     private static final long MAX_WAIT_MS = 30000;
 
     @Override public long getRetryDelayMsFor(LoadErrorInfo info) {
-        for (Throwable cause = info.exception; cause != null; cause = cause.getCause()) {
+        if (AndroidPlaybackErrors.status(info.exception) == 458) {
+            return info.errorCount == 1 ? sessionRetryDelay(info.exception) : C.TIME_UNSET;
+        }
+        return super.getRetryDelayMsFor(info);
+    }
+
+    static long sessionRetryDelay(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
             if (cause instanceof HttpDataSource.InvalidResponseCodeException response && response.responseCode == 458) {
-                if (info.errorCount > 1) return C.TIME_UNSET;
                 for (Map.Entry<String, List<String>> header : response.headerFields.entrySet()) {
                     if ("Retry-After".equalsIgnoreCase(header.getKey()) && !header.getValue().isEmpty()) {
                         return retryDelay(header.getValue().get(0), System.currentTimeMillis());
@@ -26,7 +32,7 @@ final class AndroidLoadErrorPolicy extends DefaultLoadErrorHandlingPolicy {
                 return DEFAULT_WAIT_MS;
             }
         }
-        return super.getRetryDelayMsFor(info);
+        return C.TIME_UNSET;
     }
 
     // Do not retry early when the provider requests a longer wait.
