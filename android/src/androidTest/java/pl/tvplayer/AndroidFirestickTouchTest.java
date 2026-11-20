@@ -89,10 +89,12 @@ public class AndroidFirestickTouchTest {
     }
     private boolean touchBounds(View target,Rect bounds) {
         target.requestRectangleOnScreen(new Rect(0,0,target.getWidth(),target.getHeight()),true);
-        if(!target.isAttachedToWindow() || !target.isShown() || !target.getLocalVisibleRect(bounds) || bounds.width()<=0 || bounds.height()<=0) return false;
+        if(!target.isAttachedToWindow() || !target.isShown() || !target.getGlobalVisibleRect(bounds) || bounds.width()<=0 || bounds.height()<=0) return false;
         // Dialog roots are offset from the screen origin. Root-relative rectangles
         // would tap another row (or the background) in a centred phone dialog.
-        int[] screen=new int[2]; target.getLocationOnScreen(screen); bounds.offset(screen[0],screen[1]); return true;
+        int[] screen=new int[2],window=new int[2]; View root=target.getRootView(); root.getLocationOnScreen(screen); root.getLocationInWindow(window);
+        bounds.offset(screen[0]-window[0],screen[1]-window[1]);
+        android.util.Log.i("TestRunner","Touch "+target.getClass().getSimpleName()+" screen="+bounds+" windowOffset="+(screen[0]-window[0])+","+(screen[1]-window[1])); return true;
     }
     protected void tap(View target) throws Exception {
         assertNotNull(target); Rect bounds=new Rect();
