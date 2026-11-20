@@ -32,7 +32,7 @@ sleep 3
 adb install -r apk/debug/tv-debug.apk
 adb install apk/androidTest/debug/tv-debug-androidTest.apk
 run_case 'pl.tvplayer.SeriesActivityTest#televisionRemoteReachesSeasonPickerAndEpisodePlayback' series-remote
-for case in homeAndMoviesWorkWithRemoteOnly oktvHomeReachesManagementAndAboutWithRemote bouquetsAndItemOptionsWorkWithRemote credentialsAreEncryptedAndReadableAfterRestart playerKeepsLandscapeAndHandlesRemoteMenu; do
+for case in seriesTabOpensTheCatalogueEvenAfterASeriesOpenedFromHome homeAndMoviesWorkWithRemoteOnly oktvHomeReachesManagementAndAboutWithRemote bouquetsAndItemOptionsWorkWithRemote credentialsAreEncryptedAndReadableAfterRestart playerKeepsLandscapeAndHandlesRemoteMenu; do
   run_case "pl.tvplayer.TvNavigationTest#$case" "$case"
 done
 for case in catalogOpensMovieDetailsAndRemoteCanFavoriteAndPlay m3uMovieCanResumeAndRestartWithoutMetadataApi; do

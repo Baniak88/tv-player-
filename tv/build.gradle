@@ -8,8 +8,8 @@ android {
         applicationId 'pl.tvplayer.television'
         minSdk 25
         targetSdk 35
-        versionCode 21
-        versionName '0.9.20-preview'
+        versionCode 22
+        versionName '0.9.21-preview'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     signingConfigs {

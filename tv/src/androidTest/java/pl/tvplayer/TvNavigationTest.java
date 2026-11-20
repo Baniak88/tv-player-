@@ -34,6 +34,17 @@ public class TvNavigationTest {
     }
     private void key(int code) throws Exception { try(android.os.ParcelFileDescriptor.AutoCloseInputStream input=new android.os.ParcelFileDescriptor.AutoCloseInputStream(instrument().getUiAutomation().executeShellCommand("input keyevent "+code))) { byte[] buffer=new byte[256]; while(input.read(buffer)!=-1) {} } instrument().waitForIdleSync(); Thread.sleep(200); }
     private void screenshot(TvActivity activity,String name) throws Exception { java.util.concurrent.atomic.AtomicReference<android.graphics.Bitmap> image=new java.util.concurrent.atomic.AtomicReference<>(); instrument().runOnMainSync(() -> { View root=activity.getWindow().getDecorView(); android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(root.getWidth(),root.getHeight(),android.graphics.Bitmap.Config.ARGB_8888); root.draw(new android.graphics.Canvas(bitmap)); image.set(bitmap); }); android.graphics.Bitmap bitmap=image.get(); try(java.io.FileOutputStream out=context().openFileOutput(name,Context.MODE_PRIVATE)) { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out); } bitmap.recycle(); }
+    @Test public void seriesTabOpensTheCatalogueEvenAfterASeriesOpenedFromHome() throws Exception {
+        TvActivity activity=start();
+        try {
+            // Saved state of an episode list opened from the home row: its parent is home, not the series catalogue.
+            TvBrowseState homeState=new TvBrowseState(true,"tv","","",false,"","","","",0,0,0,0,0,true,false,"start",0,null);
+            TvBrowseState inside=new TvBrowseState(false,"series","","",false,"local-series:abc","Kochaj albo wróć","","",0,0,0,0,0,true,false,"",0,homeState);
+            context().getSharedPreferences("tv-navigation",0).edit().putString("section-series",new com.google.gson.Gson().toJson(inside)).commit();
+            instrument().runOnMainSync(() -> { try { java.lang.reflect.Method open=TvActivity.class.getDeclaredMethod("open",String.class); open.setAccessible(true); open.invoke(activity,"series"); } catch(Exception e) { throw new AssertionError(e); } });
+            TvTestUi.waitFor("Series tab must open the series catalogue",() -> { try { return !(Boolean)TvTestUi.field(activity,"home") && "series".equals(TvTestUi.field(activity,"section")) && "".equals(TvTestUi.field(activity,"seriesTitle")); } catch(Exception e) { return false; } });
+        } finally { instrument().runOnMainSync(activity::finish); instrument().waitForIdleSync(); }
+    }
     @Test public void homeAndMoviesWorkWithRemoteOnly() throws Exception {
         TvActivity activity=start();
         try {
