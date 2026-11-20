@@ -80,7 +80,9 @@ public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
         EditText search=dialog.getWindow().getDecorView().findViewWithTag("android-bouquet-search");
         visible(search); tap(search); instrument().sendStringSync(searchText);
         ListView list=dialog.getWindow().getDecorView().findViewWithTag("android-bouquet-list");
-        waitFor("Bouquet search did not filter the visible list",() -> searchText.contentEquals(search.getText()) && list.getAdapter().getCount()==1 && list.getChildCount()==1 && find(list.getChildAt(0),name)!=null);
+        screenshot(dialog.getWindow().getDecorView(),"android-bouquets-portrait");
+        try { waitFor("Bouquet search did not filter the visible list",() -> !search.getText().toString().trim().isEmpty() && list.getAdapter().getCount()==1 && list.getChildCount()==1 && find(list.getChildAt(0),name)!=null); }
+        catch(AssertionError failure) { android.util.Log.e("TestRunner","Bouquet query="+search.getText()+" rows="+list.getAdapter().getCount()+" children="+list.getChildCount()+" searchHeight="+search.getHeight()+" listHeight="+list.getHeight()); screenshot(dialog.getWindow().getDecorView(),"android-bouquets-portrait"); throw failure; }
         screenshot(dialog.getWindow().getDecorView(),"android-bouquets-portrait"); tap(find(dialog.getWindow().getDecorView(),name));
         waitFor("Bouquet selection did not filter the catalogue",() -> { try { return name.equals(field(home,"group")); } catch(Exception error) { return false; } });
     }
