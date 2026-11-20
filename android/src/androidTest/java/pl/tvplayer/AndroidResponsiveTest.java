@@ -95,12 +95,12 @@ public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
         Channel otherSeries=new Channel("Serial UK",series.url().replace("series_id=9","series_id=10"),"UK SERIALE","","series").withLogo(series.logo());
         channels.add(otherMovie); channels.add(otherSeries); new LibraryStore(context()).save(channels,java.util.Collections.emptySet());
         AndroidScreenTest.rotate(home,true); section("TV","tv",a.name());
-        selectBouquet("UK | MOVIES","UK"); waitFor("UK live channel is missing",() -> find(root(home),"UK Movies test")!=null);
+        selectBouquet("UK | MOVIES","UK Movies"); waitFor("UK live channel is missing",() -> find(root(home),"UK Movies test")!=null);
         assertNull("A channel from another bouquet is still shown",find(root(home),a.name())); screenshot(home,"android-bouquet-selected");
         waitFor("UK preview missing",() -> { try { return preview()!=null; } catch(Exception e) { return false; } }); playing(preview());
         opens(PlayerActivity.class.getName(),() -> tap(find(root(home),"UK Movies test"))); close(child); child=null; waitFor("Library did not resume",home::hasWindowFocus);
         assertEquals("UK | MOVIES",field(home,"group")); AndroidScreenTest.rotate(home,false); assertEquals("UK | MOVIES",field(home,"group")); AndroidScreenTest.rotate(home,true);
-        section("Filmy","movie",movie.name()); selectBouquet("UK VOD","UK"); waitFor("Movie bouquet did not render",() -> find(root(home),otherMovie.name())!=null && find(root(home),movie.name())==null);
-        section("Seriale","series",series.name()); selectBouquet("UK SERIALE","UK"); waitFor("Series bouquet did not render",() -> find(root(home),otherSeries.name())!=null && find(root(home),series.name())==null);
+        section("Filmy","movie",movie.name()); selectBouquet("UK VOD","UK VOD"); waitFor("Movie bouquet did not render",() -> find(root(home),otherMovie.name())!=null && find(root(home),movie.name())==null);
+        section("Seriale","series",series.name()); selectBouquet("UK SERIALE","UK SERIALE"); waitFor("Series bouquet did not render",() -> find(root(home),otherSeries.name())!=null && find(root(home),series.name())==null);
     }
 }
