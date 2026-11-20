@@ -22,6 +22,22 @@ public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
         int[] origin=new int[2]; view.getLocationOnScreen(origin);
         assertTrue("Control extends past the left/right edge",origin[0]>=screen.left && origin[0]+view.getWidth()<=screen.right); assertTrue(box.width()>0 && box.height()>0);
     }
+    @Test public void opensLocalSeriesFromHomeAndPlaysEpisode() throws Exception {
+        // The home shelf holds only a preview. Its folder must resolve against the full library.
+        Channel episode = new Channel("Biblioteka S02E03",server.url("/series/203.ts").toString(),"M3U","","episode");
+        Channel folder = TvCatalog.series(java.util.Collections.singletonList(episode)).items().get(0);
+        java.lang.reflect.Method open = TvActivity.class.getDeclaredMethod("openCard",Channel.class);
+        open.setAccessible(true);
+        instrument().runOnMainSync(() -> {
+            try { open.invoke(home,folder); } catch(Exception failure) { throw new AssertionError(failure); }
+        });
+        waitFor("M3U episode missing",() -> find(root(home),episode.name())!=null);
+        opens(PlayerActivity.class.getName(),() -> tap(find(root(home),episode.name())));
+        assertEquals(episode.url(),child.getIntent().getStringExtra("url"));
+        waitFor("Player missing",() -> { try { return field(child,"player")!=null; } catch(Exception e) { return false; } });
+        playing((ExoPlayer)field(child,"player"));
+        assertEquals(0,seriesRequests.get());
+    }
     private ExoPlayer preview() throws Exception { return (ExoPlayer)field(field(home,"livePreview"),"player"); }
     @Test public void portraitHomeAndCataloguesFitAndKeepTheSelectedSection() throws Exception {
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR,home.getRequestedOrientation());

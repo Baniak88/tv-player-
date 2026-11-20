@@ -188,5 +188,26 @@ public class AndroidMovieHttpTest {
         assertEquals(C.TIME_UNSET, AndroidLoadErrorPolicy.retryDelay("invalid", now));
         assertEquals(5000, AndroidLoadErrorPolicy.retryDelay("0", now));
     }
+    @Test public void m3uSeriesAcceptsNumberedHlsEpisodesAndPreservesLiveChannels() throws Exception {
+        String playlist = "#EXTM3U\n#EXTINF:-1 group-title=\"PL SERIALE\",Test S01.E02\n/v/one.m3u8\n"
+                + "#EXTINF:-1 group-title=\"PL SERIALE\",Test S01E02\n/live/two.ts\n";
+        server.enqueue(new MockResponse().setBody(playlist));
+        server.start();
+        List<Channel> items = AndroidM3uLibrary.load(new SourceClient(),server.url("/list").toString(), text -> {});
+        assertEquals("episode",items.get(0).kind());
+        assertEquals("tv",items.get(1).kind());
+    }
+
+    @Test public void emptySeriesInPanelPlaylistLoadsProvidersSeriesCatalogue() throws Exception {
+        server.enqueue(new MockResponse().setBody("#EXTM3U\n#EXTINF:-1,TV\n/live/test.ts\n"));
+        server.enqueue(new MockResponse().setBody("{\"user_info\":{\"auth\":1,\"status\":\"Active\"}}"));
+        server.enqueue(new MockResponse().setBody("[{\"category_id\":\"3\",\"category_name\":\"Seriale\"}]"));
+        server.enqueue(new MockResponse().setBody("[{\"series_id\":7,\"name\":\"Serial panelu\",\"category_id\":\"3\"}]"));
+        server.start();
+        List<Channel> items = AndroidM3uLibrary.load(new SourceClient(),server.url("/get.php?username=test&password=test").toString(), text -> {});
+        assertEquals(2,items.size());
+        assertEquals("series",items.get(1).section());
+        assertEquals("Serial panelu",items.get(1).name());
+    }
     @After public void cleanup() throws Exception { close(player); HttpsURLConnection.setDefaultSSLSocketFactory(previousTls); if(secure!=null) secure.shutdown(); server.shutdown(); }
 }

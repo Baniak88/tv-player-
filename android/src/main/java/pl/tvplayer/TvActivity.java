@@ -612,6 +612,7 @@ public final class TvActivity extends Activity {
         String sortMode=getPreferences(MODE_PRIVATE).getString("sort-"+section,"provider");
         if(countsSource!=items || !sortMode.equals(countsMode)) { countsCache=BouquetOrder.counts(items,sortMode); countsSource=items; countsMode=sortMode; } // reused while browsing bouquets
         Map<String,Integer> counts=countsCache; groups=new ArrayList<>(counts.keySet());
+        if (catalogReady && section.equals("series") && !group.isEmpty() && !counts.containsKey(group)) group="";
         List<String> labels=new ArrayList<>(); labels.add(seriesTitle.isEmpty()?"Cała oferta":"Wszystkie odcinki"); labels.addAll(groups);
         if(shelves!=null) { bindRail(); filter(); return; }
         rebinding=true;
@@ -673,6 +674,13 @@ public final class TvActivity extends Activity {
     private void select(Channel channel) {
         rememberLocation();
         if(channel.kind().equals("tv") && livePreview!=null && !channel.url().equals(livePreview.selectedUrl())) { livePreview.select(channel); return; }
+        if (home && channel.url().startsWith("local-series:")) {
+            TvBrowseState folder = new TvBrowseState(false, "series", "", "", false,
+                    channel.url(), channel.name(), "", "", 0, 0, 0, 0, 0, true,
+                    false, "", 0, location());
+            restoreLocation(folder);
+            return;
+        }
         if(seriesFolders.containsKey(channel.url())) { openLocalSeries(channel); return; }
         if(channel.kind().equals("series")) startActivity(SeriesActivity.intent(this,channel,true)); else if(channel.kind().equals("movie")) startActivity(new Intent(this,MovieActivity.class).putExtra("television",true).putExtra("url",channel.url()).putExtra("name",channel.name()).putExtra("group",channel.group()).putExtra("logo",channel.logo())); else play(channel);
     }
@@ -749,7 +757,7 @@ public final class TvActivity extends Activity {
         final Set<String> savedFavorites=new HashSet<>(favorites);
         sourceWorker.execute(() -> {
             try {
-                List<Channel> imported=next.type().equals("xtream")?source.xtreamSection(next.server(),next.user(),next.password(),"tv",this::progress):source.m3u(next.server());
+                List<Channel> imported=next.type().equals("xtream")?source.xtreamSection(next.server(),next.user(),next.password(),"tv",this::progress):AndroidM3uLibrary.load(source,next.server(),this::progress);
                 if(isDestroyed() || epoch!=sourceEpoch) return;
                 LibraryStore store=new LibraryStore(this);
                 if(sameSource && next.type().equals("xtream") && new java.io.File(getFilesDir(),"catalog.current").isFile()) store.updateSection("tv",imported);
