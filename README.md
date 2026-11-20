@@ -1,6 +1,6 @@
 # TV Player — Android
 
-Oryginalny **Fire Stick 0.9.16** i jego bezpośredni **port Android 0.9.16**. Obie paczki mają interfejs z Fire Sticka: ekran poziomy, te same ekrany TV, filmów i seriali. [Przywrócenie Fire Sticka i instalacja portu na Androidzie](ANDROID-FIRESTICK.md). Błędne wydanie Android 1.1.8 ze starym ekranem telefonu zostało wycofane.
+Oryginalny **Fire Stick 0.9.16** i jego bezpośredni **port Android 0.9.17**. Android zachowuje styl Fire Sticka, dostosowując ekrany TV, filmów i seriali do pionu i poziomu. Strzałki kanałów są stale widoczne podczas pełnoekranowego oglądania TV. [Przywrócenie Fire Sticka i instalacja portu na Androidzie](ANDROID-FIRESTICK.md). Błędne wydanie Android 1.1.8 ze starym ekranem telefonu zostało wycofane.
 
 Wersja TV: **OKTV Player TV 0.9.16-preview**. [Prosta instalacja z terminala Chromebooka na Fire Stick](CHROMEBOOK-FIRESTICK.md). [Pozostałe sposoby instalacji na TV](TV-INSTALL.md).
 
@@ -21,7 +21,7 @@ Dostępne są również filmy i seriale z miniaturami dostawcy, podgląd TV, EPG
 
 ## Instalacja
 
-[Port Android 0.9.16](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.16-android): pobierz `OKTV-Player-Android-0.9.16.apk`, otwórz go na telefonie lub tablecie i zatwierdź instalację. Przy prywatnym repozytorium zaloguj się na konto GitHub z dostępem. [Oryginalny Fire Stick 0.9.16](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.16-tv-preview) pozostaje osobno, z niezmienionym APK. [Instrukcja obu wersji i gotowy kod przywrócenia Fire Sticka](ANDROID-FIRESTICK.md).
+[Port Android 0.9.17](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.17-android): pobierz `OKTV-Player-Android-0.9.17.apk`, otwórz go na telefonie lub tablecie i zatwierdź instalację. Przy prywatnym repozytorium zaloguj się na konto GitHub z dostępem. [Oryginalny Fire Stick 0.9.16](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.16-tv-preview) pozostaje osobno, z niezmienionym APK. [Instrukcja obu wersji i gotowy kod przywrócenia Fire Sticka](ANDROID-FIRESTICK.md).
 
 Paczki preview nie są wydaniami sklepowymi. Android używa pakietu `pl.tvplayer.preview` i zachowuje dotychczasowy klucz preview. Aktualizacja zgodnie podpisanej wersji zachowuje lokalną bibliotekę bez odinstalowywania. Wersja TV to osobny pakiet `pl.tvplayer.television`.
 
@@ -33,7 +33,7 @@ Wymagane: JDK 17, Gradle 8.9, Android SDK 35, Build Tools 35.0.0. Otwórz projek
 gradle :app:testDebugUnitTest :android:lintDebug :android:assembleDebug :android:assembleDebugAndroidTest
 ```
 
-Wynik portu: `android/build/outputs/apk/debug/android-debug.apk`. Moduł `:android` używa bezpośrednio manifestu i ekranów `:tv`; różnice to identyfikator paczki, rosnący kod wersji i adapter dotyku. `bash scripts/verify-firestick-base.sh` potwierdza niezmieniony kod oryginalnego Fire Sticka. Historyczny moduł `:app` nie jest publikowany jako ten port.
+Wynik portu: `android/build/outputs/apk/debug/android-debug.apk`. Moduł `:android` zachowuje styl TV, z osobnym manifestem oraz wariantami ekranów i połączeń dla telefonu. Odtwarzanie obsługuje przekierowania HTTP/HTTPS i pokazuje konkretne kody błędów dostawcy. `bash scripts/verify-firestick-base.sh` potwierdza niezmieniony kod oryginalnego Fire Sticka. Historyczny moduł `:app` nie jest publikowany jako ten port.
 
 ## Prywatność i połączenia
 

@@ -13,7 +13,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
-/** Android-only input adapter; all screens and their layout remain the Fire Stick originals. */
+/** Input adapter for the responsive Android port; it is not part of the Fire Stick build. */
 public final class AndroidApplication extends Application {
     @Override public void onCreate() {
         super.onCreate();
@@ -45,12 +45,16 @@ public final class AndroidApplication extends Application {
         ViewGroup content=activity.findViewById(android.R.id.content);
         if(content==null || content.getChildCount()==0 || !(content.getChildAt(0) instanceof FrameLayout stage)) return;
         View existing=stage.findViewWithTag("android-live-controls");
-        if(existing!=null) { if(activity.isInPictureInPictureMode()) existing.setVisibility(View.GONE); return; }
+        if(existing!=null) {
+            boolean pip=activity.isInPictureInPictureMode(); if(pip) existing.setVisibility(View.GONE);
+            for(String tag:new String[]{"android-channel-previous","android-channel-next"}) { View arrow=stage.findViewWithTag(tag); if(arrow!=null) arrow.setVisibility(pip?View.GONE:View.VISIBLE); }
+            return;
+        }
         LinearLayout controls=new LinearLayout(activity); controls.setTag("android-live-controls"); controls.setPadding(Ui.dp(activity,4),0,Ui.dp(activity,4),0);
         controls.setBackground(Ui.shape(activity,0xB3101620,12,0));
-        String[] labels={"‹","−","＋","EPG","⚙","i"};
-        String[] descriptions={"Wróć do listy kanałów","Poprzedni kanał","Następny kanał","Program TV","Opcje odtwarzania","Informacja o kanale"};
-        int[] keys={KeyEvent.KEYCODE_BACK,KeyEvent.KEYCODE_MEDIA_PREVIOUS,KeyEvent.KEYCODE_MEDIA_NEXT,KeyEvent.KEYCODE_GUIDE,KeyEvent.KEYCODE_MENU,KeyEvent.KEYCODE_INFO};
+        String[] labels={"‹","EPG","⚙","i"};
+        String[] descriptions={"Wróć do listy kanałów","Program TV","Opcje odtwarzania","Informacja o kanale"};
+        int[] keys={KeyEvent.KEYCODE_BACK,KeyEvent.KEYCODE_GUIDE,KeyEvent.KEYCODE_MENU,KeyEvent.KEYCODE_INFO};
         Runnable hide=() -> controls.setVisibility(View.GONE);
         for(int i=0;i<labels.length;i++) {
             final int index=i; Button button=Ui.button(activity,labels[i]); button.setTextSize(i==3?13:20); button.setPadding(0,0,0,0); button.setContentDescription(descriptions[i]); Ui.ghost(button,Ui.TEXT);
@@ -59,6 +63,8 @@ public final class AndroidApplication extends Application {
             controls.addView(button,new LinearLayout.LayoutParams(Ui.dp(activity,48),Ui.dp(activity,48)));
         }
         FrameLayout.LayoutParams size=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.END); size.topMargin=Ui.dp(activity,12); size.rightMargin=Ui.dp(activity,16); stage.addView(controls,size); controls.postDelayed(hide,6500);
+        arrow(activity,stage,"◀","Poprzedni kanał","android-channel-previous",KeyEvent.KEYCODE_MEDIA_PREVIOUS,Gravity.START);
+        arrow(activity,stage,"▶","Następny kanał","android-channel-next",KeyEvent.KEYCODE_MEDIA_NEXT,Gravity.END);
         // The original live-TV screen hides Media3's buttons and expects remote keys.
         // Android gets touch equivalents; tapping the picture reveals/hides them.
         stage.setOnTouchListener((view,event) -> {
@@ -66,5 +72,10 @@ public final class AndroidApplication extends Application {
             if(event.getActionMasked()==MotionEvent.ACTION_UP) { controls.removeCallbacks(hide); boolean show=controls.getVisibility()!=View.VISIBLE; controls.setVisibility(show?View.VISIBLE:View.GONE); if(show) { key(activity,KeyEvent.KEYCODE_INFO); controls.postDelayed(hide,6500); } }
             return true;
         });
+    }
+    private static void arrow(Activity activity,FrameLayout stage,String label,String description,String tag,int code,int edge) {
+        Button button=Ui.button(activity,label); button.setTag(tag); button.setContentDescription(description); button.setTextSize(22); button.setTextColor(Ui.TV_GOLD); button.setPadding(0,0,0,0); button.setFocusableInTouchMode(false);
+        button.setBackground(Ui.touch(activity,0xB3101620,28,0x55FFFFFF)); button.setOnClickListener(view -> key(activity,code));
+        FrameLayout.LayoutParams size=new FrameLayout.LayoutParams(Ui.dp(activity,52),Ui.dp(activity,56),edge|Gravity.CENTER_VERTICAL); size.leftMargin=Ui.dp(activity,8); size.rightMargin=Ui.dp(activity,8); stage.addView(button,size);
     }
 }
