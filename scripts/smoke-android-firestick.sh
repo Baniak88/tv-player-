@@ -3,7 +3,7 @@ set -euo pipefail
 mkdir -p android-tv-smoke-output
 cleanup() {
   adb logcat -d -v brief -s AndroidRuntime TestRunner > android-tv-smoke-output/runtime.txt
-  for name in android-firestick-home android-firestick-movies android-firestick-series android-firestick-film android-firestick-serial android-firestick-tv android-home-portrait android-movies-portrait android-series-portrait android-series-landscape android-tv-portrait android-tv-landscape android-player-tv-portrait android-player-tv-landscape android-film-portrait android-film-landscape android-serial-portrait android-serial-landscape android-player-film-portrait; do
+  for name in android-touch-failure android-firestick-home android-firestick-movies android-firestick-series android-firestick-film android-firestick-serial android-firestick-tv android-home-portrait android-movies-portrait android-series-portrait android-series-landscape android-tv-portrait android-tv-landscape android-player-tv-portrait android-player-tv-landscape android-film-portrait android-film-landscape android-serial-portrait android-serial-landscape android-player-film-portrait; do
     adb exec-out run-as pl.tvplayer.preview cat "files/$name.png" > "android-tv-smoke-output/$name.png" || true
   done
 }

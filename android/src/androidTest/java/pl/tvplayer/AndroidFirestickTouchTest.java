@@ -66,15 +66,26 @@ public class AndroidFirestickTouchTest {
     }
     protected void tap(Activity activity,String label) throws Exception {
         Rect bounds=new Rect();
-        waitFor("Visible touch target missing: "+label,() -> {
+        try { waitFor("Visible touch target missing: "+label,() -> {
             boolean[] ready={false}; instrument().runOnMainSync(() -> {
                 // A configuration callback can replace the navigation after focus is gained.
                 // Resolve the current view on every pass instead of retaining the old subtree.
                 View target=clickable(root(activity),label);
                 if(target!=null) ready[0]=touchBounds(target,bounds);
             }); return ready[0];
-        });
+        }); } catch(AssertionError failure) {
+            instrument().runOnMainSync(() -> {
+                android.util.Log.e("TestRunner","Touch failure: "+label+" activity="+activity+" destroyed="+activity.isDestroyed()+" finishing="+activity.isFinishing()+" focus="+activity.hasWindowFocus());
+                dumpTouchTree(root(activity),"");
+            });
+            screenshot(activity,"android-touch-failure"); throw failure;
+        }
         pointer(bounds);
+    }
+    private void dumpTouchTree(View view,String depth) {
+        Rect box=new Rect(); boolean visible=view.getGlobalVisibleRect(box);
+        android.util.Log.e("TestRunner",depth+view.getClass().getSimpleName()+" text="+(view instanceof TextView?((TextView)view).getText():view.getContentDescription())+" size="+view.getWidth()+"x"+view.getHeight()+" attached="+view.isAttachedToWindow()+" shown="+view.isShown()+" visible="+visible+" rect="+box);
+        if(view instanceof ViewGroup) for(int i=0;i<((ViewGroup)view).getChildCount();i++) dumpTouchTree(((ViewGroup)view).getChildAt(i),depth+" ");
     }
     private boolean touchBounds(View target,Rect bounds) {
         target.requestRectangleOnScreen(new Rect(0,0,target.getWidth(),target.getHeight()),true);
