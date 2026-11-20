@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p android-tv-smoke-output
+cleanup() {
+  adb logcat -d -v brief -s AndroidRuntime TestRunner > android-tv-smoke-output/runtime.txt
+  for name in android-firestick-home android-firestick-movies android-firestick-series android-firestick-film android-firestick-serial android-firestick-tv; do
+    adb exec-out run-as pl.tvplayer.preview cat "files/$name.png" > "android-tv-smoke-output/$name.png" || true
+  done
+}
+trap cleanup EXIT
+adb install apk/debug/android-debug.apk
+adb shell am start -W -n pl.tvplayer.preview/pl.tvplayer.TvActivity
+adb install -r apk/debug/android-debug.apk
+adb install apk/androidTest/debug/android-debug-androidTest.apk
+adb shell am force-stop pl.tvplayer.preview
+adb shell input keyevent KEYCODE_WAKEUP
+adb shell wm dismiss-keyguard
+adb shell am instrument -w -r -e class pl.tvplayer.PlaybackRecoveryTest,pl.tvplayer.PlaybackBandwidthTest,pl.tvplayer.StreamResumptionTest pl.tvplayer.preview.test/androidx.test.runner.AndroidJUnitRunner | tee android-tv-smoke-output/playback.txt
+grep -q 'OK (8 tests)' android-tv-smoke-output/playback.txt
+adb shell am force-stop pl.tvplayer.preview
+adb shell am instrument -w -r -e class pl.tvplayer.AndroidFirestickTouchTest pl.tvplayer.preview.test/androidx.test.runner.AndroidJUnitRunner | tee android-tv-smoke-output/touch.txt
+grep -q 'OK (4 tests)' android-tv-smoke-output/touch.txt
+echo 'ANDROID_FIRESTICK_CHECKS_PASSED=12'
