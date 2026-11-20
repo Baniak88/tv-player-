@@ -16,6 +16,13 @@ public class PlayerActivity extends Activity {
     private ExoPlayer player;
     private Player.Listener playbackListener;
     private PlaybackRecovery recovery;
+    private boolean vodPlayed, vodRenewalUsed;
+    private final Runnable allowVodRenewal = () -> vodRenewalUsed = false;
+    private final Runnable renewVod = () -> {
+        if (player == null || isFinishing() || !player.getPlayWhenReady()
+                || AndroidPlaybackErrors.status(player.getPlayerError()) != 458) return;
+        reopenVod();
+    };
     private PlayerView view;
     private LinearLayout error;
     private TextView message,title;
@@ -112,7 +119,16 @@ public class PlayerActivity extends Activity {
         error.setBackgroundColor(0xEE141A27); error.setPadding(dp(24),dp(20),dp(24),dp(20));
         message=new TextView(this); message.setTextColor(-1); message.setTextSize(17); error.addView(message);
         Button retry=action("Spróbuj ponownie"); error.addView(retry);
-        retry.setOnClickListener(v -> { if(player!=null) { error.setVisibility(View.GONE); if(recovery!=null) recovery.retryNow(); else { player.prepare(); player.play(); } } });
+        retry.setOnClickListener(v -> {
+            if (player == null) return;
+            error.setVisibility(View.GONE);
+            if (onDemand && AndroidPlaybackErrors.status(player.getPlayerError()) == 458) {
+                infoHandler.removeCallbacks(renewVod);
+                reopenVod();
+                player.play();
+            } else if (recovery != null) recovery.retryNow();
+            else { player.prepare(); player.play(); }
+        });
         androidRestart=action("Odtwórz od początku"); androidRestart.setVisibility(View.GONE); error.addView(androidRestart);
         androidRestart.setOnClickListener(v -> { if(player!=null) { position=0; WatchProgress.restart(this,url); player.seekTo(0); error.setVisibility(View.GONE); if(recovery!=null) recovery.retryNow(); else { player.prepare(); player.play(); } } });
         error.setVisibility(View.GONE); root.addView(error,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
@@ -398,12 +414,38 @@ public class PlayerActivity extends Activity {
         final ExoPlayer current=player; view.setPlayer(!television && !onDemand?channelControls(player):player);
         if(!television && !onDemand) describeChannelButtons();
         playbackListener=new Player.Listener() {
+            @Override public void onIsPlayingChanged(boolean playing) {
+                if (player != current || !onDemand) return;
+                infoHandler.removeCallbacks(allowVodRenewal);
+                if (playing) {
+                    vodPlayed = true;
+                    if (vodRenewalUsed) infoHandler.postDelayed(allowVodRenewal, 60000);
+                }
+            }
+            @Override public void onPlayWhenReadyChanged(boolean ready, int reason) {
+                if (!ready && player == current && onDemand) {
+                    infoHandler.removeCallbacks(renewVod);
+                    PlaybackException failure = current.getPlayerError();
+                    if (failure != null) message.setText(AndroidPlaybackErrors.message(failure));
+                }
+            }
             @Override public void onTracksChanged(Tracks tracks) { if(player==current && liveInfo!=null) liveInfo.audio(PlaybackAudio.description(tracks)); }
             @Override public void onPlayerError(PlaybackException e) {
                 if(player!=current) return;
                 message.setText(AndroidPlaybackErrors.message(e));
                 androidRestart.setVisibility(onDemand && (AndroidPlaybackErrors.status(e)==416 || e.errorCode==PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)?View.VISIBLE:View.GONE);
                 error.setVisibility(View.VISIBLE);
+                if (onDemand && vodPlayed && !vodRenewalUsed && current.getPlayWhenReady()
+                        && current.getContentPosition() > 0) {
+                    long wait = AndroidLoadErrorPolicy.sessionRetryDelay(e);
+                    if (wait != C.TIME_UNSET) {
+                        vodRenewalUsed = true;
+                        WatchProgress.save(PlayerActivity.this, url, current.getContentPosition(), current.getDuration(), false);
+                        message.setText("Przerwa w filmie (HTTP 458). Za " + ((wait + 999) / 1000)
+                                + " s spróbuję wznowić od miejsca przerwania.");
+                        infoHandler.postDelayed(renewVod, wait);
+                    }
+                }
             }
         }; player.addListener(playbackListener);
         recovery=new PlaybackRecovery(player,!onDemand,text -> {
@@ -417,6 +459,14 @@ public class PlayerActivity extends Activity {
         player.setMediaSource(PlaybackNetwork.sources(this,onDemand?null:liveChannel()).createMediaSource(item.build()));
         if(onDemand) player.seekTo(position); else player.seekToDefaultPosition(); player.prepare(); player.play();
         if(onDemand && position>5000) Toast.makeText(this,"Wznawiam oglądanie. Od początku: Opcje.",Toast.LENGTH_LONG).show();
+    }
+    private void reopenVod() {
+        MediaItem original = player.getCurrentMediaItem();
+        if (original == null) return;
+        // Go through the original provider URL again to obtain a fresh VOD playlist or redirect.
+        player.setMediaItem(original, Math.max(0, player.getContentPosition()));
+        player.prepare();
+        error.setVisibility(View.GONE);
     }
     @Override public void finish() {
         if(!onDemand && player!=null && getIntent().getBooleanExtra("return_preview",false)) {
@@ -511,7 +561,13 @@ public class PlayerActivity extends Activity {
         if(rotation!=null) rotation.disable(); guideWorker.shutdown(); super.onDestroy();
     }
     private void stopStreamObservation() { if(streamObserved) { GuideRepository.get(this).streamStopped(liveChannel()); streamObserved=false; } }
-    private void closeRecovery() { if(recovery!=null) { recovery.close(); recovery=null; } }
+    private void closeRecovery() {
+        infoHandler.removeCallbacks(renewVod);
+        infoHandler.removeCallbacks(allowVodRenewal);
+        vodPlayed = false;
+        vodRenewalUsed = false;
+        if(recovery!=null) { recovery.close(); recovery=null; }
+    }
     @Override protected void onSaveInstanceState(Bundle out) {
         if(adjustments!=null) adjustments.save(out);
         if(!onDemand && getIntent().getExtras()!=null) out.putBundle("live_channel",new Bundle(getIntent().getExtras()));

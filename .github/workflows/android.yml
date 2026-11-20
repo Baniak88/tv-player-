@@ -30,11 +30,11 @@ jobs:
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/build/outputs/apk/debug/android-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging android/build/outputs/apk/debug/android-debug.apk | tee android-package.txt
-          grep -q "name='pl.tvplayer.preview' versionCode='36' versionName='0.9.19-android'" android-package.txt
+          grep -q "name='pl.tvplayer.preview' versionCode='37' versionName='0.9.20-android'" android-package.txt
           grep -q "launchable-activity: name='pl.tvplayer.TvActivity'" android-package.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: OKTV-Android-0.9.19
+          name: OKTV-Android-0.9.20
           retention-days: 5
           path: |
             android/build/outputs/apk/debug/android-debug.apk
@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with: {name: OKTV-Android-0.9.19, path: apk}
+        with: {name: OKTV-Android-0.9.20, path: apk}
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -69,7 +69,7 @@ jobs:
     permissions: {contents: write}
     steps:
       - uses: actions/download-artifact@v4
-        with: {name: OKTV-Android-0.9.19, path: apk}
+        with: {name: OKTV-Android-0.9.20, path: apk}
       - name: Publish Android port while preserving the original TV package
         env:
           GH_TOKEN: ${{ github.token }}
@@ -78,6 +78,6 @@ jobs:
         run: |
           gh release download v0.9.16-tv-preview --pattern OKTV-Player-TV.apk --dir firestick-original
           echo '6e75e4949b117e135b35b3e5ac59133d766ebc364c5cb90cb0418634043e9e39  firestick-original/OKTV-Player-TV.apk' | sha256sum -c -
-          cp apk/debug/android-debug.apk OKTV-Player-Android-0.9.19.apk
-          sha256sum OKTV-Player-Android-0.9.19.apk > SHA256SUMS-Android.txt
-          gh release create v0.9.19-android OKTV-Player-Android-0.9.19.apk SHA256SUMS-Android.txt --target "$SOURCE_SHA" --prerelease --latest=false --title "OKTV Player Android 0.9.19 — obsługa HTTP 458" --notes "Po HTTP 458 odtwarzacz może ponowić żądanie po przerwie. Uwzględnia czas oczekiwania wskazany przez serwer. Przy ponownej odmowie wyświetla kod błędu. Aktualizacja dla telefonów i tabletów z Androidem 8 lub nowszym."
+          cp apk/debug/android-debug.apk OKTV-Player-Android-0.9.20.apk
+          sha256sum OKTV-Player-Android-0.9.20.apk > SHA256SUMS-Android.txt
+          gh release create v0.9.20-android OKTV-Player-Android-0.9.20.apk SHA256SUMS-Android.txt --target "$SOURCE_SHA" --prerelease --latest=false --title "OKTV Player Android 0.9.20 — wznawianie filmu po HTTP 458" --notes "Gdy dostawca odrzuca dalszą część filmu po rozpoczęciu oglądania, aplikacja może ponownie otworzyć jego oryginalny adres i wznowić od miejsca przerwania. Uwzględnia Retry-After i ogranicza częstotliwość prób. Aktualizacja dla telefonów i tabletów z Androidem 8 lub nowszym."

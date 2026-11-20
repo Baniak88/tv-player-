@@ -123,6 +123,63 @@ public class AndroidMovieHttpTest {
         assertFalse(((android.widget.TextView)field(player, "message")).getText().toString().contains("private-test-marker"));
     }
 
+    @Test public void expiredVodSegmentReopensPlaylistAtPlaybackPosition() throws Exception {
+        byte[] shortSegment;
+        try (InputStream input = instrument().getContext().getAssets().open("vod-session.ts");
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            for (int n; (n = input.read(buffer)) != -1;) output.write(buffer, 0, n);
+            shortSegment = output.toByteArray();
+        }
+        AtomicInteger playlists = new AtomicInteger(), refusals = new AtomicInteger();
+        java.util.concurrent.CountDownLatch watching = new java.util.concurrent.CountDownLatch(1);
+        server.setDispatcher(new Dispatcher() {
+            @Override public MockResponse dispatch(RecordedRequest request) throws InterruptedException {
+                String path = request.getPath();
+                if ("/vod.m3u8".equals(path)) {
+                    int generation = playlists.incrementAndGet();
+                    String playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:60\n"
+                            + "#EXTINF:60,\nearly.ts\n#EXT-X-DISCONTINUITY\n#EXTINF:60,\nearly.ts\n"
+                            + "#EXT-X-DISCONTINUITY\n#EXTINF:60,\nearly.ts\n#EXT-X-DISCONTINUITY\n"
+                            + "#EXTINF:6,\nshort.ts\n#EXT-X-DISCONTINUITY\n#EXTINF:60,\nnext.ts?session="
+                            + generation + "\n#EXT-X-ENDLIST\n";
+                    return new MockResponse().setHeader("Content-Type", "application/vnd.apple.mpegurl").setBody(playlist);
+                }
+                if ("/next.ts?session=1".equals(path)) {
+                    if (!watching.await(20, java.util.concurrent.TimeUnit.SECONDS)) return new MockResponse().setResponseCode(503);
+                    refusals.incrementAndGet();
+                    return new MockResponse().setResponseCode(458);
+                }
+                return new MockResponse().setHeader("Content-Type", "video/mp2t")
+                        .setBody(new okio.Buffer().write("/short.ts".equals(path) ? shortSegment : movie));
+            }
+        });
+        server.start();
+        String address = server.url("/vod.m3u8").toString();
+        WatchProgress.save(context(), address, 181000, 246000, false);
+        start(address);
+        ExoPlayer engine = (ExoPlayer)field(player, "player");
+        AtomicLong failedPosition = new AtomicLong();
+        try {
+            playing();
+            instrument().runOnMainSync(() -> engine.addListener(new androidx.media3.common.Player.Listener() {
+                @Override public void onPlayerError(androidx.media3.common.PlaybackException failure) {
+                    if (AndroidPlaybackErrors.status(failure) == 458) failedPosition.set(engine.getContentPosition());
+                }
+            }));
+        } finally { watching.countDown(); }
+        waitFor("The original VOD playlist was not reopened", () -> playlists.get() == 2);
+        assertEquals(2, refusals.get());
+        assertTrue("Movie was not already playing in minute four", failedPosition.get() >= 181000);
+        waitFor("Playback did not advance beyond the previously refused segment", () -> {
+            boolean[] resumed = {false};
+            instrument().runOnMainSync(() -> resumed[0] = engine.isPlaying()
+                    && engine.getContentPosition() > Math.max(186000, failedPosition.get()));
+            return resumed[0];
+        });
+        assertEquals(2, playlists.get());
+    }
+
     @Test public void retryAfterDatesAndLongDelaysAreRespected() {
         long now = java.time.Instant.parse("2026-11-20T12:00:00Z").toEpochMilli();
         assertEquals(19000, AndroidLoadErrorPolicy.retryDelay("Fri, 20 Nov 2026 12:00:19 GMT", now));
