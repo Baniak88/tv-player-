@@ -673,6 +673,13 @@ public final class TvActivity extends Activity {
     private void select(Channel channel) {
         rememberLocation();
         if(channel.kind().equals("tv") && livePreview!=null && !channel.url().equals(livePreview.selectedUrl())) { livePreview.select(channel); return; }
+        if (home && channel.url().startsWith("local-series:")) {
+            TvBrowseState folder = new TvBrowseState(false, "series", "", "", false,
+                    channel.url(), channel.name(), "", "", 0, 0, 0, 0, 0, true,
+                    false, "", 0, location());
+            restoreLocation(folder);
+            return;
+        }
         if(seriesFolders.containsKey(channel.url())) { openLocalSeries(channel); return; }
         if(channel.kind().equals("series")) startActivity(SeriesActivity.intent(this,channel,true)); else if(channel.kind().equals("movie")) startActivity(new Intent(this,MovieActivity.class).putExtra("television",true).putExtra("url",channel.url()).putExtra("name",channel.name()).putExtra("group",channel.group()).putExtra("logo",channel.logo())); else play(channel);
     }

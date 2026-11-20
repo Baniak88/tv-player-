@@ -1,6 +1,6 @@
 # TV Player — Android
 
-Oryginalny **Fire Stick 0.9.16** i jego bezpośredni **port Android 0.9.21**. Android zachowuje styl Fire Sticka, dostosowując ekrany TV, filmów i seriali do pionu i poziomu. Strzałki kanałów chowają się po 5 sekundach i wracają po dotknięciu obrazu. [Przywrócenie Fire Sticka i instalacja portu na Androidzie](ANDROID-FIRESTICK.md). Błędne wydanie Android 1.1.8 ze starym ekranem telefonu zostało wycofane.
+Oryginalny **Fire Stick 0.9.16** i jego bezpośredni **port Android 0.9.22**. Android zachowuje styl Fire Sticka, dostosowując ekrany TV, filmów i seriali do pionu i poziomu. Strzałki kanałów chowają się po 5 sekundach i wracają po dotknięciu obrazu. [Przywrócenie Fire Sticka i instalacja portu na Androidzie](ANDROID-FIRESTICK.md). Błędne wydanie Android 1.1.8 ze starym ekranem telefonu zostało wycofane.
 
 Wersja TV: **OKTV Player TV 0.9.16-preview**. [Prosta instalacja z terminala Chromebooka na Fire Stick](CHROMEBOOK-FIRESTICK.md). [Pozostałe sposoby instalacji na TV](TV-INSTALL.md).
 
@@ -21,7 +21,7 @@ Dostępne są również filmy i seriale z miniaturami dostawcy, podgląd TV, EPG
 
 ## Instalacja
 
-[Port Android 0.9.21](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.21-android): pobierz `OKTV-Player-Android-0.9.21.apk`, otwórz go na telefonie lub tablecie i zatwierdź instalację. Przy prywatnym repozytorium zaloguj się na konto GitHub z dostępem. [Oryginalny Fire Stick 0.9.16](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.16-tv-preview) pozostaje osobno, z niezmienionym APK. [Instrukcja obu wersji i gotowy kod przywrócenia Fire Sticka](ANDROID-FIRESTICK.md).
+[Port Android 0.9.22](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.22-android): pobierz `OKTV-Player-Android-0.9.22.apk`, otwórz go na telefonie lub tablecie i zatwierdź instalację. Przy prywatnym repozytorium zaloguj się na konto GitHub z dostępem. [Oryginalny Fire Stick 0.9.16](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.16-tv-preview) pozostaje osobno, z niezmienionym APK. [Instrukcja obu wersji i gotowy kod przywrócenia Fire Sticka](ANDROID-FIRESTICK.md).
 
 Paczki preview nie są wydaniami sklepowymi. Android używa pakietu `pl.tvplayer.preview` i zachowuje dotychczasowy klucz preview. Aktualizacja zgodnie podpisanej wersji zachowuje lokalną bibliotekę bez odinstalowywania. Wersja TV to osobny pakiet `pl.tvplayer.television`.
 

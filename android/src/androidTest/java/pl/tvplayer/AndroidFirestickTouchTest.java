@@ -43,7 +43,7 @@ public class AndroidFirestickTouchTest {
         a=new Channel("Kanał dotykowy A",server.url("/a.ts").toString(),"Test TV","","tv"); b=new Channel("Kanał dotykowy B",server.url("/b.ts").toString(),"Test TV","","tv");
         movie=new Channel("Film dotykowy",server.url("/film.mp4").toString(),"Test filmy","","movie").withLogo(art);
         series=new Channel("Serial dotykowy",server.url("/player_api.php?username=test&password=test&action=get_series_info&series_id=9").toString(),"Test seriale","","series").withLogo(art);
-        new LibraryStore(context()).save(Arrays.asList(a,b,movie,series),Collections.emptySet());
+        new LibraryStore(context()).save(Arrays.asList(a,b,movie,series,new Channel("Biblioteka S02E03",server.url("/series/203.ts").toString(),"M3U","","episode")),Collections.emptySet());
         Intent launch=context().getPackageManager().getLaunchIntentForPackage(context().getPackageName()); assertNotNull(launch); assertEquals(TvActivity.class.getName(),launch.getComponent().getClassName());
         home=(TvActivity)instrument().startActivitySync(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
         waitFor("Phone launcher did not gain focus",() -> {

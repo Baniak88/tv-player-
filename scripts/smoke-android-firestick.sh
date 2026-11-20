@@ -35,10 +35,10 @@ for attempt in {1..50}; do
 done
 curl --silent --fail http://127.0.0.1:8769/health >/dev/null
 adb shell am instrument -w -r -e class pl.tvplayer.AndroidResponsiveTest pl.tvplayer.preview.test/androidx.test.runner.AndroidJUnitRunner | tee android-tv-smoke-output/touch.txt
-grep -q 'OK (11 tests)' android-tv-smoke-output/touch.txt
+grep -q 'OK (12 tests)' android-tv-smoke-output/touch.txt
 test "$(adb shell settings get system accelerometer_rotation | tr -d '\r')" = 0
 echo 'ANDROID_SENSOR_ROTATION_WITH_SYSTEM_LOCK=passed'
 adb shell am force-stop pl.tvplayer.preview
 adb shell am instrument -w -r -e class pl.tvplayer.AndroidMovieHttpTest pl.tvplayer.preview.test/androidx.test.runner.AndroidJUnitRunner | tee android-tv-smoke-output/http.txt
 grep -q 'OK (9 tests)' android-tv-smoke-output/http.txt
-echo 'ANDROID_RESPONSIVE_CHECKS_PASSED=28'
+echo 'ANDROID_RESPONSIVE_CHECKS_PASSED=29'
