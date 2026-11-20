@@ -80,7 +80,7 @@ public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
         EditText search=dialog.getWindow().getDecorView().findViewWithTag("android-bouquet-search");
         visible(search); tap(search); instrument().sendStringSync(searchText);
         ListView list=dialog.getWindow().getDecorView().findViewWithTag("android-bouquet-list");
-        waitFor("Bouquet search did not filter the visible list",() -> searchText.contentEquals(search.getText()) && list.getAdapter().getCount()==1 && find(dialog.getWindow().getDecorView(),name)!=null);
+        waitFor("Bouquet search did not filter the visible list",() -> searchText.contentEquals(search.getText()) && list.getAdapter().getCount()==1 && list.getChildCount()==1 && find(list.getChildAt(0),name)!=null);
         screenshot(dialog.getWindow().getDecorView(),"android-bouquets-portrait"); tap(find(dialog.getWindow().getDecorView(),name));
         waitFor("Bouquet selection did not filter the catalogue",() -> { try { return name.equals(field(home,"group")); } catch(Exception error) { return false; } });
     }
@@ -98,7 +98,7 @@ public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
         waitFor("UK preview missing",() -> { try { return preview()!=null; } catch(Exception e) { return false; } }); playing(preview());
         opens(PlayerActivity.class.getName(),() -> tap(find(root(home),"UK Movies test"))); close(child); child=null; waitFor("Library did not resume",home::hasWindowFocus);
         assertEquals("UK | MOVIES",field(home,"group")); AndroidScreenTest.rotate(home,false); assertEquals("UK | MOVIES",field(home,"group")); AndroidScreenTest.rotate(home,true);
-        section("Filmy","movie",movie.name()); selectBouquet("UK VOD","UK"); assertNotNull(find(root(home),otherMovie.name())); assertNull(find(root(home),movie.name()));
-        section("Seriale","series",series.name()); selectBouquet("UK SERIALE","UK"); assertNotNull(find(root(home),otherSeries.name())); assertNull(find(root(home),series.name()));
+        section("Filmy","movie",movie.name()); selectBouquet("UK VOD","UK"); waitFor("Movie bouquet did not render",() -> find(root(home),otherMovie.name())!=null && find(root(home),movie.name())==null);
+        section("Seriale","series",series.name()); selectBouquet("UK SERIALE","UK"); waitFor("Series bouquet did not render",() -> find(root(home),otherSeries.name())!=null && find(root(home),series.name())==null);
     }
 }
