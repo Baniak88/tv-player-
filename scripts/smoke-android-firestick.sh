@@ -8,6 +8,7 @@ cleanup() {
   done
 }
 trap cleanup EXIT
+adb shell settings put secure immersive_mode_confirmations confirmed
 adb install apk/debug/android-debug.apk
 adb shell am start -W -n pl.tvplayer.preview/pl.tvplayer.TvActivity
 adb install -r apk/debug/android-debug.apk
