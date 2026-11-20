@@ -93,7 +93,7 @@ public class AndroidFirestickTouchTest {
         section("TV","tv",a.name()); waitFor("Live preview missing",() -> { try { Object preview=field(home,"livePreview"); return preview!=null && field(preview,"player")!=null; } catch(Exception e) { return false; } }); ExoPlayer preview=(ExoPlayer)field(field(home,"livePreview"),"player"); playing(preview); screenshot(home,"android-firestick-tv");
         // The original TV layout opens full screen by selecting the current channel again.
         opens(PlayerActivity.class.getName(),() -> tap(find(root(home),a.name()))); waitFor("Full screen player missing",() -> { try { return field(child,"player")!=null; } catch(Exception e) { return false; } }); assertSame(preview,field(child,"player"));
-        PlayerView view=(PlayerView)field(child,"view"); instrument().runOnMainSync(view::showController); tap(view.findViewById(androidx.media3.ui.R.id.exo_next)); waitFor("Touch did not switch channel",() -> b.url().equals(child.getIntent().getStringExtra("url"))); playing((ExoPlayer)field(child,"player"));
+        tap(child,"Następny kanał"); waitFor("Touch did not switch channel",() -> b.url().equals(child.getIntent().getStringExtra("url"))); playing((ExoPlayer)field(child,"player"));
     }
     @After public void cleanup() throws Exception { instrument().runOnMainSync(() -> { for(Activity activity:new ArrayList<>(androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED))) activity.finish(); }); close(child); close(home); if(server!=null) server.shutdown(); }
 }
