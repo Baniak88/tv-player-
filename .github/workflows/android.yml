@@ -1,7 +1,7 @@
 name: Android APK
 on:
   push:
-    branches: [main, feature/android-player]
+    branches: [main, feature/android-player, 'fix/android-**']
   pull_request:
   workflow_dispatch:
 concurrency:
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           retention-days: 5
-          name: OKTV-Player-1.1.7
+          name: OKTV-Player-1.1.8
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: OKTV-Player-1.1.7
+          name: OKTV-Player-1.1.8
           path: apk
       - name: Enable KVM
         run: |
@@ -107,7 +107,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: OKTV-Player-1.1.7
+          name: OKTV-Player-1.1.8
           path: apk
       - name: Publish directly installable APK
         env:
@@ -115,12 +115,6 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/app-debug.apk OKTV-Player-1.1.7.apk
-          gh release view v1.1.7 >/dev/null 2>&1 || gh release create v1.1.7 --target "$SOURCE_SHA" --prerelease --title "OKTV Player 1.1.7" --notes "Dźwięk: wbudowany programowy dekoder audio (FFmpeg) dla kanałów z dźwiękiem AC-3/E-AC-3 (Dolby), MP2 i DTS, które wcześniej mogły grać bez dźwięku, szczególnie na Fire TV. Tryb Stereo PCM w Opcjach używa go dla wszystkich formatów."
-          gh api --method PATCH "repos/$GH_REPO/git/refs/tags/v1.1.7" -f sha="$SOURCE_SHA" -F force=false >/dev/null
-          gh release upload v1.1.7 OKTV-Player-1.1.7.apk --clobber
-
-
-
-
-
+          cp apk/debug/app-debug.apk OKTV-Player-1.1.8.apk
+          sha256sum OKTV-Player-1.1.8.apk > SHA256SUMS-Android.txt
+          gh release create v1.1.8 OKTV-Player-1.1.8.apk SHA256SUMS-Android.txt --target "$SOURCE_SHA" --prerelease --latest=false --title "OKTV Player Android 1.1.8" --notes "Wersja na telefony i tablety z Androidem 8+. Zbudowana z aktualnej bazy wydania Fire Stick / Android TV 0.9.16: TV, filmy i seriale z miniaturami dostawcy, podgląd kanałów, buforowanie i dekodery audio FFmpeg. Interfejs dotykowy z obsługą obrotu ekranu. Osobna paczka do pilota: https://github.com/Baniak88/tv-player-/releases/tag/v0.9.16-tv-preview. Instrukcja obu wersji: ANDROID-FIRESTICK.md. Aktualizacja zgodnie podpisanej wersji zachowuje lokalną bibliotekę."

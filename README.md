@@ -1,45 +1,47 @@
 # TV Player — Android
 
-Wersja TV: **OKTV Player TV 0.9.6-preview**. [Prosta instalacja z terminala Chromebooka na Fire Stick](CHROMEBOOK-FIRESTICK.md). [Pozostałe sposoby instalacji na TV](TV-INSTALL.md). [Wygląd interfejsu na bazie OKTV 1.1.6](OKTV-TV-0.9.3.md).
+Aktualne paczki: **Android 1.1.8** na telefon i tablet oraz **TV 0.9.16** na Fire Stick / Android TV. [Pobieranie i instalacja obu wersji](ANDROID-FIRESTICK.md). Wersja telefonu powstaje z aktualnej bazy kodu TV, z interfejsem dotykowym i obsługą obrotu ekranu.
+
+Wersja TV: **OKTV Player TV 0.9.16-preview**. [Prosta instalacja z terminala Chromebooka na Fire Stick](CHROMEBOOK-FIRESTICK.md). [Pozostałe sposoby instalacji na TV](TV-INSTALL.md).
 
 [Nowy interfejs TV i powrót do bukietu 0.9.6](OKTV-TV-0.9.6.md). [Zmiany katalogu TV 0.9.5](OKTV-TV-0.9.5.md). [Raport testów 0.9.5](TEST-TV-0.9.5.md). [Poprzedni raport testów 0.9.4](TEST-TV-0.9.4.md).
 
-Pierwsza wersja natywnego odtwarzacza IPTV po polsku na telefony z Androidem 8.0 lub nowszym.
+Natywny odtwarzacz IPTV po polsku na telefony i tablety z Androidem 8.0 lub nowszym.
 
 ## Funkcje
 
 - M3U/M3U8 z adresu HTTP/HTTPS lub pliku wybranego z telefonu.
 - Xtream Codes: adres serwera (z portem, jeśli wymagany), login i hasło; import telewizji na żywo.
 - Kategorie, wyszukiwanie, ulubione (przytrzymanie kanału).
-- Odtwarzanie przez AndroidX Media3: HLS, DASH i MPEG-TS, zależnie od kodeków urządzenia.
+- Odtwarzanie przez AndroidX Media3: HLS, DASH i MPEG-TS, z dodatkowymi dekoderami audio FFmpeg.
 - Pełny ekran, zmiana orientacji i ponowienie po błędzie.
 - Lokalna biblioteka szyfrowana AES-GCM z kluczem Android Keystore. Kopie zapasowe aplikacji wyłączone.
 
-To początkowa wersja inspirowana funkcjami MyTVOnline+, z własnym interfejsem. Nie zawiera kanałów ani abonamentu. Nie obejmuje jeszcze EPG, VOD, seriali, nagrywania, catch-up ani wielu profili. Metadane tvg-id są odczytywane na potrzeby przyszłego EPG. Nie obsługuje dodatkowych nagłówków z dyrektyw VLC/Kodi w M3U.
+Dostępne są również filmy i seriale z miniaturami dostawcy, podgląd TV, EPG i archiwum. Dostępność transmisji, obrazów, EPG i archiwum zależy od źródła. Aplikacja nie zawiera kanałów ani abonamentu.
 
 ## Instalacja
 
-Workflow **Android APK** buduje APK w GitHub Actions. Po udanym przebiegu otwórz **Actions → Android APK → Artifacts → tv-player-debug**, pobierz i rozpakuj ZIP. Przenieś `app-debug.apk` na telefon i zezwól na instalację z używanej przeglądarki lub menedżera plików.
+[Android 1.1.8](https://github.com/Baniak88/tv-player-/releases/tag/v1.1.8): pobierz `OKTV-Player-1.1.8.apk`, otwórz go na telefonie lub tablecie i zatwierdź instalację. Przy prywatnym repozytorium zaloguj się na konto GitHub z dostępem. [Instrukcja obu wersji i gotowy kod instalacji na Fire Stick](ANDROID-FIRESTICK.md).
 
-APK debug służy do testów. Nie jest wydaniem sklepowym. Przed publikacją potrzebne są testy na urządzeniu i podpis release. Kolejne kompilacje debug z CI mogą mieć inny klucz i wymagać odinstalowania starej wersji (co usuwa bibliotekę).
+Paczki preview nie są wydaniami sklepowymi. Android używa pakietu `pl.tvplayer.preview` i zachowuje dotychczasowy klucz preview. Aktualizacja zgodnie podpisanej wersji zachowuje lokalną bibliotekę bez odinstalowywania. Wersja TV to osobny pakiet `pl.tvplayer.television`.
 
 ## Budowanie
 
 Wymagane: JDK 17, Gradle 8.9, Android SDK 35, Build Tools 35.0.0. Otwórz projekt w Android Studio albo ustaw `ANDROID_HOME` i uruchom:
 
 ```sh
-gradle testDebugUnitTest lintDebug assembleDebug
+gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
 ```
 
 Wynik: `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Prywatność i połączenia
 
-Dane źródła trafiają bezpośrednio do wskazanego dostawcy. Aplikacja nie ma serwera pośredniczącego ani analityki. Hasła znajdują się w adresach Xtream wymaganych przez protokół, dlatego zapisana biblioteka jest szyfrowana. Preferuj HTTPS; HTTP jest dozwolone dla zgodności z dostawcami, lecz przesyła dane bez szyfrowania. Import zastępuje bieżącą bibliotekę; nie zapisuje formularza logowania i nie odświeża źródeł automatycznie. Bibliotekę można usunąć w menu „Dodaj źródło”.
+Dane źródła trafiają bezpośrednio do wskazanego dostawcy. Aplikacja nie ma serwera pośredniczącego ani analityki. Hasła znajdują się w adresach Xtream wymaganych przez protokół, dlatego zapisana biblioteka jest szyfrowana. Preferuj HTTPS; HTTP jest dozwolone dla zgodności z dostawcami, lecz przesyła dane bez szyfrowania. Telefon i telewizor nie synchronizują automatycznie kont ani bibliotek.
 
 ## Walidacja
 
-Kod wymaga kompilacji i testu z rzeczywistym dostawcą na telefonie. Samo przygotowanie kodu nie potwierdza poprawnego odtwarzania. Workflow uruchamia testy parsera, Android Lint i kompilację przed udostępnieniem APK.
+Workflow **Android APK** sprawdza testy JVM, lint, podpis APK, instalację, ponowną instalację i natywne testy ekranów na emulatorze API 35. Raport i zrzuty ekranów znajdują się w artefakcie `Android-install-report`. Artefakty Actions są dostępne przez pięć dni; gotowe APK pozostają w Releases. Testy emulatora nie zastępują sprawdzenia prywatnego źródła na fizycznym urządzeniu.
 
 ## Wersja 0.1.1
 
