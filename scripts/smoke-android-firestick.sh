@@ -18,6 +18,10 @@ adb shell wm dismiss-keyguard
 adb shell am instrument -w -r -e class pl.tvplayer.PlaybackRecoveryTest,pl.tvplayer.PlaybackBandwidthTest,pl.tvplayer.StreamResumptionTest pl.tvplayer.preview.test/androidx.test.runner.AndroidJUnitRunner | tee android-tv-smoke-output/playback.txt
 grep -q 'OK (8 tests)' android-tv-smoke-output/playback.txt
 adb shell am force-stop pl.tvplayer.preview
+# Configure the phone before its process starts, so the first touch test is not
+# observing an Activity being recreated during a density change.
+adb shell wm size 400x800
+adb shell wm density 160
 adb shell am instrument -w -r -e class pl.tvplayer.AndroidFirestickTouchTest pl.tvplayer.preview.test/androidx.test.runner.AndroidJUnitRunner | tee android-tv-smoke-output/touch.txt
 grep -q 'OK (4 tests)' android-tv-smoke-output/touch.txt
 echo 'ANDROID_FIRESTICK_CHECKS_PASSED=12'
