@@ -291,6 +291,7 @@ public final class TvActivity extends Activity {
                         // Only the library already saved on the device is prepared; provider downloads still happen when a section is opened.
                         if(target.type().equals("xtream") && !getPreferences(MODE_PRIVATE).getBoolean("loaded-"+kind,false)) continue;
                         List<Channel> loaded=catalogs.get(kind); if(loaded==null) loaded=new LibraryStore(this).loadSection(kind,new HashSet<>());
+                        if(loaded.isEmpty()) continue; // an empty section is filled when opened (e.g. M3U series from the panel)
                         if(epoch!=sourceEpoch) return;
                         catalogs.put(kind,loaded); TvCatalog.Catalog prepared=presentation(kind,loaded); preparedCatalogs.put(kind,prepared); rememberCount(kind,prepared);
                     }
@@ -309,6 +310,11 @@ public final class TvActivity extends Activity {
             try {
                 List<Channel> loaded=catalogs.get(kind);
                 if(loaded==null) loaded=new LibraryStore(this).loadSection(kind,favorites);
+                // M3U playlists from Xtream panels often omit series; fetch them from the panel once and keep them in the library.
+                if(kind.equals("series") && loaded.isEmpty() && account!=null && account.type().equals("m3u")) {
+                    List<Channel> fetched=M3uSeries.panelSeries(source,account.server(),this::progress);
+                    if(!fetched.isEmpty() && epoch==sourceEpoch) { new LibraryStore(this).updateSection("series",fetched); loaded=fetched; }
+                }
                 if(account!=null && account.type().equals("xtream") && !getPreferences(MODE_PRIVATE).getBoolean("loaded-"+kind,false)) {
                     final List<Channel> cached=loaded; final TvCatalog.Catalog cachedView=presentation(kind,cached);
                     if(!cached.isEmpty()) runOnUiThread(() -> {
