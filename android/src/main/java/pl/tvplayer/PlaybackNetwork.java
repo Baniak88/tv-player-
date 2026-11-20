@@ -1,0 +1,16 @@
+package pl.tvplayer;
+
+import android.content.Context;
+import androidx.media3.datasource.DefaultDataSource;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
+
+/** Android transport; the Fire Stick keeps its original PlaybackNetwork implementation. */
+@androidx.annotation.OptIn(markerClass=androidx.media3.common.util.UnstableApi.class)
+final class PlaybackNetwork {
+    static DefaultMediaSourceFactory sources(Context context,Channel live) {
+        DefaultDataSource.Factory upstream=new DefaultDataSource.Factory(context.getApplicationContext(),AndroidHttpSource::new);
+        if(live==null) return new DefaultMediaSourceFactory(upstream);
+        GuideRepository guide=GuideRepository.get(context);
+        return new DefaultMediaSourceFactory(() -> new EitDataSource(upstream.createDataSource(),live,guide));
+    }
+}
