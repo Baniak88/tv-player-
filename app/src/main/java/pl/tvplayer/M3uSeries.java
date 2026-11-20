@@ -15,6 +15,8 @@ final class M3uSeries {
     private static final Pattern EPISODE = Pattern.compile(
             "(?i)(?<![a-z0-9])(?:s\\s*\\d{1,3}[ ._-]*e\\s*\\d{1,4}|\\d{1,2}x\\d{1,3})(?![a-z0-9])");
     private static final Pattern SERIES_GROUP = Pattern.compile("(?i)\\b(?:series|seriale|seriali)\\b");
+    /** Human-readable outcome of the last load/series check, shown in the status line so problems are visible on the TV. */
+    static volatile String report = "";
     private M3uSeries() { }
 
     /** Downloads the playlist and, for panel playlists, uses the panel's series when they are fuller than the playlist's. */
@@ -31,8 +33,14 @@ final class M3uSeries {
                 }
             }
         }
-        return preferFuller(items, panelSeries(source, address, progress));
+        int tv = 0, movies = 0, own = 0; for (Channel c : items) { if (c.section().equals("tv")) tv++; else if (c.section().equals("movie")) movies++; else own++; }
+        List<Channel> panel = panelSeries(source, address, progress); List<Channel> result = preferFuller(items, panel);
+        int series = 0; for (Channel c : result) if (c.section().equals("series")) series++;
+        report = "Lista: " + Ui.count(tv) + " kanałów · " + Ui.count(movies) + " filmów · seriale: " + Ui.count(series) + (result == items ? " (z listy M3U)" : " (z panelu, lista miała " + Ui.count(own) + ")") + (panelError.isEmpty() ? "" : " · panel: " + panelError);
+        return result;
     }
+    /** Why the last panel series request returned nothing (empty when it succeeded). */
+    static volatile String panelError = "";
 
     /**
      * Keeps whichever series catalogue is fuller: the playlist's own (it may carry just a stray title or two)
@@ -52,12 +60,16 @@ final class M3uSeries {
     static List<Channel> panelSeries(SourceClient source, String address, Consumer<String> progress) {
         try {
             HttpUrl playlist = SourceClient.validate(address);
-            if (playlist.pathSize() == 0 || !playlist.pathSegments().get(playlist.pathSize() - 1).equalsIgnoreCase("get.php")) return Collections.emptyList();
+            panelError = "";
+            if (playlist.pathSize() == 0 || !playlist.pathSegments().get(playlist.pathSize() - 1).equalsIgnoreCase("get.php")) { panelError = "adres listy nie jest z panelu Xtream (get.php)"; return Collections.emptyList(); }
             String user = playlist.queryParameter("username"), password = playlist.queryParameter("password");
-            if (user == null || user.isEmpty() || password == null || password.isEmpty()) return Collections.emptyList();
+            if (user == null || user.isEmpty() || password == null || password.isEmpty()) { panelError = "brak loginu/hasła w adresie listy"; return Collections.emptyList(); }
             HttpUrl panel = playlist.newBuilder().query(null).fragment(null).removePathSegment(playlist.pathSize() - 1).build();
-            return source.xtreamSection(panel.toString(), user, password, "series", progress);
+            List<Channel> series = source.xtreamSection(panel.toString(), user, password, "series", progress);
+            if (series.isEmpty()) panelError = "panel nie ma seriali";
+            return series;
         } catch (Exception unavailable) {
+            panelError = unavailable.getMessage() == null ? unavailable.getClass().getSimpleName() : unavailable.getMessage();
             return Collections.emptyList(); // the playlist stays usable without its optional series catalogue
         }
     }

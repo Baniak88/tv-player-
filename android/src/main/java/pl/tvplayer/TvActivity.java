@@ -317,6 +317,7 @@ public final class TvActivity extends Activity {
                     panelSeriesChecked=true;
                     List<Channel> fuller=M3uSeries.preferFuller(loaded,M3uSeries.panelSeries(source,account.server(),this::progress));
                     if(fuller!=loaded && epoch==sourceEpoch) { new LibraryStore(this).updateSection("series",fuller); loaded=fuller; }
+                    else if(!M3uSeries.panelError.isEmpty()) progress("Seriale z panelu niedostępne: "+M3uSeries.panelError);
                 }
                 if(account!=null && account.type().equals("xtream") && !getPreferences(MODE_PRIVATE).getBoolean("loaded-"+kind,false)) {
                     final List<Channel> cached=loaded; final TvCatalog.Catalog cachedView=presentation(kind,cached);
@@ -766,7 +767,7 @@ public final class TvActivity extends Activity {
         final Set<String> savedFavorites=new HashSet<>(favorites);
         sourceWorker.execute(() -> {
             try {
-                List<Channel> imported=next.type().equals("xtream")?source.xtreamSection(next.server(),next.user(),next.password(),"tv",this::progress):AndroidM3uLibrary.load(source,next.server(),this::progress);
+                List<Channel> imported=next.type().equals("xtream")?source.xtreamSection(next.server(),next.user(),next.password(),"tv",this::progress):M3uSeries.load(source,next.server(),this::progress);
                 if(isDestroyed() || epoch!=sourceEpoch) return;
                 LibraryStore store=new LibraryStore(this);
                 if(sameSource && next.type().equals("xtream") && new java.io.File(getFilesDir(),"catalog.current").isFile()) store.updateSection("tv",imported);
@@ -780,10 +781,12 @@ public final class TvActivity extends Activity {
                     if(sameSource && !current.home()) restoreLocation(current);
                     else if(sameSource) showHome();
                     else { navigationStore().edit().remove("location").remove("last-browse").remove("section-tv").remove("section-movie").remove("section-series").apply(); section="tv"; group=""; query=""; seriesTitle=""; seriesFolderUrl=""; parentLocation=null; pendingLocation=null; catalogGrid=false; home=false; openInitialTv(); }
+                    // What was actually loaded (and what the panel said about series) is shown, so problems are visible on the TV.
+                    if(next.type().equals("m3u") && !M3uSeries.report.isEmpty()) { String report=M3uSeries.report; Toast.makeText(this,report,Toast.LENGTH_LONG).show(); ui.postDelayed(() -> { if(!isDestroyed()) status.setText(report); },1500); }
                 });
                 if(next.type().equals("m3u")) completeLiveGroups(next,epoch);
             } catch(Exception failure) {
-                runOnUiThread(() -> { if(!isDestroyed() && epoch==sourceEpoch) { refreshing=false; busy=false; status.setText("Nie udało się odświeżyć źródła. Zapisana biblioteka pozostaje dostępna."); error("Sprawdź połączenie i dostępność źródła. Zapisana biblioteka pozostaje dostępna."); } });
+                runOnUiThread(() -> { if(!isDestroyed() && epoch==sourceEpoch) { refreshing=false; busy=false; status.setText("Nie udało się odświeżyć źródła. Zapisana biblioteka pozostaje dostępna."); error("Sprawdź połączenie i dostępność źródła. Zapisana biblioteka pozostaje dostępna.\n\nSzczegóły: "+(failure.getMessage()==null?failure.getClass().getSimpleName():failure.getMessage())); } });
             }
         });
     }
