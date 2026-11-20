@@ -55,21 +55,43 @@ public class AndroidFirestickTouchTest {
     }
     protected View root(Activity activity) { return activity.getWindow().getDecorView(); }
     protected View clickable(View view,String label) {
-        if(view.isShown() && view.isClickable() && (label.equals(String.valueOf(view.getContentDescription())) || find(view,label)!=null)) return view;
+        if(!view.isShown()) return null;
+        if(label.equals(String.valueOf(view.getContentDescription())) || view instanceof TextView && label.contentEquals(((TextView)view).getText())) {
+            View target=view;
+            while(!target.isClickable() && target.getParent() instanceof View) target=(View)target.getParent();
+            if(target.isClickable()) return target;
+        }
         if(view instanceof ViewGroup) for(int i=0;i<((ViewGroup)view).getChildCount();i++) { View hit=clickable(((ViewGroup)view).getChildAt(i),label); if(hit!=null) return hit; }
         return null;
     }
-    protected void tap(Activity activity,String label) throws Exception { waitFor("Touch target missing: "+label,() -> clickable(root(activity),label)!=null); tap(clickable(root(activity),label)); }
+    protected void tap(Activity activity,String label) throws Exception {
+        Rect bounds=new Rect();
+        waitFor("Visible touch target missing: "+label,() -> {
+            boolean[] ready={false}; instrument().runOnMainSync(() -> {
+                // A configuration callback can replace the navigation after focus is gained.
+                // Resolve the current view on every pass instead of retaining the old subtree.
+                View target=clickable(root(activity),label);
+                if(target!=null) ready[0]=touchBounds(target,bounds);
+            }); return ready[0];
+        });
+        pointer(bounds);
+    }
+    private boolean touchBounds(View target,Rect bounds) {
+        target.requestRectangleOnScreen(new Rect(0,0,target.getWidth(),target.getHeight()),true);
+        return target.isAttachedToWindow() && target.isShown() && target.getGlobalVisibleRect(bounds) && bounds.width()>0 && bounds.height()>0;
+    }
     protected void tap(View target) throws Exception {
         assertNotNull(target); Rect bounds=new Rect();
         // Window focus may arrive before the first layout after an emulator rotation.
         // Wait for an actual visible touch rectangle, rather than tapping a zero-sized view.
         waitFor("Touch target is outside the viewport",() -> {
             boolean[] ready={false}; instrument().runOnMainSync(() -> {
-                target.requestRectangleOnScreen(new Rect(0,0,target.getWidth(),target.getHeight()),true);
-                ready[0]=target.isAttachedToWindow() && target.isShown() && target.getGlobalVisibleRect(bounds) && bounds.width()>0 && bounds.height()>0;
+                ready[0]=touchBounds(target,bounds);
             }); return ready[0];
         });
+        pointer(bounds);
+    }
+    private void pointer(Rect bounds) throws Exception {
         long now=SystemClock.uptimeMillis(); MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,bounds.exactCenterX(),bounds.exactCenterY(),0),up=MotionEvent.obtain(now,now+80,MotionEvent.ACTION_UP,bounds.exactCenterX(),bounds.exactCenterY(),0);
         try { instrument().sendPointerSync(down); instrument().sendPointerSync(up); } finally { down.recycle(); up.recycle(); } instrument().waitForIdleSync();
     }
