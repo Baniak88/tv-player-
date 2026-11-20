@@ -27,7 +27,7 @@ public class AndroidFirestickTouchTest {
     private MockWebServer server;
     private Channel movie,series,a,b;
     @Before public void setup() throws Exception {
-        landscape(800,400); resetNavigation();
+        landscape(800,400); waitFor("Phone density has not settled",() -> context().getResources().getDisplayMetrics().densityDpi==160); instrument().waitForIdleSync(); resetNavigation();
         new android.util.AtomicFile(new File(context().getFilesDir(),"tv-account.enc")).delete();
         context().getSharedPreferences("watch-progress",0).edit().clear().commit();
         byte[] stream; try(InputStream input=instrument().getContext().getAssets().open("live-controls.ts"); ByteArrayOutputStream out=new ByteArrayOutputStream()) { byte[] bytes=new byte[8192]; for(int n;(n=input.read(bytes))!=-1;) out.write(bytes,0,n); stream=out.toByteArray(); }
@@ -48,7 +48,7 @@ public class AndroidFirestickTouchTest {
     }
     private View root(Activity activity) { return activity.getWindow().getDecorView(); }
     private View clickable(View view,String label) {
-        if(view.isShown() && view.isClickable() && (label.contentEquals(view.getContentDescription()) || find(view,label)!=null)) return view;
+        if(view.isShown() && view.isClickable() && (label.equals(String.valueOf(view.getContentDescription())) || find(view,label)!=null)) return view;
         if(view instanceof ViewGroup) for(int i=0;i<((ViewGroup)view).getChildCount();i++) { View hit=clickable(((ViewGroup)view).getChildAt(i),label); if(hit!=null) return hit; }
         return null;
     }
