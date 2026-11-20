@@ -80,4 +80,4 @@ jobs:
           echo '6e75e4949b117e135b35b3e5ac59133d766ebc364c5cb90cb0418634043e9e39  firestick-original/OKTV-Player-TV.apk' | sha256sum -c -
           cp apk/debug/android-debug.apk OKTV-Player-Android-0.9.22.apk
           sha256sum OKTV-Player-Android-0.9.22.apk > SHA256SUMS-Android.txt
-          gh release create v0.9.22-android OKTV-Player-Android-0.9.22.apk SHA256SUMS-Android.txt --target "$SOURCE_SHA" --prerelease --latest=false --title "OKTV Player Android 0.9.22" --notes "Seriale M3U wybrane z ekranu głównego otwierają odcinki z pełnej biblioteki."
+          gh release create v0.9.22-android OKTV-Player-Android-0.9.22.apk SHA256SUMS-Android.txt --target "$SOURCE_SHA" --prerelease --latest=false --title "OKTV Player Android 0.9.22" --notes "Odśwież źródło, aby ponownie rozpoznać odcinki M3U. Przy pustej sekcji aplikacja sprawdza też katalog seriali dla list get.php z kontem Xtream."

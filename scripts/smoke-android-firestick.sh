@@ -40,5 +40,5 @@ test "$(adb shell settings get system accelerometer_rotation | tr -d '\r')" = 0
 echo 'ANDROID_SENSOR_ROTATION_WITH_SYSTEM_LOCK=passed'
 adb shell am force-stop pl.tvplayer.preview
 adb shell am instrument -w -r -e class pl.tvplayer.AndroidMovieHttpTest pl.tvplayer.preview.test/androidx.test.runner.AndroidJUnitRunner | tee android-tv-smoke-output/http.txt
-grep -q 'OK (9 tests)' android-tv-smoke-output/http.txt
-echo 'ANDROID_RESPONSIVE_CHECKS_PASSED=29'
+grep -q 'OK (11 tests)' android-tv-smoke-output/http.txt
+echo 'ANDROID_RESPONSIVE_CHECKS_PASSED=31'
