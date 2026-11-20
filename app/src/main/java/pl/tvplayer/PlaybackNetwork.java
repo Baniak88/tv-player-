@@ -10,10 +10,11 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 final class PlaybackNetwork {
     static DefaultMediaSourceFactory sources(Context context,Channel live) {
         DefaultHttpDataSource.Factory http=new DefaultHttpDataSource.Factory()
-            .setUserAgent(SourceClient.PLAYER_AGENT).setConnectTimeoutMs(10000).setReadTimeoutMs(12000);
+            .setUserAgent(SourceClient.PLAYER_AGENT).setConnectTimeoutMs(10000).setReadTimeoutMs(12000)
+            .setAllowCrossProtocolRedirects(true); // films and episodes are often redirected from http to an https CDN
         DefaultDataSource.Factory upstream=new DefaultDataSource.Factory(context.getApplicationContext(),http);
-        if(live==null) return new DefaultMediaSourceFactory(upstream);
+        if(live==null) return new DefaultMediaSourceFactory(upstream).setLoadErrorHandlingPolicy(new ProviderLoadErrorPolicy());
         GuideRepository guide=GuideRepository.get(context);
-        return new DefaultMediaSourceFactory(() -> new EitDataSource(upstream.createDataSource(),live,guide));
+        return new DefaultMediaSourceFactory(() -> new EitDataSource(upstream.createDataSource(),live,guide)).setLoadErrorHandlingPolicy(new ProviderLoadErrorPolicy());
     }
 }
