@@ -22,6 +22,7 @@ public final class TvActivity extends Activity {
     /** Background preparation of films, series and channels so opening a section is instant. */
     private final ExecutorService prefetcher=Executors.newSingleThreadExecutor(task -> { Thread thread=new Thread(task,"tv-library-prefetch"); thread.setPriority(Thread.MIN_PRIORITY); return thread; });
     private final Map<String,Object> sectionLocks=new ConcurrentHashMap<>();
+    private volatile boolean panelSeriesChecked;
     private volatile boolean prefetched;
     private final ExecutorService sourceWorker=Executors.newSingleThreadExecutor();
     private volatile int sourceEpoch;
@@ -283,7 +284,7 @@ public final class TvActivity extends Activity {
                         // Only the library already saved on the device is prepared; provider downloads still happen when a section is opened.
                         if(target.type().equals("xtream") && !getPreferences(MODE_PRIVATE).getBoolean("loaded-"+kind,false)) continue;
                         List<Channel> loaded=catalogs.get(kind); if(loaded==null) loaded=new LibraryStore(this).loadSection(kind,new HashSet<>());
-                        if(loaded.isEmpty()) continue; // an empty section is filled when opened (e.g. M3U series from the panel)
+                        if(loaded.isEmpty() || kind.equals("series") && target.type().equals("m3u") && M3uSeries.groups(loaded)<3) continue; // completed from the panel when opened
                         if(epoch!=sourceEpoch) return;
                         catalogs.put(kind,loaded); TvCatalog.Catalog prepared=presentation(kind,loaded); preparedCatalogs.put(kind,prepared); rememberCount(kind,prepared);
                     }
@@ -303,9 +304,11 @@ public final class TvActivity extends Activity {
                 List<Channel> loaded=catalogs.get(kind);
                 if(loaded==null) loaded=new LibraryStore(this).loadSection(kind,favorites);
                 // M3U playlists from Xtream panels often omit series; fetch them from the panel once and keep them in the library.
-                if(kind.equals("series") && loaded.isEmpty() && account!=null && account.type().equals("m3u")) {
-                    List<Channel> fetched=M3uSeries.panelSeries(source,account.server(),this::progress);
-                    if(!fetched.isEmpty() && epoch==sourceEpoch) { new LibraryStore(this).updateSection("series",fetched); loaded=fetched; }
+                // Checked once per source and app start when the saved series look incomplete (fewer than 3 categories).
+                if(kind.equals("series") && M3uSeries.groups(loaded)<3 && account!=null && account.type().equals("m3u") && !panelSeriesChecked) {
+                    panelSeriesChecked=true;
+                    List<Channel> fuller=M3uSeries.preferFuller(loaded,M3uSeries.panelSeries(source,account.server(),this::progress));
+                    if(fuller!=loaded && epoch==sourceEpoch) { new LibraryStore(this).updateSection("series",fuller); loaded=fuller; }
                 }
                 if(account!=null && account.type().equals("xtream") && !getPreferences(MODE_PRIVATE).getBoolean("loaded-"+kind,false)) {
                     final List<Channel> cached=loaded; final TvCatalog.Catalog cachedView=presentation(kind,cached);
@@ -706,7 +709,7 @@ public final class TvActivity extends Activity {
                 if(!sameSource || !next.type().equals("xtream")) flags.putBoolean("loaded-movie",!next.type().equals("xtream")).putBoolean("loaded-series",!next.type().equals("xtream")); flags.apply();
                 runOnUiThread(() -> {
                     if(isDestroyed() || epoch!=sourceEpoch) return;
-                    TvBrowseState current=location(); account=next; catalogs.clear(); preparedCatalogs.clear(); prefetched=false; homePreview=Collections.emptyList(); homeRequest++; busy=false; refreshing=false;
+                    TvBrowseState current=location(); account=next; catalogs.clear(); preparedCatalogs.clear(); prefetched=false; panelSeriesChecked=false; homePreview=Collections.emptyList(); homeRequest++; busy=false; refreshing=false;
                     if(sameSource && !current.home()) restoreLocation(current);
                     else if(sameSource) showHome();
                     else { navigationStore().edit().remove("location").remove("last-browse").remove("section-tv").remove("section-movie").remove("section-series").apply(); section="tv"; group=""; query=""; seriesTitle=""; seriesFolderUrl=""; parentLocation=null; pendingLocation=null; catalogGrid=false; home=false; openInitialTv(); }

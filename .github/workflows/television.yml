@@ -127,11 +127,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.17-preview.apk
+          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.18-preview.apk
           # A fixed file name on the latest release gives Fire TV "Downloader" one permanent link:
           # https://github.com/<owner>/<repo>/releases/latest/download/OKTV-Player-TV.apk
           cp apk/debug/tv-debug.apk OKTV-Player-TV.apk
-          gh release create v0.9.17-tv-preview --target "$SOURCE_SHA" --latest --title "OKTV Player TV 0.9.17 Preview" --notes "Seriale ze źródeł M3U: gdy lista od dostawcy nie zawiera seriali, aplikacja pobiera je z panelu Xtream (jak inne odtwarzacze IPTV)."
-          gh release upload v0.9.17-tv-preview OKTV-Player-TV.apk OKTV-Player-TV-0.9.17-preview.apk bundle/OKTV-FireStick-Chromebook.zip
+          gh release create v0.9.18-tv-preview --target "$SOURCE_SHA" --latest --title "OKTV Player TV 0.9.18 Preview" --notes "Seriale z panelu Xtream także wtedy, gdy lista M3U zawiera tylko pojedyncze seriale – aplikacja wybiera pełniejszy katalog."
+          gh release upload v0.9.18-tv-preview OKTV-Player-TV.apk OKTV-Player-TV-0.9.18-preview.apk bundle/OKTV-FireStick-Chromebook.zip
 
 

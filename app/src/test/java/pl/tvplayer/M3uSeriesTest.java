@@ -29,4 +29,11 @@ public class M3uSeriesTest {
             assertEquals(1,items.size()); assertEquals(1,server.getRequestCount());
         }
     }
+    @Test public void aStrayPlaylistSeriesDoesNotHideThePanelCatalogue() {
+        List<Channel> playlist=new java.util.ArrayList<>(List.of(new Channel("Sport 1","http://h/live/u/p/1.ts","Sport","","tv"),new Channel("Pilot S01E01","http://h/series/u/p/9.mkv","Inne","","episode")));
+        List<Channel> panel=List.of(new Channel("Wiedźmin","http://h/series/u/p/42","|MULTI| NETFLIX SERIALE","","series"),new Channel("Dom","http://h/series/u/p/43","|EN| 4K SERIES","","series"));
+        List<Channel> result=M3uSeries.preferFuller(playlist,panel);
+        assertEquals(3,result.size()); assertEquals(2,M3uSeries.groups(result)); assertTrue(result.stream().anyMatch(c -> c.name().equals("Sport 1")));
+        assertSame("A fuller playlist stays as it is",playlist,M3uSeries.preferFuller(playlist,List.of()));
+    }
 }

@@ -17,9 +17,9 @@ final class M3uSeries {
     private static final Pattern SERIES_GROUP = Pattern.compile("(?i)\\b(?:series|seriale|seriali)\\b");
     private M3uSeries() { }
 
-    /** Downloads the playlist and adds the panel's series when the playlist itself carries none. */
+    /** Downloads the playlist and, for panel playlists, uses the panel's series when they are fuller than the playlist's. */
     static List<Channel> load(SourceClient source, String address, Consumer<String> progress) throws java.io.IOException {
-        List<Channel> items = new java.util.ArrayList<>(source.m3u(address)); boolean hasSeries = false;
+        List<Channel> items = new java.util.ArrayList<>(source.m3u(address));
         for (int i = 0; i < items.size(); i++) {
             Channel item = items.get(i);
             // "S01E02" titles inside a "Series" bouquet are episodes even when the address looks like a film.
@@ -30,11 +30,23 @@ final class M3uSeries {
                     items.set(i, item);
                 }
             }
-            hasSeries |= item.section().equals("series");
         }
-        if (!hasSeries) items.addAll(panelSeries(source, address, progress));
-        return items;
+        return preferFuller(items, panelSeries(source, address, progress));
     }
+
+    /**
+     * Keeps whichever series catalogue is fuller: the playlist's own (it may carry just a stray title or two)
+     * or the panel's. Other sections are never touched.
+     */
+    static List<Channel> preferFuller(List<Channel> items, List<Channel> panel) {
+        if (panel.isEmpty() || groups(panel) <= groups(items) && titles(panel) <= titles(items)) return items;
+        List<Channel> result = new java.util.ArrayList<>(items.size() + panel.size());
+        for (Channel item : items) if (!item.section().equals("series")) result.add(item);
+        result.addAll(panel); return result;
+    }
+    /** Number of series categories in a list (only its series entries count). */
+    static int groups(List<Channel> items) { java.util.Set<String> names = new java.util.HashSet<>(); for (Channel c : items) if (c.section().equals("series")) names.add(c.group()); return names.size(); }
+    private static int titles(List<Channel> items) { int count = 0; for (Channel c : items) if (c.section().equals("series")) count++; return count; }
 
     /** The series catalogue of the panel behind a get.php playlist; empty for plain playlists or when the panel refuses. */
     static List<Channel> panelSeries(SourceClient source, String address, Consumer<String> progress) {
