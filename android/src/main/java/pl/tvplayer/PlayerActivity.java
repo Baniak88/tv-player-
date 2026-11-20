@@ -23,6 +23,7 @@ public class PlayerActivity extends Activity {
     private PlaybackAdjustments adjustments;
     private Button full;
     private Button androidRestart;
+    private android.app.AlertDialog androidOptions;
     private String url, bookmark;
     private long position;
     private boolean fullscreen=true, onDemand, resumed, enteringPip, television;
@@ -54,7 +55,7 @@ public class PlayerActivity extends Activity {
         if(state!=null && state.getBundle("live_channel")!=null) getIntent().replaceExtras(state.getBundle("live_channel"));
         url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }
         television=getIntent().getBooleanExtra("television",false) || (getResources().getConfiguration().uiMode & Configuration.UI_MODE_TYPE_MASK)==Configuration.UI_MODE_TYPE_TELEVISION;
-        if(television) sensorOrientation=ActivityInfo.SCREEN_ORIENTATION_FULL_USER;
+        if(television) sensorOrientation=ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR;
         String kind=getIntent().getStringExtra("kind");
         onDemand=kind!=null?!kind.equals("tv"):!Channel.infer(url,"","").equals("tv");
         try {
@@ -177,9 +178,9 @@ public class PlayerActivity extends Activity {
     }
     @Override public void onWindowFocusChanged(boolean hasFocus) { super.onWindowFocusChanged(hasFocus); if(hasFocus) { restoreImmersive(); if(liveInfo==null) revealLiveControls(); } }
     private void updateFullscreen() {
-        if(television) { fullscreen=true; sensorOrientation=ActivityInfo.SCREEN_ORIENTATION_FULL_USER; }
+        if(television) { fullscreen=true; sensorOrientation=ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR; }
         if(enteringPip || isInPictureInPictureMode()) return;
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
         if(rotation!=null) { if(!television && fullscreen && resumed && !enteringPip && !isInPictureInPictureMode()) rotation.enable(); else rotation.disable(); }
         int flags=fullscreen?View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION:0;
         getWindow().getDecorView().setSystemUiVisibility(flags);
@@ -223,7 +224,7 @@ public class PlayerActivity extends Activity {
         DisplaySettings.pad(toolbar,side,dp(16),side,dp(12)); View controller=view.findViewById(androidx.media3.ui.R.id.exo_controller); if(controller!=null) DisplaySettings.pad(controller,side,dp(16),side,dp(16));
         if(liveInfo!=null) DisplaySettings.pad(liveInfo,side,dp(12),side,dp(12));
     }
-    @Override public void onConfigurationChanged(Configuration config) { super.onConfigurationChanged(config); androidPlayerPadding(); if(!isInPictureInPictureMode()) { updateFullscreen(); revealLiveControls(); } }
+    @Override public void onConfigurationChanged(Configuration config) { super.onConfigurationChanged(config); androidPlayerPadding(); if(!isInPictureInPictureMode()) { updateFullscreen(); revealLiveControls(); } AndroidLayout.fitDialog(this,androidOptions); }
     private void showOptions() {
         List<String> labels=new ArrayList<>(Arrays.asList("Ścieżka audio","Napisy","Odtwórz od początku","Obraz w obrazie (PiP)"));
         if(!onDemand) { labels.add("Program TV i archiwum"); labels.add(RecordingService.active?"Zatrzymaj nagrywanie":"Nagraj kanał do pliku"); }
@@ -257,27 +258,10 @@ public class PlayerActivity extends Activity {
                 case 5: if(RecordingService.active) stopService(new android.content.Intent(this,RecordingService.class)); else chooseRecording(); break;
             }
         };
-        if(television) { televisionOptions(labels,choose); return; }
-        new Ui.Dialog(this).setTitle("Opcje odtwarzania").setAdapter(optionRows(labels),choose).show();
-    }
-    /** TV options: a dark panel of our own (not the light Fire OS dialog) docked inside the overscan-safe area on the right. */
-    private void televisionOptions(List<String> labels,android.content.DialogInterface.OnClickListener choose) {
-        android.app.Dialog panel=new android.app.Dialog(this,android.R.style.Theme_Translucent_NoTitleBar);
-        FrameLayout root=new FrameLayout(this); root.setBackgroundColor(0x66000000); root.setOnClickListener(v -> panel.dismiss());
-        LinearLayout card=new LinearLayout(this); card.setOrientation(LinearLayout.VERTICAL); card.setClickable(true); card.setPadding(0,dp(14),0,dp(10));
-        card.setBackground(Ui.shape(this,0xF2111620,16,0x26FFFFFF)); card.setClipToOutline(true);
-        TextView heading=new TextView(this); heading.setText("Opcje odtwarzania"); heading.setTextSize(18); heading.setTextColor(Ui.TEXT); heading.setTypeface(null,android.graphics.Typeface.BOLD); heading.setPadding(dp(20),0,dp(20),dp(10)); card.addView(heading);
-        ListView list=new ListView(this); list.setAdapter(optionRows(labels)); list.setDivider(new android.graphics.drawable.ColorDrawable(0x14FFFFFF)); list.setDividerHeight(Math.max(1,dp(1)));
-        android.graphics.drawable.StateListDrawable cursor=new android.graphics.drawable.StateListDrawable();
-        android.graphics.drawable.LayerDrawable focused=new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{Ui.shape(this,0x26FFFFFF,0,0),Ui.shape(this,Ui.TV_GOLD,0,0)});
-        focused.setLayerWidth(1,dp(4)); focused.setLayerGravity(1,Gravity.START|Gravity.FILL_VERTICAL);
-        cursor.addState(new int[]{android.R.attr.state_focused},focused); cursor.addState(new int[]{android.R.attr.state_pressed},focused); cursor.addState(new int[]{},new android.graphics.drawable.ColorDrawable(0));
-        list.setSelector(cursor); list.setDrawSelectorOnTop(false); list.setOnItemClickListener((parent,view,index,id) -> { panel.dismiss(); choose.onClick(panel,index); });
-        card.addView(list,new LinearLayout.LayoutParams(-1,0,1));
-        root.addView(card,new FrameLayout.LayoutParams(dp(420),-1,Gravity.END)); DisplaySettings.pad(root,dp(48),dp(32),dp(48),dp(32));
-        panel.setContentView(root); Ui.localize(root);
-        if(panel.getWindow()!=null) { panel.getWindow().setLayout(-1,-1); panel.getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN); }
-        panel.show(); list.requestFocus();
+        // Like Android 1.1.6: an ordinary scrollable dialog, rather than a fixed-width TV panel.
+        if(androidOptions!=null) androidOptions.dismiss();
+        androidOptions=new Ui.Dialog(this).setTitle("Opcje odtwarzania").setAdapter(optionRows(labels),choose).setNegativeButton("Zamknij",null).create();
+        androidOptions.show(); AndroidLayout.fitDialog(this,androidOptions);
     }
     private void chooseAudioOutput() {
         boolean previous=PlaybackAudio.pcm(this);
@@ -520,6 +504,7 @@ public class PlayerActivity extends Activity {
     }
     @Override protected void onDestroy() {
         infoHandler.removeCallbacksAndMessages(null);
+        if(androidOptions!=null) androidOptions.dismiss();
         if(adjustments!=null) adjustments.dismissFeedback();
         if(player!=null) { saveWatchProgress(); closeRecovery(); view.setPlayer(null); player.release(); player=null; }
         stopStreamObservation();

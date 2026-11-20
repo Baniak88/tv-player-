@@ -5,9 +5,9 @@ Podstawą obu paczek jest **Fire Stick 0.9.16**, commit `67fa2975945dc4a92400c56
 | Urządzenie | Odpowiedni plik | Pakiet |
 | --- | --- | --- |
 | Fire Stick / Android TV | [Oryginalny APK TV 0.9.16](https://github.com/Baniak88/tv-player-/releases/download/v0.9.16-tv-preview/OKTV-Player-TV-0.9.16-preview.apk) | `pl.tvplayer.television` |
-| Telefon / tablet z Androidem | [Port Android 0.9.17](https://github.com/Baniak88/tv-player-/releases/download/v0.9.17-android/OKTV-Player-Android-0.9.17.apk) | `pl.tvplayer.preview` |
+| Telefon / tablet z Androidem | [Port Android 0.9.18](https://github.com/Baniak88/tv-player-/releases/download/v0.9.18-android/OKTV-Player-Android-0.9.18.apk) | `pl.tvplayer.preview` |
 
-Błędne wydanie Android 1.1.8 ze starym ekranem telefonu zostało wycofane. Nowy APK Androida ma `versionCode 34` oraz ten sam podpis preview, więc może je zaktualizować pomimo innej nazwy wersji. Instalacja nie wymaga usuwania poprzedniej aplikacji. Konta i biblioteki obu pakietów są lokalne; przy pierwszym uruchomieniu portu może być potrzebne dodanie źródła w Opcje → Źródło.
+Błędne wydanie Android 1.1.8 ze starym ekranem telefonu zostało wycofane. Nowy APK Androida ma `versionCode 35` oraz ten sam podpis preview, więc może je zaktualizować pomimo innej nazwy wersji. Instalacja nie wymaga usuwania poprzedniej aplikacji. Konta i biblioteki obu pakietów są lokalne; przy pierwszym uruchomieniu portu może być potrzebne dodanie źródła w Opcje → Źródło.
 
 ## Przywrócenie oryginalnego Fire Sticka z Chromebooka
 
@@ -34,9 +34,9 @@ Oryginalny APK Fire Sticka ma SHA-256 `6e75e4949b117e135b35b3e5ac59133d766ebc364
 
 ## Instalacja portu na telefonie lub tablecie
 
-1. Otwórz [wydanie Android 0.9.17](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.17-android), zaloguj się na GitHubie, jeśli repozytorium jest prywatne, i pobierz `OKTV-Player-Android-0.9.17.apk`.
+1. Otwórz [wydanie Android 0.9.18](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.18-android), zaloguj się na GitHubie, jeśli repozytorium jest prywatne, i pobierz `OKTV-Player-Android-0.9.18.apk`.
 2. Otwórz APK na urządzeniu i zatwierdź instalację lub aktualizację. Wymagany Android 8.0+.
-3. Aplikacja dostosowuje układ do pionu i poziomu, zgodnie z ustawieniem automatycznego obrotu urządzenia. Zachowuje ciemny interfejs Fire Sticka. Przyciski, plakaty i kanały wybierasz dotykiem. W osobnym module Androida dodano obsługę pojedynczego dotknięcia oraz dotykowe odpowiedniki przycisków pilota podczas oglądania TV: poprzedni/następny kanał, EPG, opcje, informacje i powrót. Strzałki ◀/▶ na pełnym ekranie TV pozostają widoczne, także po obrocie. Dodatkowy pasek opcji chowa się po kilku sekundach; dotknięcie obrazu pokazuje go ponownie. Te dodatki nie są kompilowane do wersji Fire Stick.
+3. Ekran obraca się automatycznie według czujnika telefonu, również przy systemowej blokadzie obrotu. Zachowuje ciemny interfejs Fire Sticka. W pionie przycisk **Bukiety TV / filmów / seriali** otwiera listę grup z wyszukiwaniem; wybrany bukiet pozostaje po obrocie i po powrocie z oglądania. Menu odtwarzacza jest przewijane i dopasowane do szerokości telefonu. Przyciski, plakaty i kanały wybierasz dotykiem. Strzałki ◀/▶ na pełnym ekranie TV pozostają widoczne. Dodatkowy pasek opcji chowa się po kilku sekundach; dotknięcie obrazu pokazuje go ponownie. Te dodatki nie są kompilowane do wersji Fire Stick.
 
 Suma APK znajduje się w `SHA256SUMS-Android.txt` w tym samym wydaniu. Filmy, seriale i kanały korzystają z danych dostawcy; brakujące obrazy mają miniatury zastępcze.
 

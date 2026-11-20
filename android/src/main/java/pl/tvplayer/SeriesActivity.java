@@ -51,7 +51,7 @@ public final class SeriesActivity extends Activity {
         DisplaySettings.apply(this);
         super.onCreate(state); String url=getIntent().getStringExtra("url"); if(url==null) { finish(); return; }
         television=getIntent().getBooleanExtra("television",false)||(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_TYPE_MASK)==android.content.res.Configuration.UI_MODE_TYPE_TELEVISION;
-        if(television) { setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_USER); getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN); }
+        if(television) { setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR); getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN); }
         source=new Channel(getIntent().getStringExtra("name"),url,getIntent().getStringExtra("group"),"","series").withLogo(getIntent().getStringExtra("logo"));
         if(state!=null) selectedSeason=state.getInt("season",0);
         list=new ListView(this); list.setBackgroundColor(Ui.BG); list.setDivider(new ColorDrawable(Ui.BG)); list.setDividerHeight(dp(10)); list.setHeaderDividersEnabled(false); list.setFooterDividersEnabled(false); list.setItemsCanFocus(television); list.setClipToPadding(false);

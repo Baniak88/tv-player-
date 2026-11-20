@@ -30,11 +30,11 @@ jobs:
         run: |
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/build/outputs/apk/debug/android-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging android/build/outputs/apk/debug/android-debug.apk | tee android-package.txt
-          grep -q "name='pl.tvplayer.preview' versionCode='34' versionName='0.9.17-android'" android-package.txt
+          grep -q "name='pl.tvplayer.preview' versionCode='35' versionName='0.9.18-android'" android-package.txt
           grep -q "launchable-activity: name='pl.tvplayer.TvActivity'" android-package.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: OKTV-Android-0.9.17
+          name: OKTV-Android-0.9.18
           retention-days: 5
           path: |
             android/build/outputs/apk/debug/android-debug.apk
@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with: {name: OKTV-Android-0.9.17, path: apk}
+        with: {name: OKTV-Android-0.9.18, path: apk}
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -69,7 +69,7 @@ jobs:
     permissions: {contents: write}
     steps:
       - uses: actions/download-artifact@v4
-        with: {name: OKTV-Android-0.9.17, path: apk}
+        with: {name: OKTV-Android-0.9.18, path: apk}
       - name: Publish Android port while preserving the original TV package
         env:
           GH_TOKEN: ${{ github.token }}
@@ -78,6 +78,6 @@ jobs:
         run: |
           gh release download v0.9.16-tv-preview --pattern OKTV-Player-TV.apk --dir firestick-original
           echo '6e75e4949b117e135b35b3e5ac59133d766ebc364c5cb90cb0418634043e9e39  firestick-original/OKTV-Player-TV.apk' | sha256sum -c -
-          cp apk/debug/android-debug.apk OKTV-Player-Android-0.9.17.apk
-          sha256sum OKTV-Player-Android-0.9.17.apk > SHA256SUMS-Android.txt
-          gh release create v0.9.17-android OKTV-Player-Android-0.9.17.apk SHA256SUMS-Android.txt --target "$SOURCE_SHA" --prerelease --latest=false --title "OKTV Player Android 0.9.17 — obrót, kanały i odtwarzanie" --notes "Poprawki tylko dla Androida: pionowy i poziomy układ TV, filmów i seriali, obrót bez utraty odtwarzania, stale widoczne strzałki zmiany kanałów. Odtwarzacz obsługuje przekierowania HTTP/HTTPS, zgodność User-Agent oraz ograniczony fallback błędnych małych zakresów bajtowych. Błędy dostawcy pokazują konkretny kod HTTP, a nie ogólne Bad HTTP status. Android 8+, pakiet pl.tvplayer.preview, versionCode 34 i dotychczasowy podpis aktualizacji. Oryginalny Fire Stick 0.9.16 i jego APK pozostają bez zmian."
+          cp apk/debug/android-debug.apk OKTV-Player-Android-0.9.18.apk
+          sha256sum OKTV-Player-Android-0.9.18.apk > SHA256SUMS-Android.txt
+          gh release create v0.9.18-android OKTV-Player-Android-0.9.18.apk SHA256SUMS-Android.txt --target "$SOURCE_SHA" --prerelease --latest=false --title "OKTV Player Android 0.9.18 — automatyczny obrót i bukiety" --notes "Poprawki wyłącznie dla Androida: automatyczny obrót czujnikiem również przy systemowej blokadzie obrotu, przewijane menu opcji mieszczące się na ekranie telefonu oraz wyraźny przycisk Bukiety z wyszukiwaniem dla TV, filmów i seriali. Rozwiązania oparte na wersji Android 1.1.6, z zachowaniem obecnego wyglądu. Wybrany bukiet pozostaje po powrocie z oglądania i po obrocie. Android 8+, pakiet pl.tvplayer.preview, versionCode 35 i dotychczasowy podpis aktualizacji. Testy obejmują rzeczywiste wejście czujnika emulatora przy wyłączonym systemowym automatycznym obrocie. Oryginalny Fire Stick 0.9.16 i jego APK pozostają bez zmian."

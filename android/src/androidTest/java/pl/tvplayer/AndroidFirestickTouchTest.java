@@ -89,7 +89,12 @@ public class AndroidFirestickTouchTest {
     }
     private boolean touchBounds(View target,Rect bounds) {
         target.requestRectangleOnScreen(new Rect(0,0,target.getWidth(),target.getHeight()),true);
-        return target.isAttachedToWindow() && target.isShown() && target.getGlobalVisibleRect(bounds) && bounds.width()>0 && bounds.height()>0;
+        if(!target.isAttachedToWindow() || !target.isShown() || !target.getGlobalVisibleRect(bounds) || bounds.width()<=0 || bounds.height()<=0) return false;
+        // Dialog roots are offset from the screen origin. Root-relative rectangles
+        // would tap another row (or the background) in a centred phone dialog.
+        int[] screen=new int[2],window=new int[2]; View root=target.getRootView(); root.getLocationOnScreen(screen); root.getLocationInWindow(window);
+        bounds.offset(screen[0]-window[0],screen[1]-window[1]);
+        android.util.Log.i("TestRunner","Touch "+target.getClass().getSimpleName()+" screen="+bounds+" windowOffset="+(screen[0]-window[0])+","+(screen[1]-window[1])); return true;
     }
     protected void tap(View target) throws Exception {
         assertNotNull(target); Rect bounds=new Rect();
@@ -110,7 +115,10 @@ public class AndroidFirestickTouchTest {
         tap(home,label); waitFor("Section did not load: "+label,() -> { try { return !((Boolean)field(home,"busy")) && kind.equals(field(home,"section")) && find(root(home),title)!=null; } catch(Exception error) { return false; } });
     }
     protected void screenshot(Activity activity,String name) {
-        instrument().runOnMainSync(() -> { View root=root(activity); Bitmap bitmap=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap)); try(FileOutputStream out=context().openFileOutput(name+".png",0)) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } catch(IOException e) { throw new AssertionError(e); } finally { bitmap.recycle(); } });
+        screenshot(root(activity),name);
+    }
+    protected void screenshot(View root,String name) {
+        instrument().runOnMainSync(() -> { Bitmap bitmap=Bitmap.createBitmap(root.getWidth(),root.getHeight(),Bitmap.Config.ARGB_8888); root.draw(new Canvas(bitmap)); try(FileOutputStream out=context().openFileOutput(name+".png",0)) { bitmap.compress(Bitmap.CompressFormat.PNG,100,out); } catch(IOException e) { throw new AssertionError(e); } finally { bitmap.recycle(); } });
     }
     protected void playing(ExoPlayer player) throws Exception { assertNotNull(player); waitFor("Touch playback did not start",() -> { boolean[] ready={false}; instrument().runOnMainSync(() -> ready[0]=player.isPlaying() && player.getAudioFormat()!=null); return ready[0]; }); }
     protected Activity opens(String className,Throwing action) throws Exception { Instrumentation.ActivityMonitor monitor=instrument().addMonitor(className,null,false); try { action.run(); Activity opened=monitor.waitForActivityWithTimeout(15000); assertNotNull("Touch did not open "+className,opened); child=opened; waitFor("Child has no focus",opened::hasWindowFocus); return opened; } finally { instrument().removeMonitor(monitor); } }
