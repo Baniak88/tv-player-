@@ -12,7 +12,7 @@ import org.junit.runner.RunWith;
 import static org.junit.Assert.*;
 import static pl.tvplayer.TvTestUi.*;
 
-/** Includes the four original touch flows and adds real display rotation and persistent arrows. */
+/** Includes the four original touch flows and adds real display rotation and auto-hiding arrows. */
 @androidx.annotation.OptIn(markerClass=androidx.media3.common.util.UnstableApi.class)
 @RunWith(AndroidJUnit4.class)
 public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
@@ -36,10 +36,13 @@ public class AndroidResponsiveTest extends AndroidFirestickTouchTest {
         ExoPlayer player=preview(); int opened=tvRequests.get(); AndroidScreenTest.rotate(home,true); assertSame(player,preview()); playing(preview()); assertEquals("Rotation opened another TV connection",opened,tvRequests.get()); assertEquals("Test TV",field(home,"group")); screenshot(home,"android-tv-portrait");
         AndroidScreenTest.rotate(home,false); assertSame(player,preview()); assertEquals(opened,tvRequests.get()); assertEquals("Test TV",field(home,"group")); screenshot(home,"android-tv-landscape");
     }
-    @Test public void channelArrowsStayVisibleAfterTimeoutAndWorkInBothOrientations() throws Exception {
+    @Test public void channelArrowsHideAfterTimeoutAndWorkInBothOrientations() throws Exception {
         section("TV","tv",a.name()); waitFor("Preview missing",() -> { try { return preview()!=null; } catch(Exception e) { return false; } }); playing(preview());
         opens(PlayerActivity.class.getName(),() -> tap(find(root(home),a.name()))); waitFor("Player missing",() -> { try { return field(child,"player")!=null; } catch(Exception e) { return false; } }); ExoPlayer player=(ExoPlayer)field(child,"player"); int opened=tvRequests.get();
         AndroidScreenTest.rotate(child,true); assertSame(player,field(child,"player")); playing(player); assertEquals(opened,tvRequests.get()); Thread.sleep(7500); instrument().waitForIdleSync();
+        assertFalse(root(child).findViewWithTag("android-channel-previous").isShown());
+        assertFalse(root(child).findViewWithTag("android-channel-next").isShown());
+        tap((View)field(child,"view"));
         visible(clickable(root(child),"Poprzedni kanał")); visible(clickable(root(child),"Następny kanał")); screenshot(child,"android-player-tv-portrait"); tap(child,"Następny kanał"); waitFor("Portrait next channel failed",() -> b.url().equals(child.getIntent().getStringExtra("url"))); playing((ExoPlayer)field(child,"player"));
         AndroidScreenTest.rotate(child,false); visible(clickable(root(child),"Poprzedni kanał")); visible(clickable(root(child),"Następny kanał")); screenshot(child,"android-player-tv-landscape"); tap(child,"Poprzedni kanał"); waitFor("Landscape previous channel failed",() -> a.url().equals(child.getIntent().getStringExtra("url"))); playing((ExoPlayer)field(child,"player"));
     }
