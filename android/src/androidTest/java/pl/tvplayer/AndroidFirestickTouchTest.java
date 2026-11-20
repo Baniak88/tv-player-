@@ -51,6 +51,7 @@ public class AndroidFirestickTouchTest {
             instrument().runOnMainSync(() -> { for(Activity active:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED)) if(active instanceof TvActivity && !active.isFinishing()) home=(TvActivity)active; });
             return home.hasWindowFocus();
         });
+        AndroidScreenTest.rotate(home,false);
     }
     protected View root(Activity activity) { return activity.getWindow().getDecorView(); }
     protected View clickable(View view,String label) {
@@ -60,8 +61,15 @@ public class AndroidFirestickTouchTest {
     }
     protected void tap(Activity activity,String label) throws Exception { waitFor("Touch target missing: "+label,() -> clickable(root(activity),label)!=null); tap(clickable(root(activity),label)); }
     protected void tap(View target) throws Exception {
-        assertNotNull(target); instrument().runOnMainSync(() -> target.requestRectangleOnScreen(new Rect(0,0,target.getWidth(),target.getHeight()),true)); instrument().waitForIdleSync();
-        Rect bounds=new Rect(); assertTrue("Touch target is outside the viewport",target.getGlobalVisibleRect(bounds)); assertTrue(bounds.width()>0 && bounds.height()>0);
+        assertNotNull(target); Rect bounds=new Rect();
+        // Window focus may arrive before the first layout after an emulator rotation.
+        // Wait for an actual visible touch rectangle, rather than tapping a zero-sized view.
+        waitFor("Touch target is outside the viewport",() -> {
+            boolean[] ready={false}; instrument().runOnMainSync(() -> {
+                target.requestRectangleOnScreen(new Rect(0,0,target.getWidth(),target.getHeight()),true);
+                ready[0]=target.isAttachedToWindow() && target.isShown() && target.getGlobalVisibleRect(bounds) && bounds.width()>0 && bounds.height()>0;
+            }); return ready[0];
+        });
         long now=SystemClock.uptimeMillis(); MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,bounds.exactCenterX(),bounds.exactCenterY(),0),up=MotionEvent.obtain(now,now+80,MotionEvent.ACTION_UP,bounds.exactCenterX(),bounds.exactCenterY(),0);
         try { instrument().sendPointerSync(down); instrument().sendPointerSync(up); } finally { down.recycle(); up.recycle(); } instrument().waitForIdleSync();
     }
