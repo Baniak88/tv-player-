@@ -36,7 +36,7 @@ public class StreamResumptionTest {
             instrument.runOnMainSync(() -> {
                 player[0]=new ExoPlayer.Builder(context).setLoadControl(new androidx.media3.exoplayer.DefaultLoadControl.Builder().setBufferDurationsMs(1000,4000,250,500).build()).setMediaSourceFactory(PlaybackNetwork.sources(context,null)).build();
                 player[0].addListener(new Player.Listener() { @Override public void onPlaybackStateChanged(int state) { if(state==Player.STATE_READY) { if(recovering.get()) resumed.countDown(); else firstReady.countDown(); } } });
-                recovery[0]=new PlaybackRecovery(player[0],true,text -> { if(text.contains("ponawianie")) recovering.set(true); });
+                recovery[0]=new PlaybackRecovery(player[0],true,text -> { }); recovery[0].onRetry(() -> recovering.set(true));
                 player[0].setMediaItem(new MediaItem.Builder().setUri(address).setMimeType(MimeTypes.VIDEO_MP2T).build()); player[0].prepare(); player[0].play();
             });
             try { assertTrue("Stream never began before transport failure",firstReady.await(30,TimeUnit.SECONDS)); assertTrue("Playback did not recover after a mid-stream disconnect",resumed.await(60,TimeUnit.SECONDS)); assertTrue(recovering.get()); assertTrue(requests.get()>=3); }
@@ -62,7 +62,7 @@ public class StreamResumptionTest {
             instrument.runOnMainSync(() -> {
                 player[0]=new ExoPlayer.Builder(context).setMediaSourceFactory(PlaybackNetwork.sources(context,null)).build();
                 player[0].addListener(new Player.Listener() { @Override public void onPlaybackStateChanged(int state) { if(state==Player.STATE_READY) ready.countDown(); } });
-                recovery[0]=new PlaybackRecovery(player[0],true,text -> { if(text.contains("ponawianie")) recovering.set(true); });
+                recovery[0]=new PlaybackRecovery(player[0],true,text -> { }); recovery[0].onRetry(() -> recovering.set(true));
                 player[0].setMediaItem(new MediaItem.Builder().setUri(address).setMimeType(MimeTypes.VIDEO_MP2T).build());
                 player[0].prepare(); player[0].play();
             });
