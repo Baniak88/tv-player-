@@ -603,7 +603,7 @@ public final class TvActivity extends Activity {
                 if(row==null) {
                     row=new LinearLayout(TvActivity.this); row.setGravity(Gravity.CENTER_VERTICAL); row.setLayoutParams(new AbsListView.LayoutParams(-1,-2)); row.setMinimumHeight(dp(50)); row.setPadding(dp(10),dp(6),dp(10),dp(6));
                     badge=text("",11,Ui.TEXT); badge.setGravity(Gravity.CENTER); badge.setTypeface(null,Typeface.BOLD); row.addView(badge,new LinearLayout.LayoutParams(dp(32),dp(32)));
-                    LinearLayout copy=column(); copy.setPadding(dp(12),0,0,0); name=text("",15,Ui.TEXT); name.setMaxLines(2); name.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE); name.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE); name.setEllipsize(android.text.TextUtils.TruncateAt.END); copy.addView(name);
+                    LinearLayout copy=column(); copy.setPadding(dp(12),0,0,0); name=text("",15,Ui.TEXT); name.setMaxLines(2); name.setEllipsize(android.text.TextUtils.TruncateAt.END); copy.addView(name);
                     count=text("",12,Ui.MUTED); copy.addView(count); row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
                 } else { badge=(TextView)row.getChildAt(0); LinearLayout copy=(LinearLayout)row.getChildAt(1); name=(TextView)copy.getChildAt(0); count=(TextView)copy.getChildAt(1); }
                 String label=getItem(p); boolean active=p==0?group.isEmpty():group.equals(groups.get(p-1));
