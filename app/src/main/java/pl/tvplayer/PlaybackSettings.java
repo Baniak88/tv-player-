@@ -11,9 +11,9 @@ final class PlaybackSettings {
     static DefaultLoadControl loadControl(Context context) {
         boolean weak=weakInternet(context);
         // Start as quickly as before (1.5 s), but keep a much deeper buffer once playing so short network dips do not stutter.
-        // Larger cushion against provider hiccups: start after 2.5 s (5 s on slow links), resume after a stall only with 6 s
-        // buffered so playback does not stutter on and off, and keep up to a minute ahead.
-        return new DefaultLoadControl.Builder().setBufferDurationsMs(weak?40000:30000,weak?90000:60000,weak?5000:2500,weak?10000:6000)
+        // Start and resume as quickly as before (1.5 s / 3.5 s), but keep a much larger cushion (30-60 s) once playing so
+        // short provider hiccups are absorbed without the picture stopping.
+        return new DefaultLoadControl.Builder().setBufferDurationsMs(weak?40000:30000,weak?90000:60000,weak?4000:1500,weak?6000:3500)
             .setTargetBufferBytes(72*1024*1024).setPrioritizeTimeOverSizeThresholds(false).setBackBuffer(10000,true).build();
     }
     static TrackSelectionParameters tracks(Context context,TrackSelectionParameters current) {
