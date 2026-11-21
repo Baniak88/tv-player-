@@ -39,6 +39,15 @@ public class NavigationTest {
         }
     }
 
+    private boolean eventuallyFullscreen(PlayerActivity player) throws Exception {
+        long deadline=System.currentTimeMillis()+3000;
+        while(System.currentTimeMillis()<deadline) {
+            getInstrumentation().waitForIdleSync();
+            if((player.getWindow().getDecorView().getSystemUiVisibility() & View.SYSTEM_UI_FLAG_FULLSCREEN)!=0) return true;
+            Thread.sleep(100);
+        }
+        return false;
+    }
     private void waitForText(View root,String text) throws Exception {
         long deadline=System.currentTimeMillis()+5000;
         while(System.currentTimeMillis()<deadline) {
@@ -126,6 +135,20 @@ public class NavigationTest {
         if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { android.widget.GridView found=grid(((ViewGroup)root).getChildAt(i)); if(found!=null) return found; }
         return null;
     }
+    /** Taps a sort option and waits until the app saved it; repeats the tap if the dialog was not ready yet. */
+    private void chooseSort(Context context,String label,String mode) throws Exception {
+        android.content.SharedPreferences prefs=context.getSharedPreferences("catalog-ui",Context.MODE_PRIVATE);
+        for(int attempt=0;attempt<3;attempt++) {
+            clickDialog(label);
+            long deadline=System.currentTimeMillis()+2000;
+            while(System.currentTimeMillis()<deadline) {
+                getInstrumentation().waitForIdleSync();
+                if(mode.equals(prefs.getString("sort-tv",""))) { Thread.sleep(200); getInstrumentation().waitForIdleSync(); return; }
+                Thread.sleep(100);
+            }
+        }
+        fail("Sort option was not applied: "+label);
+    }
     private void clickDialog(String text) throws Exception {
         java.util.List<android.view.accessibility.AccessibilityNodeInfo> nodes=new ArrayList<>();
         long deadline=System.currentTimeMillis()+4000;
@@ -158,11 +181,11 @@ public class NavigationTest {
         View catalogRoot=catalog.getWindow().getDecorView(); waitForText(catalogRoot,"Sport");
         assertEquals("Sport",grid(catalogRoot).getAdapter().getItem(1)); assertEquals("Dzieci",grid(catalogRoot).getAdapter().getItem(2));
         getInstrumentation().runOnMainSync(() -> description(catalogRoot,"Sortuj bukiety").performClick());
-        clickDialog("Nazwa A–Z");
+        chooseSort(context,"Nazwa A–Z","az");
         assertEquals("Dzieci",grid(catalogRoot).getAdapter().getItem(1));
         assertEquals("az",context.getSharedPreferences("catalog-ui",Context.MODE_PRIVATE).getString("sort-tv",""));
         getInstrumentation().runOnMainSync(() -> description(catalogRoot,"Sortuj bukiety").performClick());
-        clickDialog("Kolejność dostawcy");
+        chooseSort(context,"Kolejność dostawcy","provider");
         assertEquals("Sport",grid(catalogRoot).getAdapter().getItem(1));
         screenshot("bouquets-grid.png");
         getInstrumentation().runOnMainSync(() -> clickGridText(catalogRoot,"Sport"));
@@ -178,6 +201,12 @@ public class NavigationTest {
             byte[] buffer=new byte[1024]; while(stream.read(buffer)!=-1) {}
         }
     }
+    private void waitLiveToolbar(PlayerActivity player,int visibility) throws Exception {
+        java.lang.reflect.Field field=PlayerActivity.class.getDeclaredField("toolbar"); field.setAccessible(true); View toolbar=(View)field.get(player);
+        long until=System.currentTimeMillis()+7000;
+        while(toolbar.getVisibility()!=visibility && System.currentTimeMillis()<until) { getInstrumentation().waitForIdleSync(); Thread.sleep(80); }
+        assertEquals("Unexpected live toolbar visibility",visibility,toolbar.getVisibility());
+    }
     @Test public void testFullscreenWithSystemRotationLocked() throws Exception {
         Context context=getInstrumentation().getTargetContext();
         int original=android.provider.Settings.System.getInt(context.getContentResolver(),android.provider.Settings.System.ACCELEROMETER_ROTATION,1);
@@ -185,23 +214,149 @@ public class NavigationTest {
         java.io.File ready=new java.io.File(context.getFilesDir(),"rotation-ready"),landscape=new java.io.File(context.getFilesDir(),"rotation-landscape-ok");
         try {
             shell("settings put system accelerometer_rotation 0");
-            player=(PlayerActivity)getInstrumentation().startActivitySync(new Intent(context,PlayerActivity.class).putExtra("url","https://example.com/test.mp4").putExtra("name","Rotation lock test").putExtra("kind","movie").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            getInstrumentation().waitForIdleSync(); Thread.sleep(500); ready.createNewFile();
+            player=(PlayerActivity)getInstrumentation().startActivitySync(new Intent(context,PlayerActivity.class).putExtra("url","https://example.com/test.mp4").putExtra("name","Rotation lock test").putExtra("kind","tv").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            getInstrumentation().waitForIdleSync(); waitLiveToolbar(player,View.VISIBLE); waitLiveToolbar(player,View.GONE); ready.createNewFile();
             long deadline=System.currentTimeMillis()+20000;
             while(player.getResources().getConfiguration().orientation!=android.content.res.Configuration.ORIENTATION_LANDSCAPE && System.currentTimeMillis()<deadline) Thread.sleep(100);
             assertEquals("Physical rotation did not reach landscape",android.content.res.Configuration.ORIENTATION_LANDSCAPE,player.getResources().getConfiguration().orientation);
+            waitLiveToolbar(player,View.VISIBLE);
             int requested=player.getRequestedOrientation();
             assertTrue(requested==ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE || requested==ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
             assertEquals(0,android.provider.Settings.System.getInt(context.getContentResolver(),android.provider.Settings.System.ACCELEROMETER_ROTATION,1));
+            waitLiveToolbar(player,View.GONE);
             landscape.createNewFile(); deadline=System.currentTimeMillis()+20000;
             while(player.getResources().getConfiguration().orientation!=android.content.res.Configuration.ORIENTATION_PORTRAIT && System.currentTimeMillis()<deadline) Thread.sleep(100);
             assertEquals("Physical rotation did not return to portrait",android.content.res.Configuration.ORIENTATION_PORTRAIT,player.getResources().getConfiguration().orientation);
             assertEquals(0,android.provider.Settings.System.getInt(context.getContentResolver(),android.provider.Settings.System.ACCELEROMETER_ROTATION,1));
+            waitLiveToolbar(player,View.VISIBLE);
             android.util.Log.i("RotationTest","Landscape and portrait passed with accelerometer_rotation=0");
         } finally {
             ready.delete(); landscape.delete(); shell("settings put system accelerometer_rotation "+original);
             final PlayerActivity closing=player; if(closing!=null) getInstrumentation().runOnMainSync(closing::finish);
         }
+    }
+    @Test public void testXmltvFallbackAndInlineGuide() throws Exception {
+        Context context=getInstrumentation().getTargetContext();
+        okhttp3.mockwebserver.MockWebServer server=new okhttp3.mockwebserver.MockWebServer();
+        long now=System.currentTimeMillis()/1000;
+        java.time.format.DateTimeFormatter stamp=java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss Z").withZone(java.time.ZoneOffset.UTC);
+        String xml="<tv><channel id=\"tvn.pl\"><display-name>TVN</display-name></channel><channel id=\"tvn7.pl\"><display-name>TVN 7</display-name></channel>";
+        for(String id:new String[]{"tvn.pl","tvn7.pl"}) {
+            xml+="<programme channel=\""+id+"\" start=\""+stamp.format(java.time.Instant.ofEpochSecond(now-900))+"\" stop=\""+stamp.format(java.time.Instant.ofEpochSecond(now+900))+"\"><title>Fakty testowe</title><desc>Opis programu testowego.</desc></programme>";
+            xml+="<programme channel=\""+id+"\" start=\""+stamp.format(java.time.Instant.ofEpochSecond(now+900))+"\" stop=\""+stamp.format(java.time.Instant.ofEpochSecond(now+3600))+"\"><title>Pogoda testowa</title></programme>";
+        }
+        xml+="</tv>";
+        java.io.ByteArrayOutputStream compressed=new java.io.ByteArrayOutputStream();
+        try(java.util.zip.GZIPOutputStream gzip=new java.util.zip.GZIPOutputStream(compressed)) { gzip.write(xml.getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+        final byte[] payload=compressed.toByteArray();
+        final byte[] video;
+        try(java.io.InputStream input=getInstrumentation().getContext().getAssets().open("live-controls.ts");java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream()) { byte[] buffer=new byte[8192]; int count; while((count=input.read(buffer))!=-1) bytes.write(buffer,0,count); video=bytes.toByteArray(); }
+        java.util.concurrent.atomic.AtomicInteger guideDownloads=new java.util.concurrent.atomic.AtomicInteger();
+        server.setDispatcher(new okhttp3.mockwebserver.Dispatcher() {
+            public okhttp3.mockwebserver.MockResponse dispatch(okhttp3.mockwebserver.RecordedRequest request) {
+                if(!request.getPath().startsWith("/epg.xml.gz")) return new okhttp3.mockwebserver.MockResponse().setHeader("Content-Type","video/mp2t").setChunkedBody(new okio.Buffer().write(video),1880);
+                guideDownloads.incrementAndGet();
+                return new okhttp3.mockwebserver.MockResponse().setHeader("Content-Type","application/gzip").setBody(new okio.Buffer().write(payload));
+            }
+        });
+        server.start(); MainActivity activity=null;
+        try {
+            String feed="xmltv:"+server.url("/epg.xml.gz");
+            List<Channel> channels=Arrays.asList(
+                new Channel("PL-VIP| TVN RAW",server.url("/stream1.ts").toString(),"Test EPG","tvn.pl","tv",feed,0,"UTC",0),
+                new Channel("PL-VIP| TVN 7 RAW",server.url("/stream2.ts").toString(),"Test EPG","tvn7.pl","tv",feed,0,"UTC",0));
+            new LibraryStore(context).save(channels,Collections.emptySet());
+            java.util.concurrent.CountDownLatch guideReady=new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.atomic.AtomicReference<GuideRepository.Data> guideData=new java.util.concurrent.atomic.AtomicReference<>();
+            GuideRepository.get(context).request(channels.get(0),true,data -> { guideData.set(data); guideReady.countDown(); });
+            assertTrue("Explicit XMLTV request did not finish",guideReady.await(10,java.util.concurrent.TimeUnit.SECONDS));
+            assertFalse("XMLTV did not contain the current schedule",guideData.get().programs().isEmpty());
+            activity=(MainActivity)getInstrumentation().startActivitySync(new Intent(context,MainActivity.class).putExtra("section","tv").putExtra("bouquet","Test EPG").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            View root=activity.getWindow().getDecorView();
+            long deadline=System.currentTimeMillis()+12000;
+            while(System.currentTimeMillis()<deadline && findContaining(root,"Fakty testowe")==null) { Thread.sleep(100); getInstrumentation().waitForIdleSync(); }
+            assertNotNull("Current programme missing from channel row",findContaining(root,"Fakty testowe"));
+            assertNotNull("Next programme missing from channel row",findContaining(root,"Pogoda testowa"));
+            screenshot("epg-channel-list.png");
+            GuideRepository.Data second=GuideRepository.get(context).peek(channels.get(1),false);
+            if(second==null) { Thread.sleep(500); second=GuideRepository.get(context).peek(channels.get(1),false); }
+            assertNotNull(second); assertFalse(second.programs().isEmpty()); assertEquals(1,guideDownloads.get());
+            GuideRepository.get(context).streamStarted(channels.get(0));
+            try {
+                final MainActivity opened=activity;
+                getInstrumentation().runOnMainSync(() -> GuideDialog.open(opened,channels.get(0),Runnable::run,c -> {}));
+                Thread.sleep(700); getInstrumentation().waitForIdleSync();
+                android.view.accessibility.AccessibilityNodeInfo window=getInstrumentation().getUiAutomation().getRootInActiveWindow();
+                assertFalse("Provider EPG must remain available during playback",window.findAccessibilityNodeInfosByText("Fakty testowe").isEmpty());
+                screenshot("epg-program-dialog.png"); assertEquals(1,guideDownloads.get());
+                getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+            } finally { GuideRepository.get(context).streamStopped(channels.get(0)); }
+        } finally { if(activity!=null) { final MainActivity closing=activity; getInstrumentation().runOnMainSync(closing::finish); } server.shutdown(); }
+    }
+    @Test public void testEitUsesPlaybackBytesAndShowsCachedProgramme() throws Exception {
+        Context context=getInstrumentation().getTargetContext();
+        okhttp3.mockwebserver.MockWebServer server=new okhttp3.mockwebserver.MockWebServer();
+        long start=System.currentTimeMillis()/1000-900;
+        byte[] payload=EitFixture.stream(start);
+        java.util.concurrent.atomic.AtomicInteger streamConnections=new java.util.concurrent.atomic.AtomicInteger();
+        server.setDispatcher(new okhttp3.mockwebserver.Dispatcher() {
+            @Override public okhttp3.mockwebserver.MockResponse dispatch(okhttp3.mockwebserver.RecordedRequest request) {
+                if(request.getPath().startsWith("/live/")) {
+                    streamConnections.incrementAndGet();
+                    return new okhttp3.mockwebserver.MockResponse().setHeader("Content-Type","video/mp2t").setBody(new okio.Buffer().write(payload));
+                }
+                // Catalog startup refreshes provider category ranks independently of EPG.
+                return new okhttp3.mockwebserver.MockResponse().setBody("[]");
+            }
+        });
+        server.start(); MainActivity activity=null;
+        Channel channel=new Channel("PL-VIP| TVN RAW",server.url("/live/u/p/101.ts").toString(),"EPG ze strumienia","tvn.pl","tv");
+        GuideRepository repository=GuideRepository.get(context);
+        repository.streamStarted(channel);
+        java.util.concurrent.atomic.AtomicReference<GuideRepository.Data> waiting=new java.util.concurrent.atomic.AtomicReference<>();
+        StreamGuideProbe watch=repository.requestStream(channel,waiting::set);
+        try {
+            androidx.media3.datasource.DataSource original=new androidx.media3.datasource.DefaultHttpDataSource.Factory().createDataSource();
+            EitDataSource source=new EitDataSource(original,channel,repository);
+            java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();
+            try {
+                source.open(new androidx.media3.datasource.DataSpec(android.net.Uri.parse(channel.url())));
+                byte[] buffer=new byte[97]; int read;
+                while((read=source.read(buffer,0,buffer.length))!=-1) bytes.write(buffer,0,read);
+            } finally { source.close(); }
+            assertArrayEquals("EPG reader modified playback bytes",payload,bytes.toByteArray());
+            long deadline=System.currentTimeMillis()+4000;
+            while(waiting.get()==null && System.currentTimeMillis()<deadline) { Thread.sleep(100); getInstrumentation().waitForIdleSync(); }
+            assertNotNull(waiting.get()); assertEquals("Strumień DVB EIT",waiting.get().source());
+            assertEquals(1,streamConnections.get());
+            assertEquals("Wiadomości ze strumienia",repository.peek(channel,false).programs().get(0).title());
+            repository.streamStopped(channel);
+            // Persistence runs after the active-stream waiter completes.
+            List<Guide.Program> stored=Collections.emptyList();
+            while(stored.isEmpty() && System.currentTimeMillis()<deadline) { stored=new StreamGuideStore(context).load(channel); if(stored.isEmpty()) Thread.sleep(100); }
+            assertFalse("Stream programme was not persisted",stored.isEmpty());
+            new LibraryStore(context).save(Arrays.asList(channel),Collections.emptySet());
+            activity=(MainActivity)getInstrumentation().startActivitySync(new Intent(context,MainActivity.class).putExtra("section","tv").putExtra("bouquet","EPG ze strumienia").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            View root=activity.getWindow().getDecorView(); waitForText(root,"PL-VIP| TVN RAW");
+            assertNotNull(findContaining(root,"Wiadomości ze strumienia")); assertNotNull(findContaining(root,"Następny program"));
+            screenshot("epg-stream-list.png");
+            final MainActivity opened=activity;
+            getInstrumentation().runOnMainSync(() -> GuideDialog.openStream(opened,channel,c -> {}));
+            Thread.sleep(600); getInstrumentation().waitForIdleSync();
+            android.view.accessibility.AccessibilityNodeInfo window=getInstrumentation().getUiAutomation().getRootInActiveWindow();
+            assertFalse(window.findAccessibilityNodeInfosByText("Wiadomości ze strumienia").isEmpty());
+            screenshot("epg-stream-dialog.png"); assertEquals("One manual fixture read plus one active bouquet preview; EPG must not open another stream",2,streamConnections.get());
+            getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
+        } finally {
+            watch.cancel(); repository.streamStopped(channel);
+            if(activity!=null) { final MainActivity closing=activity; getInstrumentation().runOnMainSync(closing::finish); }
+            server.shutdown();
+        }
+    }
+    private View findContaining(View root,String text) {
+        if(root instanceof TextView && ((TextView)root).getText().toString().contains(text)) return root;
+        if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) { View found=findContaining(((ViewGroup)root).getChildAt(i),text); if(found!=null) return found; }
+        return null;
     }
     private View find(View root,String text) {
         if(root instanceof TextView && text.equals(((TextView)root).getText().toString())) return root;
@@ -238,10 +393,12 @@ public class NavigationTest {
         getInstrumentation().runOnMainSync(() -> find(player.getWindow().getDecorView(),"↙").performClick());
         getInstrumentation().waitForIdleSync(); assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,player.getRequestedOrientation());
         getInstrumentation().runOnMainSync(() -> find(player.getWindow().getDecorView(),"⤢").performClick());
-        getInstrumentation().waitForIdleSync(); assertTrue((player.getWindow().getDecorView().getSystemUiVisibility() & View.SYSTEM_UI_FLAG_FULLSCREEN)!=0);
+        getInstrumentation().waitForIdleSync(); assertTrue(eventuallyFullscreen(player));
         getInstrumentation().runOnMainSync(() -> find(player.getWindow().getDecorView(),"Opcje").performClick());
         getInstrumentation().waitForIdleSync();
         getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK);
         getInstrumentation().runOnMainSync(() -> { player.finish(); main.finish(); });
     }
 }
+
+

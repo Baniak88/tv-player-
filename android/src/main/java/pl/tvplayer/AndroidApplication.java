@@ -1,0 +1,93 @@
+package pl.tvplayer;
+
+import android.app.Activity;
+import android.app.Application;
+import android.os.Bundle;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+
+/** Input adapter for the responsive Android port; it is not part of the Fire Stick build. */
+public final class AndroidApplication extends Application {
+    @Override public void onCreate() {
+        super.onCreate();
+        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+            @Override public void onActivityCreated(Activity activity,Bundle state) {
+                View root=activity.getWindow().getDecorView();
+                root.getViewTreeObserver().addOnGlobalLayoutListener(() -> { touchTargets(root); liveControls(activity); });
+            }
+            @Override public void onActivityStarted(Activity activity) { }
+            @Override public void onActivityResumed(Activity activity) { }
+            @Override public void onActivityPaused(Activity activity) { }
+            @Override public void onActivityStopped(Activity activity) { }
+            @Override public void onActivitySaveInstanceState(Activity activity,Bundle state) { }
+            @Override public void onActivityDestroyed(Activity activity) { }
+        });
+    }
+    private static void touchTargets(View view) {
+        // TV controls can consume the first tap just to acquire focus. Android uses ordinary
+        // single-tap buttons; text fields retain touch focus so the on-screen keyboard works.
+        if(!(view instanceof EditText) && view.isFocusableInTouchMode()) view.setFocusableInTouchMode(false);
+        if(view instanceof ViewGroup group) for(int i=0;i<group.getChildCount();i++) touchTargets(group.getChildAt(i));
+    }
+    private static void key(Activity activity,int code) {
+        activity.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,code));
+        activity.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,code));
+    }
+    private static void liveControls(Activity activity) {
+        if(!(activity instanceof PlayerActivity) || !activity.getIntent().getBooleanExtra("television",false) || !"tv".equals(activity.getIntent().getStringExtra("kind"))) return;
+        ViewGroup content=activity.findViewById(android.R.id.content);
+        if(content==null || content.getChildCount()==0 || !(content.getChildAt(0) instanceof FrameLayout stage)) return;
+        View existing=stage.findViewWithTag("android-live-overlay");
+        if(existing!=null) {
+            if(activity.isInPictureInPictureMode()) existing.setVisibility(View.GONE);
+            return;
+        }
+        FrameLayout overlay=new FrameLayout(activity);
+        overlay.setTag("android-live-overlay");
+        stage.addView(overlay,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout controls=new LinearLayout(activity); controls.setTag("android-live-controls"); controls.setPadding(Ui.dp(activity,4),0,Ui.dp(activity,4),0);
+        controls.setBackground(Ui.shape(activity,0xB3101620,12,0));
+        String[] labels={"‹","EPG","⚙","i"};
+        String[] descriptions={"Wróć do listy kanałów","Program TV","Opcje odtwarzania","Informacja o kanale"};
+        int[] keys={KeyEvent.KEYCODE_BACK,KeyEvent.KEYCODE_GUIDE,KeyEvent.KEYCODE_MENU,KeyEvent.KEYCODE_INFO};
+        Runnable hide=() -> overlay.setVisibility(View.GONE);
+        Runnable show=() -> {
+            overlay.removeCallbacks(hide);
+            if(activity.isInPictureInPictureMode()) { hide.run(); return; }
+            overlay.setVisibility(View.VISIBLE);
+            overlay.postDelayed(hide,5000);
+        };
+        for(int i=0;i<labels.length;i++) {
+            final int index=i; Button button=Ui.button(activity,labels[i]); button.setTextSize(i==3?13:20); button.setPadding(0,0,0,0); button.setContentDescription(descriptions[i]); Ui.ghost(button,Ui.TEXT);
+            button.setFocusableInTouchMode(false);
+            button.setOnClickListener(view -> { show.run(); if(index==0) activity.finish(); else key(activity,keys[index]); });
+            controls.addView(button,new LinearLayout.LayoutParams(Ui.dp(activity,48),Ui.dp(activity,48)));
+        }
+        FrameLayout.LayoutParams size=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.END); size.topMargin=Ui.dp(activity,12); size.rightMargin=Ui.dp(activity,16); overlay.addView(controls,size);
+        arrow(activity,overlay,show,"◀","Poprzedni kanał","android-channel-previous",KeyEvent.KEYCODE_MEDIA_PREVIOUS,Gravity.START);
+        arrow(activity,overlay,show,"▶","Następny kanał","android-channel-next",KeyEvent.KEYCODE_MEDIA_NEXT,Gravity.END);
+        // The original live-TV screen hides Media3's buttons and expects remote keys.
+        // Android gets touch equivalents; tapping the picture reveals/hides them.
+        show.run();
+        View.OnClickListener toggle = v -> {
+            if(activity.isInPictureInPictureMode()) return;
+            if(overlay.isShown()) hide.run();
+            else { show.run(); key(activity,KeyEvent.KEYCODE_INFO); }
+        };
+        stage.setOnClickListener(toggle);
+        for(int i=0;i<stage.getChildCount();i++) {
+            if(stage.getChildAt(i) instanceof androidx.media3.ui.PlayerView picture) picture.setOnClickListener(toggle);
+        }
+    }
+    private static void arrow(Activity activity,FrameLayout stage,Runnable show,String label,String description,String tag,int code,int edge) {
+        Button button=Ui.button(activity,label); button.setTag(tag); button.setContentDescription(description); button.setTextSize(22); button.setTextColor(Ui.TV_GOLD); button.setPadding(0,0,0,0); button.setFocusableInTouchMode(false);
+        button.setBackground(Ui.touch(activity,0xB3101620,28,0x55FFFFFF)); button.setOnClickListener(view -> { show.run(); key(activity,code); });
+        FrameLayout.LayoutParams size=new FrameLayout.LayoutParams(Ui.dp(activity,52),Ui.dp(activity,56),edge|Gravity.CENTER_VERTICAL); size.leftMargin=Ui.dp(activity,8); size.rightMargin=Ui.dp(activity,8); stage.addView(button,size);
+    }
+}

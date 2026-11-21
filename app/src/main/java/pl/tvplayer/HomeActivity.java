@@ -15,34 +15,28 @@ public final class HomeActivity extends Activity {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private List<Channel> tv=new ArrayList<>();
     private boolean loadingAccount;
+    private static final java.util.concurrent.atomic.AtomicBoolean PRELOADING=new java.util.concurrent.atomic.AtomicBoolean();
     private int dp(int n) { return (int)(n*getResources().getDisplayMetrics().density); }
     private int scaled(int n) { return dp(Math.round(n*Math.max(1f,getResources().getConfiguration().fontScale))); }
     private LinearLayout column() { LinearLayout l=new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l; }
     private TextView text(String s,int size,int color) { TextView t=new TextView(this); t.setText(s); t.setTextSize(size); t.setTextColor(color); return t; }
-    private GradientDrawable panel(int start,int end,int border) {
-        GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{start,end});
-        d.setCornerRadius(dp(5)); d.setStroke(dp(1),border); return d;
-    }
     private Drawable interactive(boolean prominent) {
-        StateListDrawable states=new StateListDrawable();
-        Drawable selected=panel(0xFFB91C38,0xFF6F0920,0xFFFFD9DF);
-        states.addState(new int[]{android.R.attr.state_pressed},selected);
-        states.addState(new int[]{android.R.attr.state_focused},panel(0xFFAC1932,0xFF720D24,0xFFFFFFFF));
-        states.addState(new int[]{},panel(prominent?0xFF99132B:0xFF471020,prominent?0xFF620B1C:0xFF200E19,prominent?0xFFE24B63:0xFF652032));
-        return states;
+        return Ui.touch(this,prominent?Ui.SURFACE_HIGH:Ui.SURFACE,16,Ui.BORDER);
     }
     private View tile(String label,String icon,boolean large,Runnable click) {
         LinearLayout box=column(); box.setGravity(Gravity.CENTER); box.setPadding(dp(12),dp(10),dp(12),dp(10));
-        box.setBackground(interactive(large)); box.setFocusable(true); box.setClickable(true); box.setContentDescription(label);
-        Icon image=new Icon(this,icon); box.addView(image,new LinearLayout.LayoutParams(dp(large?54:36),dp(large?54:36)));
-        TextView name=text(label,large?22:18,Color.WHITE); name.setGravity(Gravity.CENTER); name.setMaxLines(2);
+        box.setBackground(HomeStyle.tileBackground(this,icon)); box.setElevation(dp(4)); box.setFocusable(true); box.setClickable(true); box.setContentDescription(label);
+        HomeStyle.Icon image=new HomeStyle.Icon(this,icon); box.addView(image,new LinearLayout.LayoutParams(dp(large?54:36),dp(large?54:36)));
+        TextView name=text(label,large?21:17,0xFFFFFFFF); name.setTypeface(null,Typeface.BOLD); name.setGravity(Gravity.CENTER); name.setMaxLines(2);
         name.setPadding(0,dp(large?12:10),0,0); box.addView(name); box.setOnClickListener(v -> click.run()); return box;
     }
     private View action(String label,String icon,Runnable click) {
         LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(14),dp(6),dp(12),dp(6));
         row.setBackground(interactive(false)); row.setFocusable(true); row.setClickable(true); row.setContentDescription(label);
-        row.addView(new Icon(this,icon),new LinearLayout.LayoutParams(dp(24),dp(24)));
-        TextView t=text(label,16,0xFFF1DBE0); t.setPadding(dp(12),0,0,0); t.setMaxLines(2); row.addView(t,new LinearLayout.LayoutParams(0,-2,1));
+        HomeStyle.Icon glyph=new HomeStyle.Icon(this,icon); glyph.tint=Ui.ACCENT; row.addView(glyph,new LinearLayout.LayoutParams(dp(24),dp(24)));
+        TextView t=text(label,15,Ui.TEXT); t.setPadding(dp(12),0,0,0); t.setMaxLines(1); t.setTypeface(null,Typeface.BOLD);
+        // Shrink long labels ("Odśwież źródło") instead of wrapping them onto two lines.
+        if(android.os.Build.VERSION.SDK_INT>=26) t.setAutoSizeTextTypeUniformWithConfiguration(11,15,1,android.util.TypedValue.COMPLEX_UNIT_SP); else t.setEllipsize(android.text.TextUtils.TruncateAt.END); row.addView(t,new LinearLayout.LayoutParams(0,dp(24),1));
         row.setOnClickListener(v -> click.run()); return row;
     }
     private View compactAction(String label,String icon,Runnable click) {
@@ -50,7 +44,17 @@ public final class HomeActivity extends Activity {
         ((TextView)row.getChildAt(1)).setTextSize(14);
         row.getChildAt(0).setLayoutParams(new LinearLayout.LayoutParams(dp(20),dp(20))); return row;
     }
-    @Override public void onCreate(Bundle state) { super.onCreate(state); build(); }
+    @Override public void onCreate(Bundle state) { super.onCreate(state); build(); preload(); }
+    /** Decrypts the library in the background so TV, films and series open instantly. */
+    private void preload() {
+        if(!PRELOADING.compareAndSet(false,true)) return;
+        Context app=getApplicationContext();
+        new Thread(() -> {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+            LibraryStore store=new LibraryStore(app);
+            try { for(String section:new String[]{"tv","movie","series"}) store.warm(section); } finally { PRELOADING.set(false); }
+        },"library-preload").start();
+    }
     private void open(String section,String group,boolean source) {
         Intent intent=new Intent(this,MainActivity.class).putExtra("section",section);
         if(group!=null) intent.putExtra("bouquet",group);
@@ -60,7 +64,7 @@ public final class HomeActivity extends Activity {
     private void build() {
         boolean wide=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;
         LinearLayout root=column();
-        GradientDrawable backdrop=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFF0B1124,0xFF120B18,0xFF290910,0xFF05070C}); root.setBackground(backdrop);
+        root.setBackgroundColor(Ui.BG);
         root.setOnApplyWindowInsetsListener((view,insets) -> {
             view.setPadding(dp(14)+insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),dp(14)+insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
             return insets.consumeSystemWindowInsets();
@@ -68,11 +72,10 @@ public final class HomeActivity extends Activity {
         ScrollView page=new ScrollView(this); page.setFillViewport(true); page.setClipToPadding(false);
         LinearLayout header=column();
         LinearLayout top=new LinearLayout(this); top.setGravity(Gravity.CENTER_VERTICAL); top.setPadding(dp(2),dp(12),dp(2),dp(4));
-        TextView version=text("TV PLAYER  /  0.6",12,0xFFB98997); version.setLetterSpacing(.08f); top.addView(version,new LinearLayout.LayoutParams(0,-2,1));
-        TextClock clock=new TextClock(this); clock.setFormat24Hour("HH:mm"); clock.setFormat12Hour("HH:mm"); clock.setTextColor(0xFFCFB9C5); clock.setTextSize(14); top.addView(clock); header.addView(top);
-        TextView brand=text("TV PLAYER",wide?24:28,Color.WHITE); brand.setTypeface(null,Typeface.BOLD); brand.setLetterSpacing(.1f); brand.setGravity(Gravity.CENTER);
-        brand.setPadding(0,dp(wide?8:18),0,dp(8)); header.addView(brand);
-        TextView tag=text("Wybierz, co chcesz oglądać",14,0xFFC3A7B5); tag.setGravity(Gravity.CENTER); tag.setPadding(0,0,0,dp(wide?12:22)); header.addView(tag);
+        TextView version=text(Ui.APP_NAME.toUpperCase(),13,Ui.ACCENT); version.setTypeface(null,Typeface.BOLD); version.setLetterSpacing(.08f); top.addView(version,new LinearLayout.LayoutParams(0,-2,1));
+        TextClock clock=new TextClock(this); clock.setFormat24Hour("HH:mm"); clock.setFormat12Hour("HH:mm"); clock.setTextColor(Ui.MUTED); clock.setTextSize(14); top.addView(clock); header.addView(top);
+        TextView brand=text("Co oglądamy?",wide?22:26,Ui.TEXT); brand.setTypeface(null,Typeface.BOLD);
+        brand.setPadding(dp(2),dp(wide?6:16),0,dp(wide?12:20)); header.addView(brand);
         int gap=dp(12);
         if(wide) {
             int height=scaled(176);
@@ -100,13 +103,14 @@ public final class HomeActivity extends Activity {
             films.addView(tile("Filmy","movie",false,() -> open("movie",null,false)),filmSize);
             films.addView(tile("Seriale","series",false,() -> open("series",null,false)),new LinearLayout.LayoutParams(0,scaled(124),1));
             LinearLayout.LayoutParams rowSize=new LinearLayout.LayoutParams(-1,-2); rowSize.topMargin=gap; header.addView(films,rowSize);
-            LinearLayout account=new LinearLayout(this);
-            LinearLayout.LayoutParams accountSize=new LinearLayout.LayoutParams(0,scaled(56),1); accountSize.rightMargin=gap;
-            account.addView(action("Konto","account",this::account),accountSize);
-            account.addView(action("Zmień źródło","source",() -> open("tv",null,true)),new LinearLayout.LayoutParams(0,scaled(56),1));
-            LinearLayout.LayoutParams accountRow=new LinearLayout.LayoutParams(-1,-2); accountRow.topMargin=gap; accountRow.bottomMargin=gap; header.addView(account,accountRow);
-            for(View action:new View[]{action("Ustawienia","settings",this::settings),action("Odśwież źródło","refresh",this::refreshSource),action("Wyjście","exit",this::finish)}) {
-                LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,scaled(52)); size.bottomMargin=dp(8); header.addView(action,size);
+            // Everything about the source and the app in one small, labelled 2×2 grid.
+            TextView manage=text("ZARZĄDZANIE",12,Ui.MUTED); manage.setTypeface(null,Typeface.BOLD); manage.setLetterSpacing(.08f); manage.setPadding(dp(4),dp(22),0,dp(10)); header.addView(manage);
+            View[][] grid={{action("Konto","account",this::account),action("Zmień źródło","source",() -> open("tv",null,true))},{action("Odśwież źródło","refresh",this::refreshSource),action("Ustawienia","settings",this::settings)}};
+            for(View[] pair:grid) {
+                LinearLayout line=new LinearLayout(this);
+                LinearLayout.LayoutParams left=new LinearLayout.LayoutParams(0,scaled(56),1); left.rightMargin=gap; line.addView(pair[0],left);
+                line.addView(pair[1],new LinearLayout.LayoutParams(0,scaled(56),1));
+                LinearLayout.LayoutParams lineSize=new LinearLayout.LayoutParams(-1,-2); lineSize.bottomMargin=gap; header.addView(line,lineSize);
             }
         }
         header.setPadding(0,0,0,dp(14)); page.addView(header); root.addView(page,new LinearLayout.LayoutParams(-1,0,1)); setContentView(root);
@@ -131,47 +135,19 @@ public final class HomeActivity extends Activity {
             .setPositiveButton("Zmień źródło",(d,w) -> open("tv",null,true)).setNegativeButton("Zamknij",null).show();
     }
     private void settings() {
-        new AlertDialog.Builder(this).setTitle("Ustawienia").setItems(new String[]{"Dodaj lub zmień źródło","Uprawnienia aplikacji i PiP","Informacje o wersji"},(d,index) -> {
+        new AlertDialog.Builder(this).setTitle("Ustawienia").setItems(new String[]{"Źródło: dodaj lub zmień","Źródło: odśwież listę","Połączenie internetowe (bufor)","Uprawnienia aplikacji i PiP","O aplikacji","Program TV (EPG): własny link XMLTV"},(d,choice) -> {
+            if(choice==5) { EpgSettings.choose(this,() -> Toast.makeText(this,EpgSettings.custom(this)==null?"Używam EPG dostawcy":"Zapisano własne źródło EPG",Toast.LENGTH_SHORT).show()); return; }
+            if(choice==1) { refreshSource(); return; }
+            if(choice==2) { PlaybackSettings.choose(this,() -> {}); return; }
+            int index=choice==0?0:choice-2;
             if(index==0) open("tv",null,true);
             if(index==1) startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+getPackageName())));
-            if(index==2) new AlertDialog.Builder(this).setTitle("TV Player Preview 0.6.0").setMessage("TV, filmy i seriale. Bukiety oraz sortowanie wewnątrz katalogów.\nEPG i archiwum zależą od źródła.").setPositiveButton("OK",null).show();
+            if(index==2) new AlertDialog.Builder(this).setTitle(Ui.APP_NAME+" "+BuildConfig.VERSION_NAME).setMessage("Telewizja na żywo, filmy i seriale z Twojego źródła IPTV.\nProgram TV (EPG) i archiwum zależą od dostawcy.").setPositiveButton("OK",null).show();
         }).show();
     }
     @Override public void onConfigurationChanged(Configuration configuration) { super.onConfigurationChanged(configuration); build(); }
     @Override protected void onDestroy() { worker.shutdown(); super.onDestroy(); }
 
-    private static final class Icon extends View {
-        private final String kind;
-        private final Paint paint=new Paint(3);
-        Icon(Context context,String kind) { super(context); this.kind=kind; setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO); }
-        @Override protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas); canvas.save(); float scale=Math.min(getWidth(),getHeight())/48f;
-            canvas.translate((getWidth()-48*scale)/2,(getHeight()-48*scale)/2); canvas.scale(scale,scale);
-            paint.setColor(Color.WHITE); paint.setStrokeWidth(2.4f); paint.setStyle(Paint.Style.STROKE); paint.setStrokeCap(Paint.Cap.ROUND); paint.setStrokeJoin(Paint.Join.ROUND);
-            switch(kind) {
-                case "tv":
-                    canvas.drawRoundRect(5,12,43,40,5,5,paint); canvas.drawLine(14,4,24,12,paint); canvas.drawLine(34,4,24,12,paint);
-                    canvas.drawRoundRect(11,18,37,34,3,3,paint); play(canvas,22,22,7); break;
-                case "movie": canvas.drawCircle(24,24,18,paint); play(canvas,20,16,13); break;
-                case "series":
-                    canvas.drawRect(6,17,42,40,paint); canvas.drawRect(6,8,42,17,paint);
-                    for(int x=8;x<40;x+=10) canvas.drawLine(x,17,x+7,8,paint); canvas.drawLine(6,23,42,23,paint); break;
-                case "account":
-                    canvas.drawCircle(24,15,7,paint); canvas.drawArc(10,25,38,46,180,180,false,paint);
-                    canvas.drawCircle(9,22,4,paint); canvas.drawCircle(39,22,4,paint); break;
-                case "source":
-                    for(int y=8;y<=32;y+=12) { canvas.drawRoundRect(7,y,41,y+8,2,2,paint); canvas.drawCircle(13,y+4,1,paint); } break;
-                case "settings":
-                    canvas.drawCircle(24,24,12,paint); canvas.drawCircle(24,24,4,paint);
-                    for(int i=0;i<8;i++) { canvas.save(); canvas.rotate(i*45,24,24); canvas.drawLine(24,6,24,11,paint); canvas.restore(); } break;
-                case "refresh":
-                    canvas.drawArc(8,8,40,40,35,285,false,paint); canvas.drawLine(36,4,39,14,paint); canvas.drawLine(39,14,29,13,paint); break;
-                default:
-                    canvas.drawLine(22,6,8,6,paint); canvas.drawLine(8,6,8,42,paint); canvas.drawLine(8,42,22,42,paint);
-                    canvas.drawLine(20,24,43,24,paint); canvas.drawLine(35,16,43,24,paint); canvas.drawLine(43,24,35,32,paint);
-            }
-            canvas.restore();
-        }
-        private void play(Canvas canvas,float x,float y,float size) { Path p=new Path(); p.moveTo(x,y); p.lineTo(x+size,y+size/2); p.lineTo(x,y+size); p.close(); canvas.drawPath(p,paint); }
-    }
+
 }
+

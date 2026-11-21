@@ -15,7 +15,7 @@ public final class RecordingService extends Service {
     private String title="Nagranie";
     @Override public IBinder onBind(Intent intent) { return null; }
     private Notification notification(String text,boolean running) {
-        Notification.Builder builder=new Notification.Builder(this,"recordings").setSmallIcon(pl.tvplayer.R.drawable.ic_player)
+        Notification.Builder builder=(Build.VERSION.SDK_INT>=26?new Notification.Builder(this,"recordings"):new Notification.Builder(this)).setSmallIcon(pl.tvplayer.R.drawable.ic_player)
             .setContentTitle(title).setContentText(text).setOngoing(running).setOnlyAlertOnce(true);
         if(running) {
             PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,RecordingService.class).setAction("STOP"),
@@ -26,7 +26,7 @@ public final class RecordingService extends Service {
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId) {
         NotificationManager manager=getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(new NotificationChannel("recordings","Nagrania TV",NotificationManager.IMPORTANCE_LOW));
+        if(Build.VERSION.SDK_INT>=26) manager.createNotificationChannel(new NotificationChannel("recordings","Nagrania TV",NotificationManager.IMPORTANCE_LOW));
         if(intent==null || "STOP".equals(intent.getAction())) { stopSelf(); return START_NOT_STICKY; }
         if(active) return START_NOT_STICKY;
         title=intent.getStringExtra("name"); if(title==null) title="Nagranie TV";
@@ -42,7 +42,7 @@ public final class RecordingService extends Service {
                 HttpUrl address=SourceClient.validate(url);
                 if(!address.encodedPath().endsWith(".ts")) throw new IOException("Nagrywanie wymaga bezpośredniego strumienia MPEG-TS.");
                 OkHttpClient client=new OkHttpClient.Builder().connectTimeout(20,TimeUnit.SECONDS).readTimeout(30,TimeUnit.SECONDS).build();
-                call=client.newCall(new Request.Builder().url(address).header("User-Agent","TVPlayer/0.4.0").build());
+                call=client.newCall(new Request.Builder().url(address).header("User-Agent",SourceClient.PLAYER_AGENT).build());
                 try(Response response=call.execute()) {
                     if(!response.isSuccessful() || response.body()==null) throw new IOException("Serwer odrzucił nagrywanie.");
                     String content=response.header("Content-Type","");

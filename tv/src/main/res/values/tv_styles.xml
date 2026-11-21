@@ -1,0 +1,8 @@
+<resources>
+    <style name="TvTheme" parent="@style/BaseAppTheme">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:colorAccent">#00A8E1</item>
+    </style>
+</resources>
