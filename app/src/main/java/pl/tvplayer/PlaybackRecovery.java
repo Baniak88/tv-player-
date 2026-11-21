@@ -21,7 +21,7 @@ final class PlaybackRecovery implements Player.Listener {
     /** Restarts a stream that stays in buffering or stops advancing without the player reporting an error. */
     private final Runnable stall=this::checkStall;
     private long lastPosition=-1,lastMoved;
-    private static final long STALL_MS=20000;
+    private static final long STALL_MS=12000;
     PlaybackRecovery(ExoPlayer player,boolean live,Consumer<String> notice) {
         this.player=player; this.live=live; this.notice=notice; player.addListener(this);
         // A player transferred from another screen may already have failed.
@@ -61,7 +61,7 @@ final class PlaybackRecovery implements Player.Listener {
         if(closed || pending || !player.getPlayWhenReady()) return;
         if(attempts>=6) { notice.accept("Nie udało się wznowić. Ponów odtwarzanie lub wybierz inny kanał."); return; }
         long delay=Math.min(8000,1000L<<attempts++); pending=true;
-        notice.accept("Przerwa w połączeniu · ponawianie "+attempts+"/6…"); ui.postDelayed(retry,delay);
+        ui.postDelayed(retry,delay); // retries stay silent; only a final failure is shown
     }
     private void retry() {
         pending=false;
@@ -91,7 +91,7 @@ final class PlaybackRecovery implements Player.Listener {
     /** A silent stall (no error, no progress): reopen the same stream, at the live edge or at the current film position. */
     private void restart() {
         if(attempts>=6) { notice.accept("Nie udało się wznowić. Ponów odtwarzanie lub wybierz inny kanał."); return; }
-        attempts++; notice.accept("Obraz się zatrzymał · ponowne łączenie "+attempts+"/6…");
+        attempts++; // silent: the viewer only sees the picture continue
         long position=player.getCurrentPosition(); player.stop();
         if(live) player.seekToDefaultPosition(); else player.seekTo(position);
         player.prepare(); player.play(); watch();

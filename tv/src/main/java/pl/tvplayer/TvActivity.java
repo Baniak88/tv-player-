@@ -104,6 +104,27 @@ public final class TvActivity extends Activity {
         Button b=Ui.button(this,value); b.setTextSize(17); b.setTextColor(Ui.TEXT); b.setFocusable(true); b.setFocusableInTouchMode(true); b.setBackground(focus(Ui.SURFACE)); b.setOnClickListener(v -> action.run()); return b;
     }
     /** "UK| MOVIES" → "UK", "Sport" → "SP": a short badge for bouquet rows. */
+    /**
+     * "PL| OGÓLNOTEMATYCZNE" → {"PL","Ogólnotematyczne"}: the provider's country tag goes into the round badge and the
+     * shouting all-caps name becomes readable. Names without a tag stay as they are.
+     */
+    private static final Set<String> ACRONYMS=new HashSet<>(Arrays.asList("TV","HD","FHD","UHD","SD","4K","VIP","PL","UK","US","EN","DE","HBO","TVN","TVP","BBC","CNN","ESPN","VOD","PPV","MMA","UFC","NBA","NFL","NHL","F1","AXN","AMC","MTV","ID","USA"));
+    static String[] bouquetLabel(String label) {
+        java.util.regex.Matcher tagged=java.util.regex.Pattern.compile("^\\s*\\|?\\s*([A-Za-z0-9+]{2,5})\\s*\\|\\s*(.+)$").matcher(label);
+        String tag="",name=label.trim();
+        if(tagged.matches()) { tag=tagged.group(1).toUpperCase(Locale.ROOT); name=tagged.group(2).trim(); }
+        if(name.length()>3 && name.equals(name.toUpperCase(Locale.ROOT)) && !name.equals(name.toLowerCase(Locale.ROOT))) {
+            StringBuilder out=new StringBuilder(name.length()); boolean start=true;
+            for(String word:name.toLowerCase(new Locale("pl","PL")).split(" ",-1)) {
+                if(!start) out.append(' '); start=false;
+                // Acronyms, numbers and bracketed tags (TV, HD, VIP, 4K, (NA)) keep their capitals; ordinary words are capitalised.
+                boolean keep=ACRONYMS.contains(word.toUpperCase(Locale.ROOT)) || word.matches(".*[0-9+].*") || word.startsWith("(");
+                out.append(keep?word.toUpperCase(Locale.ROOT):word.isEmpty()?word:Character.toUpperCase(word.charAt(0))+word.substring(1));
+            }
+            name=out.toString();
+        }
+        return new String[]{tag,name};
+    }
     private static String initials(String label) {
         String clean=label.replaceAll("[^\\p{L}\\p{N} ]"," ").trim(); if(clean.isEmpty()) return "•";
         String[] words=clean.split("\\s+"); String first=words[0];
@@ -113,11 +134,13 @@ public final class TvActivity extends Activity {
     private String title(String kind) { return kind.equals("tv")?"Telewizja na żywo":kind.equals("movie")?"Filmy":"Seriale"; }
     @Override protected void attachBaseContext(android.content.Context base) { super.attachBaseContext(base); android.content.res.Configuration scale=DisplaySettings.override(base); if(scale!=null) applyOverrideConfiguration(scale); }
     @Override public void onCreate(Bundle state) {
-        DisplaySettings.apply(this); super.onCreate(state); getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((was,now) -> TvShelfView.trace("focus "+focusName(was)+" -> "+focusName(now)));
+        DisplaySettings.apply(this); super.onCreate(state); 
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON|WindowManager.LayoutParams.FLAG_SECURE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         TvBrowseState location=readLocation(state==null?navigationStore().getString("location",""):state.getString("location",""));
         if(location!=null) applyLocation(location);
+        // Faster start: decrypt and decode the saved section in parallel with the account check, so it is ready when needed.
+        if(!home) { final String warm=section; Thread warming=new Thread(() -> new LibraryStore(getApplicationContext()).warm(warm),"tv-library-warm"); warming.setPriority(Thread.NORM_PRIORITY); warming.start(); }
         build(); loadAccount();
     }
     private void loadAccount() {
@@ -580,12 +603,12 @@ public final class TvActivity extends Activity {
                 if(row==null) {
                     row=new LinearLayout(TvActivity.this); row.setGravity(Gravity.CENTER_VERTICAL); row.setLayoutParams(new AbsListView.LayoutParams(-1,-2)); row.setMinimumHeight(dp(50)); row.setPadding(dp(10),dp(6),dp(10),dp(6));
                     badge=text("",11,Ui.TEXT); badge.setGravity(Gravity.CENTER); badge.setTypeface(null,Typeface.BOLD); row.addView(badge,new LinearLayout.LayoutParams(dp(32),dp(32)));
-                    LinearLayout copy=column(); copy.setPadding(dp(12),0,0,0); name=text("",16,Ui.TEXT); name.setMaxLines(2); name.setEllipsize(android.text.TextUtils.TruncateAt.END); copy.addView(name);
+                    LinearLayout copy=column(); copy.setPadding(dp(12),0,0,0); name=text("",15,Ui.TEXT); name.setMaxLines(2); name.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE); name.setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE); name.setEllipsize(android.text.TextUtils.TruncateAt.END); copy.addView(name);
                     count=text("",12,Ui.MUTED); copy.addView(count); row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
                 } else { badge=(TextView)row.getChildAt(0); LinearLayout copy=(LinearLayout)row.getChildAt(1); name=(TextView)copy.getChildAt(0); count=(TextView)copy.getChildAt(1); }
                 String label=getItem(p); boolean active=p==0?group.isEmpty():group.equals(groups.get(p-1));
-                badge.setText(initials(label)); badge.setTextColor(active?0xFF10141A:Ui.TEXT); badge.setBackground(Ui.shape(TvActivity.this,active?Ui.TV_GOLD:0x1FFFFFFF,16,0));
-                name.setText(label); name.setTextColor(active?Ui.TEXT:0xB3FFFFFF); name.setTypeface(null,active?Typeface.BOLD:Typeface.NORMAL);
+                String[] parts=bouquetLabel(label); badge.setText(parts[0].isEmpty()?initials(label):parts[0]); badge.setTextColor(active?0xFF10141A:Ui.TEXT); badge.setBackground(Ui.shape(TvActivity.this,active?Ui.TV_GOLD:0x1FFFFFFF,16,0));
+                name.setText(parts[1]); name.setContentDescription(label); name.setTextColor(active?Ui.TEXT:0xB3FFFFFF); name.setTypeface(null,active?Typeface.BOLD:Typeface.NORMAL);
                 Integer size=p==0?Integer.valueOf(total):counts.get(groups.get(p-1)); count.setText(size==null?"":Ui.count(size)+(section.equals("tv")?" kanałów":" pozycji")); count.setVisibility(active && size!=null?View.VISIBLE:View.GONE);
                 return row;
             }
