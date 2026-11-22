@@ -45,7 +45,7 @@ public final class SourceClient {
     private <T> T request(OkHttpClient http,HttpUrl url,ReaderTask<T> task,long budgetNanos) throws IOException {
         long budget=budgetNanos>0?budgetNanos:TimeUnit.MILLISECONDS.toNanos(http.callTimeoutMillis());
         long deadline=System.nanoTime()+budget;
-        String agent=agent(url); boolean retried=false;
+        String agent=agent(url); int retries=0;
         while(true) {
             long remaining=deadline-System.nanoTime();
             if(remaining<=0) throw new java.net.SocketTimeoutException("Upłynął czas pobierania danych.");
@@ -61,13 +61,16 @@ public final class SourceClient {
                 if(agent.equals(PLAYER_AGENT)) preferPlayerAgent(url);
                 try(Reader reader=response.body().charStream()) { return task.read(reader); }
             } catch(IOException failure) {
-                if(retried || Thread.currentThread().isInterrupted()
+                // Slow panels often time out once or twice while generating a large list: retry those a few times.
+                boolean slow=failure instanceof java.net.SocketTimeoutException || failure instanceof java.net.ConnectException
+                    || failure instanceof InterruptedIOException && "timeout".equals(failure.getMessage());
+                if(retries>=(slow?3:1) || Thread.currentThread().isInterrupted()
                     || failure instanceof HttpFailure && (!transientStatus(((HttpFailure)failure).code) || !((HttpFailure)failure).retrySoon)
                     || failure instanceof javax.net.ssl.SSLException
                     || failure instanceof com.google.gson.stream.MalformedJsonException
                     || deadline-System.nanoTime()<TimeUnit.SECONDS.toNanos(1)) throw failure;
-                retried=true;
-                try { Thread.sleep(1000); } catch(InterruptedException interrupted) {
+                retries++;
+                try { Thread.sleep(1000L*retries); } catch(InterruptedException interrupted) {
                     Thread.currentThread().interrupt(); throw new InterruptedIOException("Pobieranie anulowane.");
                 }
             }

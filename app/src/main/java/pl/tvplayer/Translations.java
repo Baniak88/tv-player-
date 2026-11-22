@@ -51,7 +51,9 @@ final class Translations {
             "Brak pozycji. Wybierz kategorię lub odśwież źródło.", "Nothing here. Choose a category or refresh the source.",
             "Aktualizacja źródła w tle…", "Updating source in the background…", "Łączenie ze źródłem…", "Connecting to source…",
             "Zapisana biblioteka · sprawdzanie aktualizacji…", "Saved library · checking for updates…", "Dostawca niedostępny · korzystasz z zapisanej biblioteki.", "Provider unavailable · using the saved library.",
-            "Program TV", "TV guide", "Program TV (EPG)", "TV guide (EPG)", "Szukaj w sekcji", "Search this section", "Hasło", "Password", "Login", "Username");
+            "Program TV", "TV guide", "Program TV (EPG)", "TV guide (EPG)", "Szukaj w sekcji", "Search this section", "Hasło", "Password",
+            "Dostawca chwilowo nie odpowiada · korzystasz z zapisanej biblioteki.", "The provider is not responding · using the saved library.",
+            "Nie udało się połączyć ze źródłem.", "Could not connect to the source.", "Login", "Username");
         rule("^(\\d[\\d ]*) pozycji(.*)$", "$1 items$2");
         rule("^(\\d[\\d ]*) kanałów(.*)$", "$1 channels$2");
         rule("^Pokaż wszystkie · (.*)$", "Show all · $1");

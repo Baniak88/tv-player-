@@ -27,6 +27,7 @@ public final class TvActivity extends Activity {
     private final ExecutorService sourceWorker=Executors.newSingleThreadExecutor();
     private volatile int sourceEpoch;
     private boolean refreshing;
+    private int quietRetries;
     private LivePreview livePreview;
     private String fullscreenToken;
     private static final int LIVE_FULLSCREEN=86;
@@ -790,7 +791,7 @@ public final class TvActivity extends Activity {
     private void refresh() { if(busy) return; if(account==null) sourceDialog(); else importSource(account); }
     private void importSource(TvAccountStore.Account next) {
         if(busy || refreshing) return;
-        final boolean sameSource=next.equals(account); refreshing=true; busy=!sameSource || !catalogReady; final int epoch=++sourceEpoch; generation++;
+        final boolean sameSource=next.equals(account), background=sameSource && catalogReady; refreshing=true; busy=!sameSource || !catalogReady; final int epoch=++sourceEpoch; generation++;
         status.setText(sameSource && catalogReady?"Aktualizacja źródła w tle…":"Łączenie ze źródłem…");
         final Set<String> savedFavorites=new HashSet<>(favorites);
         sourceWorker.execute(() -> {
@@ -805,7 +806,7 @@ public final class TvActivity extends Activity {
                 if(!sameSource || !next.type().equals("xtream")) flags.putBoolean("loaded-movie",!next.type().equals("xtream")).putBoolean("loaded-series",!next.type().equals("xtream")); flags.apply();
                 runOnUiThread(() -> {
                     if(isDestroyed() || epoch!=sourceEpoch) return;
-                    TvBrowseState current=location(); account=next; catalogs.clear(); preparedCatalogs.clear(); prefetched=false; panelSeriesChecked=false; homePreview=Collections.emptyList(); homeRequest++; busy=false; refreshing=false;
+                    TvBrowseState current=location(); account=next; quietRetries=0; catalogs.clear(); preparedCatalogs.clear(); prefetched=false; panelSeriesChecked=false; homePreview=Collections.emptyList(); homeRequest++; busy=false; refreshing=false;
                     if(sameSource && !current.home()) restoreLocation(current);
                     else if(sameSource) showHome();
                     else { navigationStore().edit().remove("location").remove("last-browse").remove("section-tv").remove("section-movie").remove("section-series").apply(); section="tv"; group=""; query=""; seriesTitle=""; seriesFolderUrl=""; parentLocation=null; pendingLocation=null; catalogGrid=false; home=false; openInitialTv(); }
@@ -814,9 +815,25 @@ public final class TvActivity extends Activity {
                 });
                 if(next.type().equals("m3u")) completeLiveGroups(next,epoch);
             } catch(Exception failure) {
-                runOnUiThread(() -> { if(!isDestroyed() && epoch==sourceEpoch) { refreshing=false; busy=false; status.setText("Nie udało się odświeżyć źródła. Zapisana biblioteka pozostaje dostępna."); error("Sprawdź połączenie i dostępność źródła. Zapisana biblioteka pozostaje dostępna.\n\nSzczegóły: "+(failure.getMessage()==null?failure.getClass().getSimpleName():failure.getMessage())); } });
+                runOnUiThread(() -> {
+                    if(isDestroyed() || epoch!=sourceEpoch) return;
+                    refreshing=false; busy=false;
+                    // A background refresh with a saved library is not worth a dialog: keep watching, try again quietly later.
+                    if(background) { status.setText("Dostawca chwilowo nie odpowiada · korzystasz z zapisanej biblioteki."); if(quietRetries++<2) ui.postDelayed(() -> { if(!isDestroyed() && !busy && !refreshing && next.equals(account)) importSource(next); },60000); return; }
+                    status.setText("Nie udało się połączyć ze źródłem.");
+                    error("Serwer dostawcy nie odpowiedział.\n\n"+describe(failure)+"\n\nSpróbuj ponownie za chwilę (Opcje → Odśwież źródło).");
+                });
             }
         });
+    }
+    /** A plain-language reason for a failed source download. */
+    private static String describe(Exception failure) {
+        String message=failure.getMessage()==null?"":failure.getMessage();
+        if(failure instanceof java.net.SocketTimeoutException || failure instanceof java.io.InterruptedIOException && message.equalsIgnoreCase("timeout") || message.startsWith("Upłynął czas"))
+            return "Lista nie dotarła na czas — serwer jest przeciążony lub połączenie jest wolne.";
+        if(failure instanceof java.net.UnknownHostException) return "Brak internetu albo nieprawidłowy adres serwera.";
+        if(failure instanceof java.net.ConnectException) return "Serwer odrzucił połączenie.";
+        return message.isEmpty()?failure.getClass().getSimpleName():message;
     }
     private void openInitialTv() { catalogReady=false; items=new ArrayList<>(); shown=new ArrayList<>(); groups=new ArrayList<>(); showCatalog(); load("tv"); }
     private void completeLiveGroups(TvAccountStore.Account expected,int epoch) {
