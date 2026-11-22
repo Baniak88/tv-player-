@@ -21,7 +21,12 @@ final class M3uSeries {
 
     /** Downloads the playlist and, for panel playlists, uses the panel's series when they are fuller than the playlist's. */
     static List<Channel> load(SourceClient source, String address, Consumer<String> progress) throws java.io.IOException {
-        List<Channel> items = new java.util.ArrayList<>(source.m3u(address));
+        // The panel's series catalogue downloads at the same time as the playlist instead of after it.
+        java.util.concurrent.FutureTask<List<Channel>> panelTask = new java.util.concurrent.FutureTask<>(() -> panelSeries(source, address, progress));
+        Thread panelThread = new Thread(panelTask, "m3u-series"); panelThread.setDaemon(true); panelThread.start();
+        List<Channel> items;
+        try { items = new java.util.ArrayList<>(source.m3u(address)); }
+        catch (java.io.IOException | RuntimeException failure) { panelThread.interrupt(); throw failure; }
         for (int i = 0; i < items.size(); i++) {
             Channel item = items.get(i);
             // "S01E02" titles inside a "Series" bouquet are episodes even when the address looks like a film.
@@ -34,7 +39,11 @@ final class M3uSeries {
             }
         }
         int tv = 0, movies = 0, own = 0; for (Channel c : items) { if (c.section().equals("tv")) tv++; else if (c.section().equals("movie")) movies++; else own++; }
-        List<Channel> panel = panelSeries(source, address, progress); List<Channel> result = preferFuller(items, panel);
+        List<Channel> panel;
+        try { panel = panelTask.get(); }
+        catch (InterruptedException interrupted) { panelThread.interrupt(); Thread.currentThread().interrupt(); throw new java.io.InterruptedIOException("Pobieranie anulowane."); }
+        catch (java.util.concurrent.ExecutionException impossible) { panel = Collections.emptyList(); } // panelSeries never throws
+        List<Channel> result = preferFuller(items, panel);
         int series = 0; for (Channel c : result) if (c.section().equals("series")) series++;
         report = "Lista: " + Ui.count(tv) + " kanałów · " + Ui.count(movies) + " filmów · seriale: " + Ui.count(series) + (result == items ? " (z listy M3U)" : " (z panelu, lista miała " + Ui.count(own) + ")") + (panelError.isEmpty() ? "" : " · panel: " + panelError);
         return result;

@@ -63,7 +63,8 @@ final class PlaybackRecovery implements Player.Listener {
     private void schedule() {
         if(closed || pending || !player.getPlayWhenReady()) return;
         if(attempts>=6) { notice.accept("Nie udało się wznowić. Ponów odtwarzanie lub wybierz inny kanał."); return; }
-        long delay=Math.min(8000,1000L<<attempts++); pending=true;
+        // A live stream the server simply closed is not a failure: reconnect at once; real errors back off 1 s, 2 s, 4 s…
+        long delay=live && attempts==0 && player.getPlaybackState()==Player.STATE_ENDED?0:Math.min(8000,1000L<<attempts); attempts++; pending=true;
         retrying.run(); ui.postDelayed(retry,delay); // retries stay silent; only a final failure is shown
     }
     private void retry() {

@@ -13,6 +13,11 @@ import java.util.Map;
 @androidx.annotation.OptIn(markerClass=androidx.media3.common.util.UnstableApi.class)
 final class ProviderLoadErrorPolicy extends DefaultLoadErrorHandlingPolicy {
     private static final long DEFAULT_WAIT_MS = 5000, MAX_WAIT_MS = 30000;
+    /** Films and episodes resume byte-exact after a dropped connection, so they retry quietly for longer while the buffer plays. */
+    private final boolean onDemand;
+    ProviderLoadErrorPolicy() { this(false); }
+    ProviderLoadErrorPolicy(boolean onDemand) { this.onDemand = onDemand; }
+    @Override public int getMinimumLoadableRetryCount(int dataType) { return onDemand ? 10 : super.getMinimumLoadableRetryCount(dataType); }
 
     @Override public long getRetryDelayMsFor(LoadErrorInfo info) {
         for (Throwable cause = info.exception; cause != null; cause = cause.getCause()) {
@@ -27,6 +32,8 @@ final class ProviderLoadErrorPolicy extends DefaultLoadErrorHandlingPolicy {
                 return DEFAULT_WAIT_MS;
             }
         }
-        return super.getRetryDelayMsFor(info);
+        long delay = super.getRetryDelayMsFor(info);
+        // Default backoff grows to 5 s; for films reconnect sooner (at most 3 s) so the buffer rarely runs dry.
+        return onDemand && delay != C.TIME_UNSET ? Math.min(delay, 3000) : delay;
     }
 }
