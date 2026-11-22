@@ -1,41 +1,47 @@
 # TV Player — Android
 
-Pierwsza wersja natywnego odtwarzacza IPTV po polsku na telefony z Androidem 8.0 lub nowszym.
+Oryginalny **Fire Stick 0.9.16** i jego bezpośredni **port Android 0.9.22**. Android zachowuje styl Fire Sticka, dostosowując ekrany TV, filmów i seriali do pionu i poziomu. Strzałki kanałów chowają się po 5 sekundach i wracają po dotknięciu obrazu. [Przywrócenie Fire Sticka i instalacja portu na Androidzie](ANDROID-FIRESTICK.md). Błędne wydanie Android 1.1.8 ze starym ekranem telefonu zostało wycofane.
+
+Wersja TV: **OKTV Player TV 0.9.16-preview**. [Prosta instalacja z terminala Chromebooka na Fire Stick](CHROMEBOOK-FIRESTICK.md). [Pozostałe sposoby instalacji na TV](TV-INSTALL.md).
+
+[Nowy interfejs TV i powrót do bukietu 0.9.6](OKTV-TV-0.9.6.md). [Zmiany katalogu TV 0.9.5](OKTV-TV-0.9.5.md). [Raport testów 0.9.5](TEST-TV-0.9.5.md). [Poprzedni raport testów 0.9.4](TEST-TV-0.9.4.md).
+
+Natywny odtwarzacz IPTV po polsku na telefony i tablety z Androidem 8.0 lub nowszym.
 
 ## Funkcje
 
 - M3U/M3U8 z adresu HTTP/HTTPS lub pliku wybranego z telefonu.
 - Xtream Codes: adres serwera (z portem, jeśli wymagany), login i hasło; import telewizji na żywo.
 - Kategorie, wyszukiwanie, ulubione (przytrzymanie kanału).
-- Odtwarzanie przez AndroidX Media3: HLS, DASH i MPEG-TS, zależnie od kodeków urządzenia.
+- Odtwarzanie przez AndroidX Media3: HLS, DASH i MPEG-TS, z dodatkowymi dekoderami audio FFmpeg.
 - Pełny ekran, zmiana orientacji i ponowienie po błędzie.
 - Lokalna biblioteka szyfrowana AES-GCM z kluczem Android Keystore. Kopie zapasowe aplikacji wyłączone.
 
-To początkowa wersja inspirowana funkcjami MyTVOnline+, z własnym interfejsem. Nie zawiera kanałów ani abonamentu. Nie obejmuje jeszcze EPG, VOD, seriali, nagrywania, catch-up ani wielu profili. Metadane tvg-id są odczytywane na potrzeby przyszłego EPG. Nie obsługuje dodatkowych nagłówków z dyrektyw VLC/Kodi w M3U.
+Dostępne są również filmy i seriale z miniaturami dostawcy, podgląd TV, EPG i archiwum. Dostępność transmisji, obrazów, EPG i archiwum zależy od źródła. Aplikacja nie zawiera kanałów ani abonamentu.
 
 ## Instalacja
 
-Workflow **Android APK** buduje APK w GitHub Actions. Po udanym przebiegu otwórz **Actions → Android APK → Artifacts → tv-player-debug**, pobierz i rozpakuj ZIP. Przenieś `app-debug.apk` na telefon i zezwól na instalację z używanej przeglądarki lub menedżera plików.
+[Port Android 0.9.22](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.22-android): pobierz `OKTV-Player-Android-0.9.22.apk`, otwórz go na telefonie lub tablecie i zatwierdź instalację. Przy prywatnym repozytorium zaloguj się na konto GitHub z dostępem. [Oryginalny Fire Stick 0.9.16](https://github.com/Baniak88/tv-player-/releases/tag/v0.9.16-tv-preview) pozostaje osobno, z niezmienionym APK. [Instrukcja obu wersji i gotowy kod przywrócenia Fire Sticka](ANDROID-FIRESTICK.md).
 
-APK debug służy do testów. Nie jest wydaniem sklepowym. Przed publikacją potrzebne są testy na urządzeniu i podpis release. Kolejne kompilacje debug z CI mogą mieć inny klucz i wymagać odinstalowania starej wersji (co usuwa bibliotekę).
+Paczki preview nie są wydaniami sklepowymi. Android używa pakietu `pl.tvplayer.preview` i zachowuje dotychczasowy klucz preview. Aktualizacja zgodnie podpisanej wersji zachowuje lokalną bibliotekę bez odinstalowywania. Wersja TV to osobny pakiet `pl.tvplayer.television`.
 
 ## Budowanie
 
 Wymagane: JDK 17, Gradle 8.9, Android SDK 35, Build Tools 35.0.0. Otwórz projekt w Android Studio albo ustaw `ANDROID_HOME` i uruchom:
 
 ```sh
-gradle testDebugUnitTest lintDebug assembleDebug
+gradle :app:testDebugUnitTest :android:lintDebug :android:assembleDebug :android:assembleDebugAndroidTest
 ```
 
-Wynik: `app/build/outputs/apk/debug/app-debug.apk`.
+Wynik portu: `android/build/outputs/apk/debug/android-debug.apk`. Moduł `:android` zachowuje styl TV, z osobnym manifestem oraz wariantami ekranów i połączeń dla telefonu. Odtwarzanie obsługuje przekierowania HTTP/HTTPS i pokazuje konkretne kody błędów dostawcy. `bash scripts/verify-firestick-base.sh` potwierdza niezmieniony kod oryginalnego Fire Sticka. Historyczny moduł `:app` nie jest publikowany jako ten port.
 
 ## Prywatność i połączenia
 
-Dane źródła trafiają bezpośrednio do wskazanego dostawcy. Aplikacja nie ma serwera pośredniczącego ani analityki. Hasła znajdują się w adresach Xtream wymaganych przez protokół, dlatego zapisana biblioteka jest szyfrowana. Preferuj HTTPS; HTTP jest dozwolone dla zgodności z dostawcami, lecz przesyła dane bez szyfrowania. Import zastępuje bieżącą bibliotekę; nie zapisuje formularza logowania i nie odświeża źródeł automatycznie. Bibliotekę można usunąć w menu „Dodaj źródło”.
+Dane źródła trafiają bezpośrednio do wskazanego dostawcy. Aplikacja nie ma serwera pośredniczącego ani analityki. Hasła znajdują się w adresach Xtream wymaganych przez protokół, dlatego zapisana biblioteka jest szyfrowana. Preferuj HTTPS; HTTP jest dozwolone dla zgodności z dostawcami, lecz przesyła dane bez szyfrowania. Telefon i telewizor nie synchronizują automatycznie kont ani bibliotek.
 
 ## Walidacja
 
-Kod wymaga kompilacji i testu z rzeczywistym dostawcą na telefonie. Samo przygotowanie kodu nie potwierdza poprawnego odtwarzania. Workflow uruchamia testy parsera, Android Lint i kompilację przed udostępnieniem APK.
+Workflow **Android APK** sprawdza niezmieniony kod Fire Sticka, testy JVM, lint, podpis APK, launcher TV, instalację, ponowną instalację, odtwarzanie po awarii źródła oraz rzeczywistą obsługę dotykiem na emulatorze API 35. Raport i zrzuty ekranów znajdują się w artefakcie `Android-FireStick-test-report`. Artefakty Actions są dostępne przez pięć dni; gotowe APK pozostają w Releases. Testy emulatora nie zastępują sprawdzenia prywatnego źródła na fizycznym urządzeniu.
 
 ## Wersja 0.1.1
 

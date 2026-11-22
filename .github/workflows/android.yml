@@ -1,9 +1,12 @@
 name: Android APK
 on:
   push:
-    branches: [main, feature/android-player]
+    branches: [main, feature/android-player, 'fix/android-**']
   pull_request:
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -11,104 +14,74 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
       - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+        with: {distribution: temurin, java-version: '17'}
       - uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools'
-          log-accepted-android-sdk-licenses: false
+        with: {packages: platform-tools, log-accepted-android-sdk-licenses: false}
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-      - name: Install Android SDK
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - name: Test, lint and build
+        with: {gradle-version: '8.9'}
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Keep original Fire Stick sources unchanged
+        run: bash scripts/verify-firestick-base.sh
+      - name: Build the responsive Android port
+        run: gradle :app:testDebugUnitTest :android:lintDebug :android:assembleDebug :android:assembleDebugAndroidTest --no-daemon
+      - name: Verify Android package, signature and TV launcher
         run: |
-          gradle testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest --no-daemon || {
-            cat app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt 2>/dev/null || true
-            exit 1
-          }
-      - name: Verify APK signature and package
-        run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs android/build/outputs/apk/debug/android-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging android/build/outputs/apk/debug/android-debug.apk | tee android-package.txt
+          grep -q "name='pl.tvplayer.preview' versionCode='48' versionName='0.9.31-android'" android-package.txt
+          grep -q "launchable-activity: name='pl.tvplayer.TvActivity'" android-package.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: TV-Player-Preview-0.6.0
+          name: OKTV-Android-0.9.31
+          retention-days: 5
           path: |
-            app/build/outputs/apk/debug/app-debug.apk
-            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            android/build/outputs/apk/debug/android-debug.apk
+            android/build/outputs/apk/androidTest/debug/android-debug-androidTest.apk
           if-no-files-found: error
-
   install-smoke:
-    permissions:
-      contents: write
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with:
-          name: TV-Player-Preview-0.6.0
-          path: apk
+        with: {name: OKTV-Android-0.9.31, path: apk}
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Install, launch and reinstall on Android
-        uses: reactivecircus/android-emulator-runner@v2
+      - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
           disable-animations: true
           ram-size: 2048M
-          heap-size: 512M
-          script: bash scripts/smoke-install.sh
-      - name: Save UI previews for visual review
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          python3 - <<'PY'
-          import base64, json, pathlib
-          for name in ['home-portrait','home-landscape','sport-bouquet','bouquets-grid']:
-              path=pathlib.Path('smoke-output',name+'.png')
-              if not path.exists(): continue
-              data=path.read_bytes()
-              pathlib.Path('/tmp',name+'.json').write_text(json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}))
-          PY
-          for name in home-portrait home-landscape sport-bouquet bouquets-grid; do
-            if [ ! -f "/tmp/$name.json" ]; then continue; fi
-            ref=$(gh api "repos/$GH_REPO/git/blobs" --input "/tmp/$name.json" --jq '.sha')
-            echo "UI_PREVIEW $name $ref"
-          done
+          script: bash scripts/smoke-android-firestick.sh
       - uses: actions/upload-artifact@v4
         if: always()
-        with:
-          name: Android-install-report
-          path: smoke-output/
-
+        with: {name: Android-FireStick-test-report, path: android-tv-smoke-output/, retention-days: 5}
   publish-apk:
     needs: install-smoke
-    if: github.event_name != 'push' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    permissions: {contents: write}
     steps:
       - uses: actions/download-artifact@v4
-        with:
-          name: TV-Player-Preview-0.6.0
-          path: apk
-      - name: Publish directly installable APK
+        with: {name: OKTV-Android-0.9.31, path: apk}
+      - name: Publish Android port while preserving the original TV package
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          SOURCE_SHA: ${{ github.sha }}
         run: |
-          cp apk/debug/app-debug.apk TV-Player-0.6.0.apk
-          gh release view v0.6.0-preview >/dev/null 2>&1 || gh release create v0.6.0-preview --target "$SOURCE_SHA" --prerelease --title "TV Player Preview 0.6.0" --notes "Czytelniejszy ekran główny bez bukietów; bukiety po wybraniu TV, filmów lub seriali. Domyślna kolejność dostawcy i zapamiętywane sortowanie. Obrót pełnego ekranu z czujnika niezależnie od blokady telefonu."
-          gh release upload v0.6.0-preview TV-Player-0.6.0.apk --clobber
+          gh release download v0.9.16-tv-preview --pattern OKTV-Player-TV.apk --dir firestick-original
+          echo '6e75e4949b117e135b35b3e5ac59133d766ebc364c5cb90cb0418634043e9e39  firestick-original/OKTV-Player-TV.apk' | sha256sum -c -
+          cp apk/debug/android-debug.apk OKTV-Player-Android-0.9.31.apk
+          sha256sum OKTV-Player-Android-0.9.31.apk > SHA256SUMS-Android.txt
+          gh release create v0.9.31-android OKTV-Player-Android-0.9.31.apk SHA256SUMS-Android.txt --target "$SOURCE_SHA" --prerelease --latest=false --title "OKTV Player Android 0.9.31" --notes "Szybsze pobieranie listy (seriale równolegle z kanałami), dłuższe ciche ponawianie filmów i seriali, natychmiastowe wznawianie zakończonego strumienia na żywo."
+          # Only the newest Android release stays; older ones are removed together with their tags.
+          gh release list --limit 200 --json tagName --jq '.[].tagName|select(endswith("-android"))' | while read -r tag; do
+            [ "$tag" = v0.9.31-android ] || gh release delete "$tag" --yes --cleanup-tag || true
+          done

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://tvplayer.local/samsung" version="0.9.0" viewmodes="maximized">
+  <tizen:application id="TVPlayer09.TVPlayer" package="TVPlayer09" required_version="4.0"/>
+  <content src="index.html"/>
+  <name>TV Player</name>
+  <icon src="icon.png"/>
+  <author>TV Player</author>
+  <description>Odtwarzacz własnych list M3U i kont Xtream.</description>
+  <access origin="*" subdomains="true"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:profile name="tv-samsung"/>
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+  <tizen:metadata key="http://samsung.com/tv/metadata/use.preview" value="false"/>
+  <tizen:content-security-policy>default-src 'self'; script-src 'self' https://developer.samsung.com; style-src 'self'; connect-src http: https:; img-src 'self' http: https: data:; media-src http: https: blob:; object-src 'self'; worker-src 'self'</tizen:content-security-policy>
+</widget>

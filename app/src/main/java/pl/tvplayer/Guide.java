@@ -21,57 +21,79 @@ public final class Guide {
     }
     static String decode(String text) {
         try {
-            byte[] bytes=Base64.getDecoder().decode(text);
+            okio.ByteString decodedBytes=okio.ByteString.decodeBase64(text);
+            if(decodedBytes==null) return text;
+            byte[] bytes=decodedBytes.toByteArray();
             String decoded=StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
             for(char c:decoded.toCharArray()) if(Character.isISOControl(c) && c!='\n' && c!='\r' && c!='\t') return text;
             return decoded;
         } catch(IllegalArgumentException | CharacterCodingException e) { return text; }
     }
-    static long timestamp(JsonObject object,String field,String fallback,String timezone) {
-        try {
-            long value=Long.parseLong(field(object,field,"0"));
-            if(value>100000000000L) value/=1000;
-            if(value>0) return value;
-        } catch(NumberFormatException ignored) {}
-        try {
-            return LocalDateTime.parse(field(object,fallback,""),DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                .atZone(zone(timezone)).toEpochSecond();
-        } catch(java.time.DateTimeException e) { return 0; }
-    }
     static ZoneId zone(String timezone) {
-        try { return ZoneId.of(timezone); } catch(java.time.DateTimeException e) { return ZoneOffset.UTC; }
+        try { return ZoneId.of(timezone); } catch(java.time.DateTimeException | NullPointerException e) { return ZoneOffset.UTC; }
+    }
+    static long instant(String value,String timezone) {
+        if(value==null || value.isEmpty()) return 0;
+        try { long stamp=Long.parseLong(value); return stamp>100000000000L?stamp/1000:stamp; } catch(NumberFormatException ignored) {}
+        try { return Instant.parse(value).getEpochSecond(); } catch(java.time.DateTimeException ignored) {}
+        try { return OffsetDateTime.parse(value).toEpochSecond(); } catch(java.time.DateTimeException ignored) {}
+        for(String pattern:new String[]{"yyyy-MM-dd HH:mm:ss","yyyy-MM-dd HH:mm"}) {
+            try { return LocalDateTime.parse(value,DateTimeFormatter.ofPattern(pattern)).atZone(zone(timezone)).toEpochSecond(); }
+            catch(java.time.DateTimeException ignored) {}
+        }
+        return 0;
+    }
+    private static long time(JsonObject object,String timezone,String... fields) {
+        for(String key:fields) { long value=instant(field(object,key,""),timezone); if(value>0) return value; }
+        return 0;
     }
     public static List<Program> parse(Reader reader,String timezone) throws IOException {
         try {
-            JsonObject root=JsonParser.parseReader(reader).getAsJsonObject();
-            JsonElement value=root.get("epg_listings");
+            JsonElement root=JsonParser.parseReader(reader);
+            JsonElement value=root;
+            if(root.isJsonObject()) {
+                value=root.getAsJsonObject().get("epg_listings");
+                if(value==null) value=root.getAsJsonObject().get("epg_list");
+            }
             List<Program> programs=new ArrayList<>();
             if(value==null || value.isJsonNull()) return programs;
             if(!value.isJsonArray()) throw new IOException("Nieprawidłowy program TV.");
             for(JsonElement item:value.getAsJsonArray()) {
-                if(!item.isJsonObject()) continue;
-                JsonObject entry=item.getAsJsonObject();
-                long start=timestamp(entry,"start_timestamp","start",timezone);
-                long end=timestamp(entry,entry.has("stop_timestamp")?"stop_timestamp":"end_timestamp","end",timezone);
-                if(start<=0 || end<=start) continue;
-                String serverStart=field(entry,"start","");
-                if(!serverStart.matches("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"))
-                    serverStart=Instant.ofEpochSecond(start).atZone(zone(timezone)).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                programs.add(new Program(decode(field(entry,"title","Program")),decode(field(entry,"description","")),start,end,serverStart));
+                if(!item.isJsonObject()) continue; JsonObject entry=item.getAsJsonObject();
+                long start=time(entry,timezone,"start_timestamp","start","start_time");
+                long end=time(entry,timezone,"stop_timestamp","end_timestamp","end","stop","end_time");
+                if(start<=0) continue;
+                String raw=field(entry,"start","");
+                if(!raw.matches("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"))
+                    raw=Instant.ofEpochSecond(start).atZone(zone(timezone)).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                programs.add(new Program(decode(field(entry,"title","Program")),decode(field(entry,"description","")),start,end,raw));
             }
-            programs.sort(Comparator.comparingLong(Program::start)); return programs;
+            programs.sort(Comparator.comparingLong(Program::start));
+            List<Program> valid=new ArrayList<>();
+            for(int i=0;i<programs.size();i++) {
+                Program p=programs.get(i); long end=p.end();
+                if(end<=p.start() && i+1<programs.size()) end=programs.get(i+1).start();
+                if(end>p.start()) valid.add(new Program(p.title(),p.description(),p.start(),end,p.serverStart()));
+            }
+            return valid;
         } catch(JsonParseException | IllegalStateException e) { throw new IOException("Nieprawidłowa odpowiedź EPG.",e); }
     }
     public static HttpUrl endpoint(Channel channel) throws IOException {
-        if(!channel.guideUrl().isEmpty()) return SourceClient.validate(channel.guideUrl());
-        HttpUrl stream=SourceClient.validate(channel.url()); List<String> parts=stream.pathSegments();
-        int live=parts.indexOf("live");
-        if(live<0 || parts.size()!=live+4) throw new IOException("EPG jest dostępne dla kanałów Xtream. Zaimportuj konto Xtream.");
-        String id=parts.get(live+3).split("\\.")[0];
-        HttpUrl.Builder base=stream.newBuilder().query(null);
-        for(int i=parts.size()-1;i>=live;i--) base.removePathSegment(i);
-        return base.addPathSegment("player_api.php").addQueryParameter("username",parts.get(live+1))
-            .addQueryParameter("password",parts.get(live+2)).addQueryParameter("action","get_simple_data_table").addQueryParameter("stream_id",id).build();
+        HttpUrl api=SourceClient.accountEndpoint(channel);
+        if(api==null) throw new IOException("Brak adresu API EPG.");
+        String id=api.queryParameter("stream_id");
+        if(id==null) {
+            List<String> parts=SourceClient.validate(channel.url()).pathSegments();
+            id=parts.get(parts.size()-1).split("\\.")[0];
+        }
+        if(!id.matches("[0-9]+")) throw new IOException("Brak identyfikatora kanału w API EPG.");
+        return api.newBuilder().setQueryParameter("action","get_simple_data_table").setQueryParameter("stream_id",id).build();
+    }
+    static HttpUrl xmltv(Channel channel) throws IOException {
+        if(channel.guideUrl().startsWith("xmltv:")) return SourceClient.validate(channel.guideUrl().substring(6));
+        HttpUrl api=SourceClient.accountEndpoint(channel); if(api==null) return null;
+        return api.newBuilder().query(null).removePathSegment(api.pathSize()-1).addPathSegment("xmltv.php")
+            .addQueryParameter("username",api.queryParameter("username")).addQueryParameter("password",api.queryParameter("password")).build();
     }
     public static String replay(Channel channel,Program program,long now) throws IOException {
         if(!program.replayable(channel,now)) throw new IOException("Audycja nie mieści się w archiwum dostawcy.");

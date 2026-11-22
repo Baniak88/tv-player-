@@ -1,0 +1,144 @@
+name: TV platforms
+on:
+  push:
+    branches: [main, 'feature/tv-*', 'fix/**']
+    paths: ['tv/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'app/src/test/**', 'app/build.gradle', 'scripts/smoke-tv.sh', 'scripts/*firestick*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', '.github/workflows/television.yml']
+  pull_request:
+    paths: ['tv/**', 'samsung/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'settings.gradle', 'scripts/*tv*', 'scripts/*samsung*', 'scripts/*firestick*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', '.github/workflows/television.yml']
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  fire-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: android-actions/setup-android@v3
+        with: {packages: platform-tools, log-accepted-android-sdk-licenses: false}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.9'}
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - run: gradle :app:testDebugUnitTest :app:lintDebug :tv:lintDebug :tv:assembleDebug :tv:assembleDebugAndroidTest --no-daemon
+      - name: Check signature and launcher
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose tv/build/outputs/apk/debug/tv-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging tv/build/outputs/apk/debug/tv-debug.apk
+      - name: Test and package Chromebook installer
+        run: |
+          bash -n scripts/install-firestick.sh
+          python3 -m unittest discover -s scripts/tests -v
+          python3 scripts/package-firestick.py
+      - uses: actions/upload-artifact@v4
+        with: {name: television-chromebook, path: dist/OKTV-FireStick-Chromebook.zip, retention-days: 5}
+      - uses: actions/upload-artifact@v4
+        with:
+          retention-days: 5
+          name: television-apk
+          path: |
+            tv/build/outputs/apk/debug/tv-debug.apk
+            tv/build/outputs/apk/androidTest/debug/tv-debug-androidTest.apk
+  fire-test:
+    permissions: {contents: write}
+    needs: fire-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: {name: television-apk, path: apk}
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 25
+          arch: x86_64
+          disable-animations: true
+          ram-size: 2048M
+          script: bash scripts/smoke-tv.sh
+      - name: Save native TV previews
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import base64,json,pathlib
+          for name in ['tv-home','tv-movies','tv-bouquet','series-television','movie-television','tv-phone-setup','tv096-live-info','tv096-shelves']:
+              image=pathlib.Path('tv-smoke-output',name+'.png')
+              if image.exists() and image.read_bytes().startswith(bytes([137,80,78,71,13,10,26,10])):
+                  pathlib.Path('/tmp',name+'.json').write_text(json.dumps({'encoding':'base64','content':base64.b64encode(image.read_bytes()).decode()}))
+          PY
+          for name in tv-home tv-movies tv-bouquet series-television movie-television tv-phone-setup tv096-live-info tv096-shelves; do
+            if [ ! -f "/tmp/$name.json" ]; then continue; fi
+            ref=$(gh api "repos/$GH_REPO/git/blobs" --input "/tmp/$name.json" --jq '.sha')
+            echo "UI_PREVIEW $name $ref"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: television-test-report, path: tv-smoke-output/, retention-days: 5}
+  samsung-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - run: npm install --prefix /tmp/tv-browser --no-save playwright@1.56.1
+      - run: node samsung/tests/core.test.cjs
+      - name: Check remote UI and AVPlay integration
+        env:
+          NODE_PATH: /tmp/tv-browser/node_modules
+          CHROMIUM_PATH: /usr/bin/google-chrome
+        run: node samsung/tests/browser.cjs
+      - run: python3 scripts/package-samsung.py
+      - run: bash -n scripts/install-samsung.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          retention-days: 5
+          name: samsung-widget
+          path: |
+            dist/TV-Player-Samsung-0.9.0-unsigned.wgt
+            TV-INSTALL.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: samsung-preview-report, path: tv-smoke-output/, retention-days: 5}
+  publish-tv:
+    # Source pushes and PRs validate code; publishing a preview is a manual action.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: [fire-test, samsung-test]
+    runs-on: ubuntu-latest
+    permissions: {contents: write}
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {name: television-apk, path: apk}
+      - uses: actions/download-artifact@v4
+        with: {name: samsung-widget, path: widget}
+      - uses: actions/download-artifact@v4
+        with: {name: television-chromebook, path: bundle}
+      - name: Publish TV packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.25-preview.apk
+          # A fixed file name on the latest release gives Fire TV "Downloader" one permanent link:
+          # https://github.com/<owner>/<repo>/releases/latest/download/OKTV-Player-TV.apk
+          cp apk/debug/tv-debug.apk OKTV-Player-TV.apk
+          gh release create v0.9.25-tv-preview --target "$SOURCE_SHA" --latest --title "OKTV Player TV 0.9.25 Preview" --notes "Szybsze pobieranie listy (seriale równolegle z kanałami), dłuższe ciche ponawianie filmów i seriali, natychmiastowe wznawianie zakończonego strumienia na żywo."
+          gh release upload v0.9.25-tv-preview OKTV-Player-TV.apk OKTV-Player-TV-0.9.25-preview.apk bundle/OKTV-FireStick-Chromebook.zip
+          # Keep only the current TV release, the 0.9.16 baseline the Android workflow verifies, Android releases
+          # (cleaned by their own workflow) and the newest phone 1.x release; delete everything older with its tag.
+          newest_phone=$(gh release list --limit 200 --json tagName --jq '[.[].tagName|select(test("^v1\\."))][0] // ""')
+          gh release list --limit 200 --json tagName --jq '.[].tagName' | while read -r tag; do
+            case "$tag" in v0.9.25-tv-preview|v0.9.16-tv-preview|*-android|"$newest_phone") continue;; esac
+            gh release delete "$tag" --yes --cleanup-tag || true
+          done
+
+
