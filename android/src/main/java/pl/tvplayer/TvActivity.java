@@ -789,9 +789,11 @@ public final class TvActivity extends Activity {
         });
     }
     private void refresh() { if(busy) return; if(account==null) sourceDialog(); else importSource(account); }
-    private void importSource(TvAccountStore.Account next) {
+    private void importSource(TvAccountStore.Account next) { importSource(next,false); }
+    /** quiet: an automatic retry, which never shows a dialog. */
+    private void importSource(TvAccountStore.Account next,boolean quiet) {
         if(busy || refreshing) return;
-        final boolean sameSource=next.equals(account), background=sameSource && catalogReady; refreshing=true; busy=!sameSource || !catalogReady; final int epoch=++sourceEpoch; generation++;
+        final boolean sameSource=next.equals(account), saved=sameSource && catalogReady; refreshing=true; busy=!sameSource || !catalogReady; final int epoch=++sourceEpoch; generation++;
         status.setText(sameSource && catalogReady?"Aktualizacja źródła w tle…":"Łączenie ze źródłem…");
         final Set<String> savedFavorites=new HashSet<>(favorites);
         sourceWorker.execute(() -> {
@@ -819,8 +821,11 @@ public final class TvActivity extends Activity {
                     if(isDestroyed() || epoch!=sourceEpoch) return;
                     refreshing=false; busy=false;
                     // A background refresh with a saved library is not worth a dialog: keep watching, try again quietly later.
-                    if(background) { status.setText("Dostawca chwilowo nie odpowiada · korzystasz z zapisanej biblioteki."); if(quietRetries++<2) ui.postDelayed(() -> { if(!isDestroyed() && !busy && !refreshing && next.equals(account)) importSource(next); },60000); return; }
-                    status.setText("Nie udało się połączyć ze źródłem.");
+                    if(saved) {
+                        status.setText("Dostawca chwilowo nie odpowiada · korzystasz z zapisanej biblioteki.");
+                        if(quietRetries++<2) ui.postDelayed(() -> { if(!isDestroyed() && !busy && !refreshing && next.equals(account)) importSource(next,true); },60000);
+                        if(quiet) return;
+                    } else status.setText("Nie udało się połączyć ze źródłem.");
                     error("Serwer dostawcy nie odpowiedział.\n\n"+describe(failure)+"\n\nSpróbuj ponownie za chwilę (Opcje → Odśwież źródło).");
                 });
             }
