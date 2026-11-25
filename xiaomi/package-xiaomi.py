@@ -22,6 +22,6 @@ args.output.parent.mkdir(parents=True, exist_ok=True)
 with zipfile.ZipFile(args.output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
     archive.writestr('OKTV-Player-TV.apk', apk)
     archive.writestr('SHA256SUMS', hashlib.sha256(apk).hexdigest() + '  OKTV-Player-TV.apk\n')
-    archive.writestr('install-xiaomi.sh', (root / 'scripts/install-xiaomi.sh').read_bytes())
-    archive.writestr('CZYTAJ-XIAOMI.md', (root / 'XIAOMI-TV-BOX.md').read_bytes())
+    archive.writestr('install-xiaomi.sh', (root / 'xiaomi/install-xiaomi.sh').read_bytes())
+    archive.writestr('CZYTAJ-XIAOMI.md', (root / 'xiaomi/README.md').read_bytes())
 print(args.output)

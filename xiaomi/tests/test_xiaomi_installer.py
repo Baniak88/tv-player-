@@ -45,7 +45,7 @@ class XiaomiInstallerTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='oktv xiaomi ')
         self.path = Path(self.temp.name)
-        shutil.copy(ROOT / 'scripts/install-xiaomi.sh', self.path)
+        shutil.copy(ROOT / 'xiaomi/install-xiaomi.sh', self.path)
         self.apk = self.path / 'OKTV-Player-TV.apk'
         self.apk.write_bytes(b'PK\x03\x04test-apk')
         (self.path / 'SHA256SUMS').write_text(hashlib.sha256(self.apk.read_bytes()).hexdigest() + '  OKTV-Player-TV.apk\n')
@@ -155,13 +155,13 @@ class XiaomiInstallerTest(unittest.TestCase):
             archive.writestr('AndroidManifest.xml', b'test')
             archive.writestr('classes.dex', b'test')
         xiaomi, fire = self.path/'xiaomi.zip', self.path/'fire.zip'
-        subprocess.run(['python3', str(ROOT/'scripts/package-xiaomi.py'), '--apk', str(self.apk), '--output', str(xiaomi)], check=True, capture_output=True)
+        subprocess.run(['python3', str(ROOT/'xiaomi/package-xiaomi.py'), '--apk', str(self.apk), '--output', str(xiaomi)], check=True, capture_output=True)
         subprocess.run(['python3', str(ROOT/'scripts/package-firestick.py'), '--apk', str(self.apk), '--output', str(fire)], check=True, capture_output=True)
         with zipfile.ZipFile(xiaomi) as archive, zipfile.ZipFile(fire) as fire_archive:
             self.assertEqual({'OKTV-Player-TV.apk', 'SHA256SUMS', 'install-xiaomi.sh', 'CZYTAJ-XIAOMI.md'}, set(archive.namelist()))
             self.assertEqual(fire_archive.read('OKTV-Player-TV.apk'), archive.read('OKTV-Player-TV.apk'))
             self.assertEqual(fire_archive.read('SHA256SUMS'), archive.read('SHA256SUMS'))
-            self.assertEqual((ROOT/'scripts/install-xiaomi.sh').read_bytes(), archive.read('install-xiaomi.sh'))
+            self.assertEqual((ROOT/'xiaomi/install-xiaomi.sh').read_bytes(), archive.read('install-xiaomi.sh'))
 
 
 if __name__ == '__main__':

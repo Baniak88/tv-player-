@@ -1,6 +1,6 @@
 # TV Player — Android
 
-Wersja TV: **OKTV Player TV 0.9.6-preview**. [Prosta instalacja z terminala Chromebooka na Fire Stick](CHROMEBOOK-FIRESTICK.md). [Xiaomi TV Box S 3. gen (Google TV, Android 14)](XIAOMI-TV-BOX.md). [Pozostałe sposoby instalacji na TV](TV-INSTALL.md). [Wygląd interfejsu na bazie OKTV 1.1.6](OKTV-TV-0.9.3.md).
+Wersja TV: **OKTV Player TV 0.9.6-preview**. [Prosta instalacja z terminala Chromebooka na Fire Stick](CHROMEBOOK-FIRESTICK.md). [Xiaomi TV Box S 3. gen (Google TV, Android 14)](xiaomi/README.md). [Pozostałe sposoby instalacji na TV](TV-INSTALL.md). [Wygląd interfejsu na bazie OKTV 1.1.6](OKTV-TV-0.9.3.md).
 
 [Nowy interfejs TV i powrót do bukietu 0.9.6](OKTV-TV-0.9.6.md). [Zmiany katalogu TV 0.9.5](OKTV-TV-0.9.5.md). [Raport testów 0.9.5](TEST-TV-0.9.5.md). [Poprzedni raport testów 0.9.4](TEST-TV-0.9.4.md).
 

@@ -85,8 +85,8 @@ Program TV, kodeki i dostępność materiałów zależą od źródła i urządze
 ## Dla osoby budującej paczkę
 
 ```bash
-python3 -m unittest discover -s scripts/tests -v
-python3 scripts/package-xiaomi.py
+python3 -m unittest discover -s xiaomi/tests -v
+python3 xiaomi/package-xiaomi.py
 ```
 
-ZIP powstaje w `dist/OKTV-Xiaomi-TV-Box.zip` i zawiera ten sam APK co `OKTV-FireStick-Chromebook.zip`.
+ZIP powstaje w `dist/OKTV-Xiaomi-TV-Box.zip` i zawiera APK zbudowany z tego samego kodu co `OKTV-FireStick-Chromebook.zip`. Xiaomi ma osobny workflow (`.github/workflows/xiaomi.yml`), osobne testy i osobne wydanie `v0.9.6-xiaomi-preview`; nie wpływa na build, testy ani wydanie Fire Sticka.

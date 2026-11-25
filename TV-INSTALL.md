@@ -4,7 +4,7 @@
 
 ## Xiaomi TV Box S (3. generacja, Google TV / Android 14)
 
-Ten sam APK co na Fire Sticku, z osobnym instalatorem obsługującym Debugowanie bezprzewodowe Androida 14. Pobierz `OKTV-Xiaomi-TV-Box.zip` i skorzystaj z [instrukcji Xiaomi](XIAOMI-TV-BOX.md). Bez terminala: skopiuj APK na pendrive i zainstaluj menedżerem plików na boxie (opis w tej samej instrukcji, punkt 3).
+Ten sam APK co na Fire Sticku, z osobnym instalatorem obsługującym Debugowanie bezprzewodowe Androida 14. Pobierz `OKTV-Xiaomi-TV-Box.zip` i skorzystaj z [instrukcji Xiaomi](xiaomi/README.md). Bez terminala: skopiuj APK na pendrive i zainstaluj menedżerem plików na boxie (opis w tej samej instrukcji, punkt 3).
 
 ## Fire TV Stick 4K
 
