@@ -13,6 +13,8 @@ Paczka `OKTV-Xiaomi-TV-Box.zip` zawiera APK, sumę SHA-256, instalator `install-
 
 ## 2. Instalacja z terminala (Chromebook: Terminal → Linux, albo Linux/macOS)
 
+Nie masz terminala? Przejdź do [instalacji z pendrive’a](#3-instalacja-z-pendrivea-bez-terminala-i-bez-komputera-z-linuksem).
+
 Pobierz ZIP do katalogu, w którym działa terminal (na Chromebooku: **Pliki Linuksa**), a następnie:
 
 ```bash
@@ -38,14 +40,31 @@ bash oktv-xiaomi/install-xiaomi.sh 192.168.1.50:41234 --pair 192.168.1.50:37123
 
 Wpisz kod z TV, gdy terminal o to poprosi. Porty zmieniają się po każdym włączeniu Debugowania bezprzewodowego — zawsze przepisuj bieżące.
 
-## 3. Instalacja bez komputera (alternatywa)
+## 3. Instalacja z pendrive’a (bez terminala i bez komputera z Linuksem)
 
-1. Zainstaluj ze Sklepu Google Play aplikację do pobierania plików na TV (np. przeglądarkę plików lub „Send Files to TV”).
-2. **Ustawienia → Aplikacje → Zabezpieczenia i ograniczenia → Nieznane źródła** — zezwól tylko tej aplikacji.
-3. Prześlij `OKTV-Player-TV.apk` na box (pendrive USB, sieć lub telefon) i otwórz go, aby zainstalować.
-4. Po instalacji wyłącz zgodę dla nieznanych źródeł.
+Potrzebny jest pendrive w formacie **FAT32 lub exFAT** (NTFS często nie jest odczytywany przez Google TV) i dowolny komputer lub telefon do skopiowania pliku.
 
-Repozytorium jest prywatne, więc link GitHuba otwarty w niezalogowanej aplikacji na TV może pokazać 404. Pobierz plik na komputerze lub telefonie.
+**Na komputerze:**
+
+1. Pobierz `OKTV-Player-TV-0.9.6-preview.apk` (z wydania na GitHubie, w przeglądarce zalogowanej do GitHuba) albo wypakuj `OKTV-Player-TV.apk` z paczki ZIP.
+2. Skopiuj plik APK na pendrive’a, najlepiej do głównego katalogu. Bezpiecznie odłącz pendrive’a.
+
+**Na Xiaomi TV Box (jednorazowo):**
+
+3. Włącz Opcje programisty: **Ustawienia → System → Informacje → Kompilacja systemu operacyjnego Android TV** — naciśnij OK **7 razy**. Bez tego Google TV może nie pokazać opcji „Nieznane źródła”.
+4. Ze **Sklepu Google Play** zainstaluj menedżer plików, np. **X-plore File Manager** albo **File Commander** (Google TV nie ma wbudowanej przeglądarki plików, która instaluje APK).
+5. **Ustawienia → Aplikacje → Zabezpieczenia i ograniczenia → Nieznane źródła** — włącz tylko dla zainstalowanego menedżera plików.
+
+**Instalacja:**
+
+6. Włóż pendrive’a do portu USB z tyłu boxa. Jeśli pojawi się powiadomienie o pamięci USB, możesz je zamknąć.
+7. Otwórz menedżer plików, wejdź na pendrive (USB) i wybierz `OKTV-Player-TV…apk` → **Zainstaluj**. Jeśli system zapyta o zgodę dla menedżera plików, wybierz **Ustawienia → Zezwól**, wróć i wybierz plik ponownie.
+8. Po „Aplikacja została zainstalowana” wybierz **Otwórz**. Później OKTV Player jest w **Aplikacje → Twoje aplikacje**.
+9. Możesz wyłączyć „Nieznane źródła” dla menedżera plików i wyjąć pendrive’a.
+
+**Aktualizacja** robi się tak samo: nowy APK na pendrive → Zainstaluj. Ten sam podpis, więc konto, źródło i ulubione zostają. Nie odinstalowuj starej wersji przed aktualizacją, bo to usuwa bibliotekę.
+
+Jeśli instalator pokazuje „Aplikacja nie została zainstalowana”: sprawdź, czy plik skopiował się w całości (porównaj rozmiar z oryginałem). Jeśli na boxie jest wersja z innym podpisem, trzeba ją najpierw odinstalować. Zamiast pendrive’a można też wysłać APK z telefonu aplikacją **Send Files to TV** (zainstalowaną na telefonie i na TV) i otworzyć go tym samym menedżerem plików.
 
 ## 4. Pierwsze uruchomienie
 
