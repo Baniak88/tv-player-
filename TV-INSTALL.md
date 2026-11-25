@@ -2,6 +2,10 @@
 
 **Chromebook:** pobierz `OKTV-FireStick-Chromebook.zip` i skorzystaj z [instrukcji terminala Linux](CHROMEBOOK-FIRESTICK.md). Paczka zawiera APK i instalator ADB sprawdzający adres urządzenia, sumę APK i wynik aktualizacji.
 
+## Xiaomi TV Box S (3. generacja, Google TV / Android 14)
+
+Ten sam APK co na Fire Sticku, z osobnym instalatorem obsługującym Debugowanie bezprzewodowe Androida 14. Pobierz `OKTV-Xiaomi-TV-Box.zip` i skorzystaj z [instrukcji Xiaomi](XIAOMI-TV-BOX.md).
+
 ## Fire TV Stick 4K
 
 Użyj przygotowanego pliku **OKTV-Player-TV-0.9.6-preview.apk** lub paczki Chromebooka. Obsługiwane są Fire OS 6+ i Android TV 7.1+, w tym pierwsza generacja Sticka 4K. APK nie działa na Vega OS / 4K Select.

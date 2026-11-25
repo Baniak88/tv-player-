@@ -2,9 +2,9 @@ name: TV platforms
 on:
   push:
     branches: [main, 'feature/tv-*', 'fix/**']
-    paths: ['tv/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'app/src/test/**', 'app/build.gradle', 'scripts/smoke-tv.sh', 'scripts/*firestick*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', '.github/workflows/television.yml']
+    paths: ['tv/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'app/src/test/**', 'app/build.gradle', 'scripts/smoke-tv.sh', 'scripts/*firestick*', 'scripts/*xiaomi*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', 'XIAOMI-TV-BOX.md', '.github/workflows/television.yml']
   pull_request:
-    paths: ['tv/**', 'samsung/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'settings.gradle', 'scripts/*tv*', 'scripts/*samsung*', 'scripts/*firestick*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', '.github/workflows/television.yml']
+    paths: ['tv/**', 'samsung/**', 'app/src/main/**', 'app/src/androidTestSeries/**', 'app/src/androidTest/assets/**', 'settings.gradle', 'scripts/*tv*', 'scripts/*samsung*', 'scripts/*firestick*', 'scripts/*xiaomi*', 'scripts/tests/**', 'CHROMEBOOK-FIRESTICK.md', 'XIAOMI-TV-BOX.md', '.github/workflows/television.yml']
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -31,10 +31,14 @@ jobs:
       - name: Test and package Chromebook installer
         run: |
           bash -n scripts/install-firestick.sh
+          bash -n scripts/install-xiaomi.sh
           python3 -m unittest discover -s scripts/tests -v
           python3 scripts/package-firestick.py
+          python3 scripts/package-xiaomi.py
       - uses: actions/upload-artifact@v4
         with: {name: television-chromebook, path: dist/OKTV-FireStick-Chromebook.zip}
+      - uses: actions/upload-artifact@v4
+        with: {name: television-xiaomi, path: dist/OKTV-Xiaomi-TV-Box.zip}
       - uses: actions/upload-artifact@v4
         with:
           name: television-apk
@@ -82,6 +86,30 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: television-test-report, path: tv-smoke-output/}
+  xiaomi-test:
+    # Xiaomi TV Box S 3rd gen (MiTV-AFMU0) runs Google TV on Android 14: same APK, Android TV API 34 image.
+    needs: fire-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: {name: television-apk, path: apk}
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: android-tv
+          arch: x86
+          disable-animations: true
+          ram-size: 2048M
+          script: bash scripts/smoke-tv.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: xiaomi-android14-test-report, path: tv-smoke-output/}
   samsung-test:
     runs-on: ubuntu-latest
     steps:
@@ -109,7 +137,7 @@ jobs:
   publish-tv:
     # Source pushes and PRs validate code; publishing a preview is a manual action.
     if: ${{ github.event_name == 'workflow_dispatch' }}
-    needs: [fire-test, samsung-test]
+    needs: [fire-test, xiaomi-test, samsung-test]
     runs-on: ubuntu-latest
     permissions: {contents: write}
     steps:
@@ -119,6 +147,8 @@ jobs:
         with: {name: samsung-widget, path: widget}
       - uses: actions/download-artifact@v4
         with: {name: television-chromebook, path: bundle}
+      - uses: actions/download-artifact@v4
+        with: {name: television-xiaomi, path: bundle}
       - name: Publish TV packages
         env:
           GH_TOKEN: ${{ github.token }}
@@ -126,7 +156,7 @@ jobs:
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           cp apk/debug/tv-debug.apk OKTV-Player-TV-0.9.6-preview.apk
-          gh release create v0.9.6-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.6 Preview" --notes "Interfejs OKTV na TV, poprawki archiwum i obsługi nagrywania oraz paczka instalacyjna dla terminala Linux na Chromebooku. APK na Fire OS 6+ i Android TV 7.1+. Nie jest zgodny z Vega OS. Instrukcja Chromebooka znajduje się w paczce ZIP. Pakiet Samsung pozostaje dostępny osobno w wydaniu v0.9.0-tv-preview."
-          gh release upload v0.9.6-tv-preview OKTV-Player-TV-0.9.6-preview.apk bundle/OKTV-FireStick-Chromebook.zip
+          gh release view v0.9.6-tv-preview >/dev/null 2>&1 || gh release create v0.9.6-tv-preview --target "$SOURCE_SHA" --prerelease --title "OKTV Player TV 0.9.6 Preview" --notes "Interfejs OKTV na TV, poprawki archiwum i obsługi nagrywania oraz paczka instalacyjna dla terminala Linux na Chromebooku. APK na Fire OS 6+ i Android TV 7.1+. Nie jest zgodny z Vega OS. Instrukcja Chromebooka znajduje się w paczce ZIP. Ten sam APK z instalatorem dla Xiaomi TV Box S (Google TV / Android 14) jest w OKTV-Xiaomi-TV-Box.zip. Pakiet Samsung pozostaje dostępny osobno w wydaniu v0.9.0-tv-preview."
+          gh release upload --clobber v0.9.6-tv-preview OKTV-Player-TV-0.9.6-preview.apk bundle/OKTV-FireStick-Chromebook.zip bundle/OKTV-Xiaomi-TV-Box.zip
 
 
